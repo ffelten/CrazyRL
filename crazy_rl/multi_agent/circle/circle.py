@@ -5,7 +5,6 @@ from typing_extensions import override
 
 import numpy as np
 from gymnasium import spaces
-from pettingzoo.test.parallel_test import parallel_api_test
 
 from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
 
@@ -36,10 +35,7 @@ class Circle(BaseParallelEnv):
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
-        if drone_ids is None:
-            raise Exception("Drone ids is mandatory")
-        else:
-            self.num_drones = len(drone_ids)
+        self.num_drones = len(drone_ids)
 
         self._agent_location = dict()
         self._target_location = dict()
@@ -52,7 +48,7 @@ class Circle(BaseParallelEnv):
         circle_radius = np.zeros(self.num_drones, dtype=float)
         self.num_ref_points = np.zeros(self.num_drones, dtype=int)
         self.ref_offset = np.zeros(self.num_drones, dtype=int)
-        self.ref = [0 for i in range(self.num_drones)]
+        self.ref = [0 for _ in range(self.num_drones)]
 
         for i, agent in enumerate(self._agents_names):
             if init_xyzs is None:
@@ -162,15 +158,15 @@ class Circle(BaseParallelEnv):
 
 if __name__ == "__main__":
 
-    parallel_api_test(
-        Circle(
-            drone_ids=[1, 2],
-            render_mode="human",
-            init_xyzs=[[0, 0, 0], [1, 1, 0]],
-            init_target_points=[[0, 0, 1], [1, 1, 1]],
-        ),
-        num_cycles=1_000_000,
-    )
+    # parallel_api_test(
+    #     Circle(
+    #         drone_ids=[1, 2],
+    #         render_mode="human",
+    #         init_xyzs=[[0, 0, 0], [1, 1, 0]],
+    #         init_target_points=[[0, 0, 1], [1, 1, 1]],
+    #     ),
+    #     num_cycles=1_000_000,
+    # )
 
     parallel_env = Circle(
         drone_ids=[1, 2],
@@ -186,5 +182,6 @@ if __name__ == "__main__":
             agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
+        parallel_env.render()
         print("obs", observations, "reward", rewards)
         time.sleep(0.02)

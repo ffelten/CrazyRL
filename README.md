@@ -4,11 +4,12 @@
 
 # CrazyRL
 :warning: Work in progress, suggestions are welcome. :warning:
-A library for doing RL with crazyflie drones. It contains a [PettingZoo](https://pettingzoo.farama.org/) environment for parallel multiple agents.
+
+A library for doing RL with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. It contains a [PettingZoo](https://pettingzoo.farama.org/) environment for parallel multiple agents.
 The learning can be performed by with [MASAC](https://github.com/ffelten/MASAC) for multiple agents.
 
-Once the environment trained it can be displayed on simulation or in reality with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/)
-with the usage of [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/)
+Once the environment trained it can be displayed on simulation environment or in reality with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/)
+with the usage of [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/).
 
 ## API
 
@@ -43,7 +44,7 @@ You can have a look at the [test_multiagent](learning/test_multiagent.py) file. 
 ## Simulation
 `render_mode = "human"`
 
-The simulation is a simple particle representation on a 3D cartesian reference base on Crazyflie [lighthouse reference frame](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/lighthouse/terminology_definitions/).
+The simulation is a simple particle representation on a 3D cartesian reference based on Crazyflie [lighthouse reference frame](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/lighthouse/terminology_definitions/).
 It is sufficient since the control of the CrazyFlies is quite high level already.
 
 ## Real
@@ -61,15 +62,22 @@ Refer the path on [utils.py](utils/utils.py) on the load_config method and the c
 Secondly place the turned on drones on your environment. Be careful to put your drones at their right place depending on
 their id to avoid any crash at start up.
 
-
-
 ### Tips
 
 If the drones are not starting once the test, verify your config load on the Crazyflie with the [cfclient](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/).
 A method is launched at each start which reset the position estimator and load the config. If the information are not good
 the drone will not take off.
 
-Verify also the leds on drones if there is a continued red light it means the drone have not enough battery to pursue
+Verify also the LEDs on drones if there is a continued red light it means the drone have not enough battery to pursue
 the mission.
 
 The LED on lighthouse deck have to be green to ensure a good reception of lighthouse positioning.
+
+
+## Dev infos
+
+### Structure
+The switch between real environment and simulation is specified through the `render_mode` option, can be `"real"`, `"human"` or `None`.
+
+`BaseParallelEnv` is the base class for the environment. It contains the basic methods to interact with the environment. From there, child classes allow to specify specific tasks such as Circle or Hover.
+`utils/` contains the basic functions to interact with the drones and OpenGL stuff for rendering.

@@ -9,9 +9,7 @@ import numpy as np
 import pygame
 from cflib.crazyflie.swarm import Swarm
 from gymnasium import spaces
-from pettingzoo.utils.env import ParallelEnv
-from pygame.constants import DOUBLEBUF, OPENGL
-from pyglet.gl import (
+from OpenGL.GL import (
     GL_AMBIENT,
     GL_AMBIENT_AND_DIFFUSE,
     GL_BLEND,
@@ -45,9 +43,10 @@ from pyglet.gl import (
     glPopMatrix,
     glPushMatrix,
     glShadeModel,
-    gluLookAt,
-    gluPerspective,
 )
+from OpenGL.raw.GLU import gluLookAt, gluPerspective
+from pettingzoo.utils.env import ParallelEnv
+from pygame import DOUBLEBUF, OPENGL
 
 from crazy_rl.utils.graphic import axes, field, point, target_point
 from crazy_rl.utils.utils import reset_estimator, run_land, run_sequence, run_take_off
@@ -230,12 +229,14 @@ class BaseParallelEnv(ParallelEnv):
 
     def _render_frame(self):
         """Renders the current frame of the environment. Only works in human rendering mode."""
-        if self.window is None and self.render_mode == "human":
+
+        def init_window():
+            """Initializes the PyGame window."""
             pygame.init()
             pygame.display.init()
+            pygame.display.set_caption("Crazy RL")
 
-            display = (self.window_size, self.window_size)
-            self.window = pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+            self.window = pygame.display.set_mode((self.window_size, self.window_size), DOUBLEBUF | OPENGL)
 
             glEnable(GL_DEPTH_TEST)
             glEnable(GL_LIGHTING)
@@ -251,13 +252,16 @@ class BaseParallelEnv(ParallelEnv):
             glLightfv(GL_LIGHT0, GL_DIFFUSE, [1.0, 1.0, 1.0, 1])
 
             glMatrixMode(GL_PROJECTION)
-            gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
+            gluPerspective(45, (self.window_size / self.window_size), 0.1, 50.0)
 
             glMatrixMode(GL_MODELVIEW)
             gluLookAt(1, -10, 2, 0, 0, 0, 0, 0, 1)
 
             self.viewMatrix = glGetFloatv(GL_MODELVIEW_MATRIX)
             glLoadIdentity()
+
+        if self.window is None and self.render_mode == "human":
+            init_window()
 
         # if self.clock is None and self.render_mode == "human":
         self.clock = pygame.time.Clock()
@@ -295,6 +299,7 @@ class BaseParallelEnv(ParallelEnv):
             target_point(np.array([target[0], target[1], target[2]]))
             glPopMatrix()
 
+        pygame.event.pump()
         pygame.display.flip()
 
     @override

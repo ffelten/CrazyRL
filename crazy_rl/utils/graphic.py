@@ -1,6 +1,6 @@
 """Graphical representation of the UAV in 3D space. the reference is based on the Crazyflie position reference: https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/lighthouse/terminology_definitions/ ."""
 import numpy as np
-from pyglet.gl import (
+from OpenGL.GL import (
     GL_LINES,
     GL_QUADS,
     glBegin,
@@ -8,14 +8,11 @@ from pyglet.gl import (
     glColor4f,
     glEnd,
     glTranslatef,
-    gluNewQuadric,
-    gluSphere,
     glVertex3f,
     glVertex3fv,
 )
-
-
-edges = ((0, 1), (0, 3), (0, 4), (2, 1), (2, 3), (2, 7), (6, 3), (6, 4), (6, 7), (5, 1), (5, 4), (5, 7))
+from OpenGL.GLU import gluNewQuadric
+from OpenGL.raw.GLU import gluSphere
 
 
 def axes():

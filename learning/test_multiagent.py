@@ -1,4 +1,4 @@
-"""File for testing the learned policies on the multiagent environment."""
+"""File for testing the learned policies on the multiagent environment. Loads a Pytorch model and runs it on the environment."""
 import argparse
 import random
 import time
@@ -81,6 +81,7 @@ def parse_args():
                         help="if toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument("--cuda", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
                         help="if toggled, cuda will be enabled by default")
+    parser.add_argument("--model-filename", type=str, default="../../MASAC/masac.pt", help="the filename of the model to load.")
 
     parser.add_argument("--mode", type=str, default="simu", choices=["simu", "real"],
                         help="choose the replay mode to perform real or simulation")
@@ -114,11 +115,10 @@ def extract_agent_id(agent_str):
     return int(agent_str.split("_")[1])
 
 
-def replay_simu(model_filename: str, args):
+def replay_simu(args):
     """Replay the simulation for one episode.
 
     Args:
-        model_filename: the filename of the model to load. If None, the latest model will be loaded.
         args: the arguments from the command line
     """
 
@@ -144,9 +144,9 @@ def replay_simu(model_filename: str, args):
 
     # Use pretrained model
     actor = Actor(env).to(device)
-    if model_filename is not None:
-        print("Loading pre-trained model ", model_filename)
-        actor = torch.load(model_filename)
+    if args.model_filename is not None:
+        print("Loading pre-trained model ", args.model_filename)
+        actor = torch.load(args.model_filename)
 
     # TRY NOT TO MODIFY: start the game
     obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
@@ -174,11 +174,10 @@ def replay_simu(model_filename: str, args):
     env.close()
 
 
-def replay_real(model_filename: str, args):
+def replay_real(args):
     """Replay the real world for one episode.
 
     Args:
-        model_filename: the filename of the model to load. If None, the latest model will be loaded.
         args: the arguments from the command line
     """
     # TRY NOT TO MODIFY: seeding
@@ -220,9 +219,9 @@ def replay_real(model_filename: str, args):
 
         # Use pretrained model
         actor = Actor(env).to(device)
-        if model_filename is not None:
-            print("Loading pre-trained model ", model_filename)
-            actor = torch.load(model_filename)
+        if args.model_filename is not None:
+            print("Loading pre-trained model ", args.model_filename)
+            actor = torch.load(args.model_filename)
 
         # TRY NOT TO MODIFY: start the game
         obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
@@ -254,9 +253,7 @@ def replay_real(model_filename: str, args):
 if __name__ == "__main__":
     args = parse_args()
 
-    model_filename = "../../MASAC/masac.pt"
-
     if args.mode == "simu":
-        replay_simu(model_filename=model_filename, args=args)
+        replay_simu(args=args)
     elif args.mode == "real":
-        replay_real(model_filename=model_filename, args=args)
+        replay_real(args=args)

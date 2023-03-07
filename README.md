@@ -35,8 +35,7 @@ I suggest to have a look at [MASAC](https://github.com/ffelten/MASAC) for traini
             act = act.detach().cpu().numpy()
             actions[agent_id] = act.flatten()
 
-        # TRY NOT TO MODIFY: execute the game and log data.
-        obs, _, terminateds, truncateds, infos = env.step(actions)
+        obs, _, _, _, _ = env.step(actions)
 ```
 
 You can have a look at the [test_multiagent](learning/test_multiagent.py) file. The path to the save model MASAC and the mode to "real" has to be set on the main.

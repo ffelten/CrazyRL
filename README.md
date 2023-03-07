@@ -81,3 +81,6 @@ The switch between real environment and simulation is specified through the `ren
 
 `BaseParallelEnv` is the base class for the environment. It contains the basic methods to interact with the environment. From there, child classes allow to specify specific tasks such as Circle or Hover.
 `utils/` contains the basic functions to interact with the drones and OpenGL stuff for rendering.
+
+## Contributors
+Pierre-Yves Houitte wrote the original version of this library. It has been cleaned up and simplified by [Florian Felten](@ffelten).

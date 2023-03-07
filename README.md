@@ -83,4 +83,4 @@ The switch between real environment and simulation is specified through the `ren
 `utils/` contains the basic functions to interact with the drones and OpenGL stuff for rendering.
 
 ## Contributors
-Pierre-Yves Houitte wrote the original version of this library. It has been cleaned up and simplified by [Florian Felten](@ffelten).
+Pierre-Yves Houitte wrote the original version of this library. It has been cleaned up and simplified by Florian Felten (@ffelten).

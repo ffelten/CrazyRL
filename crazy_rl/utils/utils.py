@@ -130,11 +130,11 @@ def run_land(scf):
 
 
 def run_sequence(scf, command):
-    """Method use in swarm classes with parallel_safe() method to go to the targeted point for each crazyflie  of the swarm in parallel.
+    """Method use in swarm classes with parallel_safe() method to go to the targeted point for each crazyflie  of the swarm in parallel. parallel_safe() method takes care of sequencing the dictionary of args by URI, thus command is each value in the dict.
 
     Args:
         scf: SyncCrazyFlie object given automatically by the Swarm class
-        command: ndarray (2,3)-shaped array which include the actual agent position and the target position (x,y,z)
+        command: ndarray (2,3)-shaped array which include the current agent position and the target position (x,y,z)
     """
     scf.cf.param.set_value("stabilizer.controller", value=1)  # to use Mellinger controller set value to 2
 

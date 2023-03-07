@@ -92,7 +92,7 @@ class BaseParallelEnv(ParallelEnv):
             drone_ids (list): ids of the drones (ignored in simulation mode)
             init_xyzs (Dict, optional): (3)-shaped array containing the initial XYZ position of the drones.
             init_target_points (Dict, optional): (3)-shaped array containing the initial target XYZ position.
-            size (int, optional): Size of the area sides in meter
+            size (int, optional): Size of the area sides
             render_mode (str, optional): The mode to display the rendering of the environment. Can be real, human or None. Real mode is used for real tests on the field, human mode is used to display the environment on a PyGame window and None mode is used to disable the rendering.
             swarm (Swarm, optional): The Swarm object use in real mode to control all drones
         """

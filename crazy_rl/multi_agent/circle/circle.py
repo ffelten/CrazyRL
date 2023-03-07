@@ -45,10 +45,12 @@ class Circle(BaseParallelEnv):
         self.timestep = 0
 
         self.circle_time = np.zeros(self.num_drones, dtype=int)
-        circle_radius = np.zeros(self.num_drones, dtype=float)
+        circle_radius = 0.5  # [m]
+        # There are multiple ref points per agent, one for each timestep
         self.num_ref_points = np.zeros(self.num_drones, dtype=int)
-        self.ref_offset = np.zeros(self.num_drones, dtype=int)
-        self.ref = [0 for _ in range(self.num_drones)]
+        # Ref is a list of 2d arrays for each agent
+        # each 2d array contains the reference points (xyz) for the agent at each timestep
+        self.ref: List[np.ndarray] = []
 
         for i, agent in enumerate(self._agents_names):
             if init_xyzs is None:
@@ -61,17 +63,13 @@ class Circle(BaseParallelEnv):
                 self._init_target_points[agent] = init_target_points[i]
 
             self.circle_time[i] = 3  # [s]
-            circle_radius[i] = 0.5  # [m]
             self.num_ref_points[i] = self.circle_time[i] * render_fps  # [1]
             ts = 2 * np.pi * np.arange(self.num_ref_points[i]) / self.num_ref_points[i]
 
-            self.ref_offset[i] = 0  # set by task_specific_reset()-method
-            self.ref[i] = np.zeros((self.num_ref_points[i], 3))
+            self.ref.append(np.zeros((self.num_ref_points[i], 3)))
             self.ref[i][:, 2] = init_target_points[i][2]  # z-position
-            self.ref[i][:, 1] = circle_radius[i] * np.sin(ts) + (init_target_points[i][1])  # y-position
-            self.ref[i][:, 0] = circle_radius[i] * (1 - np.cos(ts)) + (
-                init_target_points[i][0] - circle_radius[i]
-            )  # x-position
+            self.ref[i][:, 1] = circle_radius * np.sin(ts) + (init_target_points[i][1])  # y-position
+            self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_target_points[i][0] - circle_radius)  # x-position
 
         self._agent_location = self._init_xyzs.copy()
         self._target_location = self._init_target_points.copy()
@@ -107,7 +105,7 @@ class Circle(BaseParallelEnv):
     def _compute_obs(self):
         obs = dict()
         for i, agent in enumerate(self._agents_names):
-            t = (self.timestep + self.ref_offset[i]) % self.num_ref_points[i]
+            t = self.timestep % self.num_ref_points[i]  # redo the circle if the end is reached
             self._target_location[agent] = self.ref[i][t]
             obs[agent] = np.hstack([self._agent_location[agent], self._target_location[agent]]).reshape(
                 6,
@@ -119,8 +117,8 @@ class Circle(BaseParallelEnv):
         target_point_action = dict()
         state = self._get_drones_state()
 
-        print("act", state, actions)
         for agent in self._agents_names:
+            # Actions are clipped to stay in the map and scaled by 0.1
             target_point_action[agent] = np.clip(
                 state[agent] + actions[agent] * 0.1, [-self.size - 1, -self.size - 1, 0], self.size - 1
             )
@@ -129,6 +127,7 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_reward(self):
+        # Reward is based on the euclidean distance to the target point
         reward = dict()
         for agent in self._agents_names:
             reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent]) ** 2
@@ -136,8 +135,7 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_terminated(self):
-        terminated = {agent: False for agent in self._agents_names}
-        return terminated
+        return {agent: False for agent in self._agents_names}
 
     @override
     def _compute_truncation(self):

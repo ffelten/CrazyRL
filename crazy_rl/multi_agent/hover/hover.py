@@ -1,6 +1,6 @@
 """Hover environment for Crazyflies 2."""
 import time
-from typing import List
+from typing import Dict, List
 from typing_extensions import override
 
 import numpy as np
@@ -60,6 +60,8 @@ class Hover(BaseParallelEnv):
             render_mode=render_mode,
             size=size,
             agents_names=self._agents_names,
+            init_xyzs=self._init_xyzs,
+            init_target_points=self._init_target_points,
             drone_ids=drone_ids,
         )
 
@@ -88,11 +90,13 @@ class Hover(BaseParallelEnv):
         return obs
 
     @override
-    def _compute_action(self, action):
+    def _compute_action(self, actions: Dict[str, np.ndarray]):
         target_point_action = dict()
         state = self._get_drones_state()
         for agent in self._agents_names:
-            target_point_action[agent] = np.clip(state[agent] + action, [-self.size - 1, -self.size - 1, 0], self.size - 1)
+            target_point_action[agent] = np.clip(
+                state[agent] + actions[agent], [-self.size - 1, -self.size - 1, 0], self.size - 1
+            )
         return target_point_action
 
     @override
@@ -110,6 +114,7 @@ class Hover(BaseParallelEnv):
     def _compute_truncation(self):
         if self.timestep == 200:
             truncation = {agent: True for agent in self._agents_names}
+            self.agents = []
             self.timestep = 0
         else:
             truncation = {agent: False for agent in self._agents_names}
@@ -129,11 +134,11 @@ if __name__ == "__main__":
     parallel_api_test(
         Hover(
             drone_ids=[1, 2],
-            render_mode="human",
+            render_mode=None,
             init_xyzs=[[0, 0, 0], [1, 1, 0]],
             init_target_points=[[0, 0, 1], [1, 1, 1]],
         ),
-        num_cycles=1_000_000,
+        num_cycles=10,
     )
 
     parallel_env = Hover(

@@ -5,6 +5,7 @@ from typing_extensions import override
 
 import numpy as np
 from gymnasium import spaces
+from pettingzoo.test.parallel_test import parallel_api_test
 
 from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
 
@@ -141,6 +142,7 @@ class Circle(BaseParallelEnv):
     def _compute_truncation(self):
         if self.timestep == 200:
             truncation = {agent: True for agent in self._agents_names}
+            self.agents = []
             self.timestep = 0
         else:
             truncation = {agent: False for agent in self._agents_names}
@@ -156,15 +158,15 @@ class Circle(BaseParallelEnv):
 
 if __name__ == "__main__":
 
-    # parallel_api_test(
-    #     Circle(
-    #         drone_ids=[1, 2],
-    #         render_mode="human",
-    #         init_xyzs=[[0, 0, 0], [1, 1, 0]],
-    #         init_target_points=[[0, 0, 1], [1, 1, 1]],
-    #     ),
-    #     num_cycles=1_000_000,
-    # )
+    parallel_api_test(
+        Circle(
+            drone_ids=[1, 2],
+            render_mode="human",
+            init_xyzs=[[0, 0, 0], [1, 1, 0]],
+            init_target_points=[[0, 0, 1], [1, 1, 1]],
+        ),
+        num_cycles=10,
+    )
 
     parallel_env = Circle(
         drone_ids=[1, 2],

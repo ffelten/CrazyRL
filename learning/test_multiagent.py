@@ -115,6 +115,38 @@ def extract_agent_id(agent_str):
     return int(agent_str.split("_")[1])
 
 
+def play_episode(actor, env, args, device):
+    """Play one episode.
+
+    Args:
+        actor: the actor network
+        env: the environment
+        args: the arguments
+        device: the device to use
+    """
+    obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
+    done = False
+    while not done:
+        # Execute policy for each agent
+        actions: Dict[str, np.ndarray] = {}
+        with torch.no_grad():
+            for agent_id in env.possible_agents:
+                obs_with_id = torch.Tensor(concat_id(obs[agent_id], agent_id)).to(device)
+                act, _, _ = actor.get_action(obs_with_id.unsqueeze(0))
+                act = act.detach().cpu().numpy()
+                actions[agent_id] = act.flatten()
+
+        # TRY NOT TO MODIFY: execute the game and log data.
+        next_obs, _, terminateds, truncateds, infos = env.step(actions)
+        time.sleep(0.02)
+
+        terminated: bool = any(terminateds.values())
+        truncated: bool = any(truncateds.values())
+
+        done = terminated or truncated
+        obs = next_obs
+
+
 def replay_simu(args):
     """Replay the simulation for one episode.
 
@@ -139,7 +171,7 @@ def replay_simu(args):
         init_target_points=[[0, 0, 1], [1, 1, 1]],
     )
 
-    obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
+    env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])
     assert isinstance(single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -150,28 +182,7 @@ def replay_simu(args):
         actor.load_state_dict(torch.load(args.model_filename))
         actor.eval()
 
-    # TRY NOT TO MODIFY: start the game
-    done = False
-    while not done:
-        # Execute policy for each agent
-        actions: Dict[str, np.ndarray] = {}
-        with torch.no_grad():
-            for agent_id in env.possible_agents:
-                obs_with_id = torch.Tensor(concat_id(obs[agent_id], agent_id)).to(device)
-                act, _, _ = actor.get_action(obs_with_id.unsqueeze(0))
-                act = act.detach().cpu().numpy()
-                actions[agent_id] = act.flatten()
-
-        # TRY NOT TO MODIFY: execute the game and log data.
-        next_obs, _, terminateds, truncateds, infos = env.step(actions)
-        time.sleep(0.02)
-
-        terminated: bool = any(terminateds.values())
-        truncated: bool = any(truncateds.values())
-
-        done = terminated or truncated
-        obs = next_obs
-
+    play_episode(actor, env, args, device)
     env.close()
 
 
@@ -215,6 +226,7 @@ def replay_real(args):
             swarm=swarm,
         )
 
+        env.reset(seed=args.seed)
         single_action_space = env.action_space(env.unwrapped.agents[0])
         assert isinstance(single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -224,29 +236,7 @@ def replay_real(args):
             print("Loading pre-trained model ", args.model_filename)
             actor = torch.load(args.model_filename)
 
-        # TRY NOT TO MODIFY: start the game
-        obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
-        done = False
-        while not done:
-            # Exec policy for each agent
-            actions: Dict[str, np.ndarray] = {}
-            with torch.no_grad():
-                for agent_id in env.possible_agents:
-                    obs_with_id = torch.Tensor(concat_id(obs[agent_id], agent_id)).to(device)
-                    act, _, _ = actor.get_action(obs_with_id.unsqueeze(0))
-                    act = act.detach().cpu().numpy()
-                    actions[agent_id] = act.flatten()
-
-            next_obs, _, terminateds, truncateds, infos = env.step(actions)
-            time.sleep(0.02)
-
-            terminated: bool = any(terminateds.values())
-            truncated: bool = any(truncateds.values())
-
-            # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
-            obs = next_obs
-
-            done = terminated or truncated
+        play_episode(actor, env, args, device)
 
         env.close()
 

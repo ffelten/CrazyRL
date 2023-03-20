@@ -200,6 +200,7 @@ class BaseParallelEnv(ParallelEnv):
 
         if self._mode == "simu":
             self._agent_location = target_action
+            self.render()
         elif self._mode == "real":
             command = dict()
             # dict target_position URI

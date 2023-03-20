@@ -81,7 +81,7 @@ def parse_args():
                         help="if toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument("--cuda", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
                         help="if toggled, cuda will be enabled by default")
-    parser.add_argument("--model-filename", type=str, default="../../MASAC/masac.pt", help="the filename of the model to load.")
+    parser.add_argument("--model-filename", type=str, required=True, help="the filename of the model to load.")
 
     parser.add_argument("--mode", type=str, default="simu", choices=["simu", "real"],
                         help="choose the replay mode to perform real or simulation")
@@ -139,6 +139,7 @@ def replay_simu(args):
         init_target_points=[[0, 0, 1], [1, 1, 1]],
     )
 
+    obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])
     assert isinstance(single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -146,10 +147,10 @@ def replay_simu(args):
     actor = Actor(env).to(device)
     if args.model_filename is not None:
         print("Loading pre-trained model ", args.model_filename)
-        actor = torch.load(args.model_filename)
+        actor.load_state_dict(torch.load(args.model_filename))
+        actor.eval()
 
     # TRY NOT TO MODIFY: start the game
-    obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
     done = False
     while not done:
         # Execute policy for each agent

@@ -103,6 +103,7 @@ class BaseParallelEnv(ParallelEnv):
         self._target_location = init_target_points.copy()
         self.possible_agents = agents_names
         self.timestep = 0
+        self.agents = []
 
         print("init", self._init_xyz, init_xyzs)
 

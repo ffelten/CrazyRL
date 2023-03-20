@@ -40,6 +40,12 @@ I suggest to have a look at [MASAC](https://github.com/ffelten/MASAC) for traini
 
 You can have a look at the [test_multiagent](learning/test_multiagent.py) file. The path to the save model MASAC and the mode to "real" has to be set on the main.
 
+## Install & run
+```shell
+poetry install
+poetry run python crazy_rl/multi_agent/circle/circle.py
+```
+
 ## Simulation
 `render_mode = "human"`
 

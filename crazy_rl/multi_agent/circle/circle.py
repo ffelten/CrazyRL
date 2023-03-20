@@ -161,7 +161,7 @@ if __name__ == "__main__":
     parallel_api_test(
         Circle(
             drone_ids=[1, 2],
-            render_mode="human",
+            render_mode=None,
             init_xyzs=[[0, 0, 0], [1, 1, 0]],
             init_target_points=[[0, 0, 1], [1, 1, 1]],
         ),

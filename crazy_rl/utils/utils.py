@@ -25,6 +25,7 @@ def reset_estimator(scf):
         scf: SyncCrazyflie
     """
     __load_config(scf)
+    print("Config loaded")
     cf = scf.cf
     cf.param.set_value("kalman.resetEstimation", "1")
     time.sleep(0.1)
@@ -108,6 +109,20 @@ def run_take_off(scf):
     commander = scf.cf.high_level_commander
 
     commander.takeoff(0.5, 2.0)
+    time.sleep(2)
+
+
+def run_square(scf):
+    """Square manoeuvre use in swarm classes with parallel_safe() method (each crazyflie of the swarm will launch it in parallel)."""
+    print("square")
+    commander = scf.cf.high_level_commander
+    commander.go_to(0.0, 1.0, 0.5, 0, 2.0)
+    time.sleep(2)
+    commander.go_to(1.0, 1.0, 0.5, 0, 2.0)
+    time.sleep(2)
+    commander.go_to(1.0, 0.0, 0.5, 0, 2.0)
+    time.sleep(2)
+    commander.go_to(0.0, 0.0, 0.5, 0, 2.0)
     time.sleep(2)
 
 

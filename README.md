@@ -62,7 +62,7 @@ Positioning is managed by [Lighthouse positioning](https://www.bitcraze.io/docum
 Firstly configuration of the lighthouse has to be saved on config file. To do that you have to connect your Crazyflie
 through the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/),
 manage the geometry for the lighthouse, estimate geometry simple and save the configuration on a yaml file.
-Refer the path on [utils.py](utils/utils.py) on the load_config method and the configuration will be load on drones at each start up.
+Refer the path on [utils.py](crazy_rl/utils/utils.py) on the load_config method and the configuration will be load on drones at each start up.
 
 Secondly place the turned on drones on your environment. Be careful to put your drones at their right place depending on
 their id to avoid any crash at start up.

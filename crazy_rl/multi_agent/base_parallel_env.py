@@ -49,7 +49,7 @@ from pettingzoo.utils.env import ParallelEnv
 from pygame import DOUBLEBUF, OPENGL
 
 from crazy_rl.utils.graphic import axes, field, point, target_point
-from crazy_rl.utils.utils import reset_estimator, run_land, run_sequence, run_take_off
+from crazy_rl.utils.utils import run_land, run_sequence, run_take_off
 
 
 class BaseParallelEnv(ParallelEnv):
@@ -168,8 +168,9 @@ class BaseParallelEnv(ParallelEnv):
         if self._mode == "simu":
             self._agent_location = self._init_xyz.copy()
         elif self._mode == "real":
-            self.swarm.parallel_safe(reset_estimator)
+            # self.swarm.parallel_safe(reset_estimator)
             self._agent_location = self._get_drones_state()
+            print("reset", self._agent_location)
 
             command = dict()
             # dict target_position URI
@@ -211,6 +212,7 @@ class BaseParallelEnv(ParallelEnv):
                 agent = self._agent_location["agent_" + str(id)]
                 command[uri] = [[agent, target]]
 
+            print("Moving commands: ", command)
             self.swarm.parallel_safe(run_sequence, args_dict=command)
 
             self._agent_location = self._get_drones_state()

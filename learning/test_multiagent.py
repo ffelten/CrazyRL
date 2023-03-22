@@ -115,7 +115,7 @@ def extract_agent_id(agent_str):
     return int(agent_str.split("_")[1])
 
 
-def play_episode(actor, env, args, device):
+def play_episode(actor, env, init_obs, device):
     """Play one episode.
 
     Args:
@@ -124,11 +124,12 @@ def play_episode(actor, env, args, device):
         args: the arguments
         device: the device to use
     """
-    obs: Dict[str, np.ndarray] = env.reset(seed=args.seed)
+    obs = init_obs
     done = False
     while not done:
         # Execute policy for each agent
         actions: Dict[str, np.ndarray] = {}
+        print("Current obs: ", obs)
         with torch.no_grad():
             for agent_id in env.possible_agents:
                 obs_with_id = torch.Tensor(concat_id(obs[agent_id], agent_id)).to(device)
@@ -171,7 +172,7 @@ def replay_simu(args):
         init_target_points=[[0, 0, 1], [1, 1, 1]],
     )
 
-    env.reset(seed=args.seed)
+    obs = env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])
     assert isinstance(single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -182,7 +183,7 @@ def replay_simu(args):
         actor.load_state_dict(torch.load(args.model_filename))
         actor.eval()
 
-    play_episode(actor, env, args, device)
+    play_episode(actor, env, obs, device)
     env.close()
 
 
@@ -213,6 +214,11 @@ def replay_real(args):
 
     # the Swarm class will automatically launch the method in parameter of parallel_safe method
     factory = CachedCfFactory(rw_cache="./cache")
+    if args.model_filename is not None:
+        print("Loading pre-trained model ", args.model_filename)
+        model_params = torch.load(args.model_filename)
+    else:
+        raise ValueError("Please specify the model filename to load.")
     with Swarm(uris, factory=factory) as swarm:
 
         swarm.parallel_safe(LoggingCrazyflie)
@@ -226,17 +232,13 @@ def replay_real(args):
             swarm=swarm,
         )
 
-        env.reset(seed=args.seed)
-        single_action_space = env.action_space(env.unwrapped.agents[0])
-        assert isinstance(single_action_space, gym.spaces.Box), "only continuous action space is supported"
-
+        obs = env.reset(seed=args.seed)
         # Use pretrained model
         actor = Actor(env).to(device)
-        if args.model_filename is not None:
-            print("Loading pre-trained model ", args.model_filename)
-            actor = torch.load(args.model_filename)
+        actor.load_state_dict(model_params)
+        actor.eval()
 
-        play_episode(actor, env, args, device)
+        play_episode(actor, env, obs, device)
 
         env.close()
 

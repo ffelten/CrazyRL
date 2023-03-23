@@ -1,7 +1,6 @@
 """File for testing the learned policies on the multiagent environment. Loads a Pytorch model and runs it on the environment."""
 import argparse
 import random
-import time
 from distutils.util import strtobool
 from typing import Dict
 
@@ -139,7 +138,6 @@ def play_episode(actor, env, init_obs, device):
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, _, terminateds, truncateds, infos = env.step(actions)
-        time.sleep(0.02)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
@@ -229,7 +227,7 @@ def replay_real(args):
             render_mode="real",
             drone_ids=[0, 1],
             init_xyzs=[[0, 0, 0], [1, 1, 0]],
-            init_target_points=[[0, 0, 0.5], [1, 1, 0.5]],
+            init_target_points=[[0, 0, 1], [1, 1, 1]],
             swarm=swarm,
         )
 

@@ -170,7 +170,7 @@ def run_sequence(scf, command):
         # z limitation for safety
         z = np.clip(target_pos[2], 0.3, 2)
         commander.go_to(target_pos[0], target_pos[1], z, yaw, flight_time, relative=False)
-        time.sleep(flight_time)
+        time.sleep(flight_time * 0.65)
 
 
 class LoggingCrazyflie:

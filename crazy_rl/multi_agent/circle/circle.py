@@ -21,7 +21,7 @@ class Circle(BaseParallelEnv):
         init_xyzs: List[List[int]],
         init_target_points: List[List[int]],
         render_mode=None,
-        render_fps: int = 20,
+        render_fps: int = 5,
         size: int = 4,
         swarm=None,
     ):
@@ -46,7 +46,7 @@ class Circle(BaseParallelEnv):
         self.timestep = 0
 
         self.circle_time = np.zeros(self.num_drones, dtype=int)
-        circle_radius = 0.3  # [m]
+        circle_radius = 0.5  # [m]
         # There are multiple ref points per agent, one for each timestep
         self.num_ref_points = np.zeros(self.num_drones, dtype=int)
         # Ref is a list of 2d arrays for each agent
@@ -63,7 +63,7 @@ class Circle(BaseParallelEnv):
             else:
                 self._init_target_points[agent] = init_target_points[i]
 
-            self.circle_time[i] = 3  # [s]
+            self.circle_time[i] = 2  # [s]
             self.num_ref_points[i] = self.circle_time[i] * render_fps  # [1]
             ts = 2 * np.pi * np.arange(self.num_ref_points[i]) / self.num_ref_points[i]
 
@@ -119,9 +119,9 @@ class Circle(BaseParallelEnv):
         state = self._get_drones_state()
 
         for agent in self._agents_names:
-            # Actions are clipped to stay in the map and scaled to do max 15cm in one step
+            # Actions are clipped to stay in the map and scaled to do max 20cm in one step
             target_point_action[agent] = np.clip(
-                state[agent] + actions[agent] * 0.15, [-self.size - 1, -self.size - 1, 0], self.size - 1
+                state[agent] + actions[agent] * 0.2, [-self.size - 1, -self.size - 1, 0], self.size - 1
             )
 
         return target_point_action

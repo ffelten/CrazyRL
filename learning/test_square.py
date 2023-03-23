@@ -17,10 +17,7 @@ if __name__ == "__main__":
     # the Swarm class will automatically launch the method in parameter of parallel_safe method
     factory = CachedCfFactory(rw_cache="./cache")
     with Swarm(uris, factory=factory) as swarm:
-
         swarm.parallel_safe(LoggingCrazyflie)
-        swarm.get_estimated_positions()
-
         swarm.parallel_safe(run_take_off)
         swarm.parallel_safe(run_square)
         swarm.parallel_safe(run_land)

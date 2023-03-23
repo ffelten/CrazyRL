@@ -104,8 +104,11 @@ def run_take_off(scf):
     Args:
         scf: SyncCrazyflie
     """
-    print("take off")
+    # print("Setting controller")
+    # scf.cf.param.set_value("stabilizer.controller", value=1)  # to use Mellinger controller set value to 2
+    # print("controller activated")
 
+    print("Taking off")
     commander = scf.cf.high_level_commander
 
     commander.takeoff(0.5, 2.0)
@@ -151,15 +154,13 @@ def run_sequence(scf, command):
         scf: SyncCrazyFlie object given automatically by the Swarm class
         command: ndarray (2,3)-shaped array which include the current agent position and the target position (x,y,z)
     """
-    scf.cf.param.set_value("stabilizer.controller", value=1)  # to use Mellinger controller set value to 2
-
     agent_pos = command[0]
     target_pos = command[1]
 
     # TODO should work but (it works on mono_agent) but not so well on multi_agent as to be figured out
     # TODO yaw = np.arctan2(target_pos[1] - agent_pos[1], target_pos[0] - agent_pos[0])
     yaw = 0
-    flight_time = np.linalg.norm(target_pos - agent_pos) * 2
+    flight_time = np.linalg.norm(target_pos - agent_pos) * 1
     print(f"Move {agent_pos} -> {target_pos} ({flight_time} secs)")
 
     if flight_time == 0.0:

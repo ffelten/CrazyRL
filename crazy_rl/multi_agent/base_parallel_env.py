@@ -176,13 +176,13 @@ class BaseParallelEnv(ParallelEnv):
             # dict target_position URI
             for id in self.drone_ids:
                 uri = "radio://0/4/2M/E7E7E7E7" + str(id).zfill(2)
-                target = self._init_xyz["agent_" + str(id)]
+                target = self._init_target_point["agent_" + str(id)]
                 agent = self._agent_location["agent_" + str(id)]
                 command[uri] = [[agent, target]]
 
             self.swarm.parallel_safe(run_take_off)
             print("Take off successful.")
-            print("Setting the drone positions to the initial positions.")
+            print(f"Setting the drone positions to the initial positions. {command}")
             self.swarm.parallel_safe(run_sequence, args_dict=command)
 
             self._agent_location = self._get_drones_state()
@@ -213,7 +213,6 @@ class BaseParallelEnv(ParallelEnv):
                 agent = self._agent_location["agent_" + str(id)]
                 command[uri] = [[agent, target]]
 
-            print("Moving commands: ", command)
             self.swarm.parallel_safe(run_sequence, args_dict=command)
 
             self._agent_location = self._get_drones_state()

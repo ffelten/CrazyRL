@@ -160,19 +160,15 @@ def run_sequence(scf, command):
     # TODO yaw = np.arctan2(target_pos[1] - agent_pos[1], target_pos[0] - agent_pos[0])
     yaw = 0
     flight_time = np.linalg.norm(target_pos - agent_pos) * 2
-    print("debug", agent_pos, target_pos, yaw, flight_time)
+    print(f"Move {agent_pos} -> {target_pos} ({flight_time} secs)")
 
     if flight_time == 0.0:
         print("first reset")
     else:
         commander = scf.cf.high_level_commander
-
-        # z limitation axes  TODO add limitation in main Base environment
-        z = max(target_pos[2], 0.3)
-        z = min(z, 2)
-
+        # z limitation for safety
+        z = np.clip(target_pos[2], 0.3, 2)
         commander.go_to(target_pos[0], target_pos[1], z, yaw, flight_time, relative=False)
-
         time.sleep(flight_time)
 
 

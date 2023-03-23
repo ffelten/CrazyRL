@@ -234,9 +234,11 @@ def replay_real(args):
 
         obs = env.reset(seed=args.seed)
         # Use pretrained model
+        print("Loading pre-trained model ", args.model_filename)
         actor = Actor(env).to(device)
         actor.load_state_dict(model_params)
         actor.eval()
+        print("Model loaded. Starting to play episode.")
 
         play_episode(actor, env, obs, device)
 

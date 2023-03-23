@@ -181,7 +181,8 @@ class BaseParallelEnv(ParallelEnv):
                 command[uri] = [[agent, target]]
 
             self.swarm.parallel_safe(run_take_off)
-
+            print("Take off successful.")
+            print("Setting the drone positions to the initial positions.")
             self.swarm.parallel_safe(run_sequence, args_dict=command)
 
             self._agent_location = self._get_drones_state()

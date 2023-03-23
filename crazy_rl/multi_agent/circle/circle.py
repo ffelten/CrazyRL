@@ -46,7 +46,7 @@ class Circle(BaseParallelEnv):
         self.timestep = 0
 
         self.circle_time = np.zeros(self.num_drones, dtype=int)
-        circle_radius = 0.5  # [m]
+        circle_radius = 0.3  # [m]
         # There are multiple ref points per agent, one for each timestep
         self.num_ref_points = np.zeros(self.num_drones, dtype=int)
         # Ref is a list of 2d arrays for each agent
@@ -68,8 +68,8 @@ class Circle(BaseParallelEnv):
             ts = 2 * np.pi * np.arange(self.num_ref_points[i]) / self.num_ref_points[i]
 
             self.ref.append(np.zeros((self.num_ref_points[i], 3)))
-            self.ref[i][:, 2] = init_target_points[i][2]  # z-position
-            self.ref[i][:, 1] = circle_radius * np.sin(ts) + (init_target_points[i][1])  # y-position
+            self.ref[i][:, 2] = circle_radius * np.sin(ts) + (init_target_points[i][2])  # z-position
+            self.ref[i][:, 1] = init_target_points[i][1]  # y-position
             self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_target_points[i][0] - circle_radius)  # x-position
 
         self._agent_location = self._init_xyzs.copy()
@@ -119,9 +119,9 @@ class Circle(BaseParallelEnv):
         state = self._get_drones_state()
 
         for agent in self._agents_names:
-            # Actions are clipped to stay in the map and scaled by 0.1
+            # Actions are clipped to stay in the map and scaled to do max 15cm in one step
             target_point_action[agent] = np.clip(
-                state[agent] + actions[agent] * 0.1, [-self.size - 1, -self.size - 1, 0], self.size - 1
+                state[agent] + actions[agent] * 0.15, [-self.size - 1, -self.size - 1, 0], self.size - 1
             )
 
         return target_point_action
@@ -172,7 +172,7 @@ if __name__ == "__main__":
         drone_ids=[1, 2],
         render_mode="human",
         init_xyzs=[[0, 0, 0], [1, 1, 0]],
-        init_target_points=[[0, 0, 1], [2, 2, 2]],
+        init_target_points=[[0, 0, 1], [2, 2, 1]],
     )
 
     observations = parallel_env.reset()

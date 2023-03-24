@@ -232,7 +232,7 @@ def replay_real(args):
             render_mode="real",
             drone_ids=[0, 1],
             init_xyzs=[[0, 0, 0], [1, 1, 0]],
-            init_target_points=[[0, 0, 0.5], [1, 1, 0.5]],
+            init_target_points=[[0, 0, 1], [1, 1, 1]],
             swarm=swarm,
         )
 

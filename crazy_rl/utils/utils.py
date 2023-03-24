@@ -157,8 +157,6 @@ def run_sequence(scf, command):
     agent_pos = command[0]
     target_pos = command[1]
 
-    # TODO should work but (it works on mono_agent) but not so well on multi_agent as to be figured out
-    # TODO yaw = np.arctan2(target_pos[1] - agent_pos[1], target_pos[0] - agent_pos[0])
     yaw = 0
     flight_time = np.linalg.norm(target_pos - agent_pos) * 1
     print(f"Move {agent_pos} -> {target_pos} ({flight_time} secs)")

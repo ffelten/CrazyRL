@@ -209,11 +209,12 @@ class BaseParallelEnv(ParallelEnv):
             for id in self.drone_ids:
                 uri = "radio://0/4/2M/E7E7E7E7" + str(id).zfill(2)
                 target = target_action["agent_" + str(id)]
-                # target = np.clip(target_action['agent_' + str(id)],[-self.size,-self.size,0.2],[self.size,self.size,3]  # TODO try limitation of range (has to be test)
-                agent = self._agent_location["agent_" + str(id)]
-                command[uri] = [[agent, target]]
+                current_location = self._agent_location["agent_" + str(id)]
+                command[uri] = [[current_location, target]]
 
+            start = time.time()
             self.swarm.parallel_safe(run_sequence, args_dict=command)
+            print("Time to execute the run_sequence", time.time() - start)
 
             self._agent_location = self._get_drones_state()
 

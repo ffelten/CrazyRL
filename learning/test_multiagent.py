@@ -130,16 +130,19 @@ def play_episode(actor, env, init_obs, device):
         # Execute policy for each agent
         actions: Dict[str, np.ndarray] = {}
         print("Current obs: ", obs)
+        start = time.time()
         with torch.no_grad():
             for agent_id in env.possible_agents:
                 obs_with_id = torch.Tensor(concat_id(obs[agent_id], agent_id)).to(device)
                 act, _, _ = actor.get_action(obs_with_id.unsqueeze(0))
                 act = act.detach().cpu().numpy()
                 actions[agent_id] = act.flatten()
+        print("Time for model inference: ", time.time() - start)
 
         # TRY NOT TO MODIFY: execute the game and log data.
+        start = time.time()
         next_obs, _, terminateds, truncateds, infos = env.step(actions)
-        time.sleep(0.02)
+        print("Time for env step: ", time.time() - start)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())

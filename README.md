@@ -1,8 +1,11 @@
+<img src="swarm.gif" alt="Swarm" align="right" width="50%"/>
+
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
 # CrazyRL
+
 :warning: Work in progress, suggestions are welcome. :warning:
 
 A library for doing RL with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. It contains a [PettingZoo](https://pettingzoo.farama.org/) environment for parallel multiple agents.

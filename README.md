@@ -101,3 +101,4 @@ If you use this code for your research, please cite this using:
     journal = {GitHub repository},
     howpublished = {\url{https://github.com/ffelten/CrazyRL}},
 }
+```

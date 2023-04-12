@@ -8,11 +8,22 @@
 
 :warning: Work in progress, suggestions are welcome. :warning:
 
-A library for doing RL with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. It contains [PettingZoo](https://pettingzoo.farama.org/) parallel environments for multiple agents RL.
-The real-life example shown in the video is the result after learning performed by with [MASAC](https://github.com/ffelten/MASAC).
+A library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. 
 
-Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/)
-with the usage of [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/).
+It is:
+
+⚡️ A lightweight and fast simulator that is good enough to control [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/) in pratice;
+
+🚁 A set of utilities based on the [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/) to control actual Crazyflies;
+
+🤝 Unified under a standard API from [PettingZoo](https://pettingzoo.farama.org/) parallel environments;
+
+✅ Good quality and documented Python code;
+
+👷 A set of example environments to learn swarming behaviors (in progress).
+
+
+The real-life example shown in the video is the result of executing the policies in real-life after learning in the lightweight simulator. The learning was performed by with [MASAC](https://github.com/ffelten/MASAC). Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/).
 
 ## API
 
@@ -60,14 +71,13 @@ It is sufficient since the control of the CrazyFlies is high-level and precise e
 
 In our experiments, positioning was managed by [Lighthouse positioning](https://www.bitcraze.io/documentation/system/positioning/ligthouse-positioning-system/). It can probably be deployed with other positioning systems too.
 
-### Guideline
+### Guidelines
 
-Firstly configuration of the positioning system has to be saved on config file. The following explains quickly how to set up the LightHouse positioning system.
+Firstly configuration of the positioning system has to be saved in a config file. The following explains quickly how to set up the LightHouse positioning system.
 
-First connect your Crazyflie through the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/),
-manage the geometry for the lighthouse, estimate geometry simple and save the configuration on a yaml file.
+Then, connect your Crazyflie through the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/), manage the geometry for the lighthouse, estimate geometry simple and save the configuration on a yaml file. You can then connect the other drones and load the geometry in them using the client.
 
-(optional) Refer the path on [utils.py](crazy_rl/utils/utils.py) on the load_config method and the configuration will be load on drones at each start up. *This line has been commented because it was very slow in practice. We just made sure the config was loaded before running the experiments.*
+(optional) Refer the path on [utils.py](crazy_rl/utils/utils.py) on the load_config method and the configuration will be load on drones at each start up. *This line has been commented out because it was very slow in practice. We just made sure the config was loaded before running the experiments.*
 
 Secondly place the turned on drones on your environment. Be careful to put your drones at their right place (`init_xyzs` in your code) depending on their id to avoid any crash at start up.
 

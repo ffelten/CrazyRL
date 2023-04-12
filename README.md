@@ -8,10 +8,10 @@
 
 :warning: Work in progress, suggestions are welcome. :warning:
 
-A library for doing RL with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. It contains a [PettingZoo](https://pettingzoo.farama.org/) environment for parallel multiple agents.
-The learning can be performed by with [MASAC](https://github.com/ffelten/MASAC) for multiple agents.
+A library for doing RL with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. It contains [PettingZoo](https://pettingzoo.farama.org/) parallel environments for multiple agents RL.
+The real-life example shown in the video is the result after learning performed by with [MASAC](https://github.com/ffelten/MASAC).
 
-Once the environment trained it can be displayed on simulation environment or in reality with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/)
+Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/)
 with the usage of [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/).
 
 ## API
@@ -53,31 +53,27 @@ poetry run python crazy_rl/multi_agent/circle/circle.py
 `render_mode = "human"`
 
 The simulation is a simple particle representation on a 3D cartesian reference based on Crazyflie [lighthouse reference frame](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/lighthouse/terminology_definitions/).
-It is sufficient since the control of the CrazyFlies is quite high level already.
+It is sufficient since the control of the CrazyFlies is high-level and precise enough.
 
 ## Real
 `render_mode = "real"`
 
-Positioning is managed by [Lighthouse positioning](https://www.bitcraze.io/documentation/system/positioning/ligthouse-positioning-system/).
+In our experiments, positioning was managed by [Lighthouse positioning](https://www.bitcraze.io/documentation/system/positioning/ligthouse-positioning-system/). It can probably be deployed with other positioning systems too.
 
 ### Guideline
 
-Firstly configuration of the lighthouse has to be saved on config file. To do that you have to connect your Crazyflie
-through the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/),
-manage the geometry for the lighthouse, estimate geometry simple and save the configuration on a yaml file.
-Refer the path on [utils.py](crazy_rl/utils/utils.py) on the load_config method and the configuration will be load on drones at each start up.
+Firstly configuration of the positioning system has to be saved on config file. The following explains quickly how to set up the LightHouse positioning system.
 
-Secondly place the turned on drones on your environment. Be careful to put your drones at their right place depending on
-their id to avoid any crash at start up.
+First connect your Crazyflie through the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/),
+manage the geometry for the lighthouse, estimate geometry simple and save the configuration on a yaml file.
+
+(optional) Refer the path on [utils.py](crazy_rl/utils/utils.py) on the load_config method and the configuration will be load on drones at each start up. *This line has been commented because it was very slow in practice. We just made sure the config was loaded before running the experiments.*
+
+Secondly place the turned on drones on your environment. Be careful to put your drones at their right place (`init_xyzs` in your code) depending on their id to avoid any crash at start up.
 
 ### Tips
 
-If the drones are not starting once the test, verify your config load on the Crazyflie with the [cfclient](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/).
-A method is launched at each start which reset the position estimator and load the config. If the information are not good
-the drone will not take off.
-
-Verify also the LEDs on drones if there is a continued red light it means the drone have not enough battery to pursue
-the mission.
+Verify also that the LEDs on drones aren't red: it means the drone have not enough battery to pursue the mission.
 
 The LED on lighthouse deck have to be green to ensure a good reception of lighthouse positioning.
 
@@ -92,3 +88,16 @@ The switch between real environment and simulation is specified through the `ren
 
 ## Contributors
 Pierre-Yves Houitte wrote the original version of this library. It has been cleaned up and simplified by Florian Felten (@ffelten).
+
+## Citation
+If you use this code for your research, please cite this using:
+
+```bibtex
+@misc{crazyrl,
+    author = {Florian Felten and Pierre-Yves Houitte and El-Ghazali Talbi and Grégoire Danoy},
+    title = {CrazyRL: A Multi-Agent Reinforcement Learning library for flying Crazyflie drones},
+    year = {2023},
+    publisher = {GitHub},
+    journal = {GitHub repository},
+    howpublished = {\url{https://github.com/ffelten/CrazyRL}},
+}

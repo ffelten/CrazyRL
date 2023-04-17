@@ -223,7 +223,6 @@ def replay_real(args):
     else:
         raise ValueError("Please specify the model filename to load.")
     with Swarm(uris, factory=factory) as swarm:
-
         swarm.parallel_safe(LoggingCrazyflie)
         # swarm.reset_estimators()
         swarm.get_estimated_positions()

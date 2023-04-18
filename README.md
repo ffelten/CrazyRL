@@ -25,6 +25,23 @@ It is:
 
 The real-life example shown in the video is the result of executing the policies in real-life after learning in the lightweight simulator. The learning was performed by with [MASAC](https://github.com/ffelten/MASAC). Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/).
 
+## Environments
+
+### Hover
+The drones learn to hover in a fixed position. [Hover](crazy_rl.multi_agent.hover.hover.py) The red balls represent the learning drones and the yellow ones the behaviour they have to fit.
+
+<img src="hover.gif" alt="Hover" align="right" width="50%"/>
+
+### Circle
+The drones learn to perform a coordinated circle. [Circle](crazy_rl.multi_agent.circle.circle.py) The red balls represent the learning drones and the yellow ones the behaviour they have to fit.
+
+<img src="circle.gif" alt="Circle" align="right" width="50%"/>
+
+### Surround
+The drones learn to surround a fixed target point. [Surround](crazy_rl.multi_agent.surround.surround.py) The red balls represent the learning drones and the yellow one is the target they have to surround.
+
+<img src="surround.gif" alt="Surround" align="right" width="50%"/>
+
 ## API
 
 ### Training
@@ -33,10 +50,9 @@ I suggest to have a look at [MASAC](https://github.com/ffelten/MASAC) for traini
 ### Execution
 ```python
     env: ParallelEnv = Circle(
-        drone_ids=[0, 1],
-        render_mode="human", # or real, or None
-        init_xyzs=[[0, 0, 0], [1, 1, 0]],
-        init_target_points=[[0, 0, 1], [1, 1, 1]],
+        drone_ids=np.array([0, 1]),
+        render_mode="human",    # or real, or None
+        init_flying_pos=np.array([[0, 0, 1], [2, 2, 1]]),
     )
 
     done = False
@@ -79,7 +95,7 @@ Then, connect your Crazyflie through the [cfclient app](https://www.bitcraze.io/
 
 (optional) Refer the path on [utils.py](crazy_rl/utils/utils.py) on the load_config method and the configuration will be load on drones at each start up. *This line has been commented out because it was very slow in practice. We just made sure the config was loaded before running the experiments.*
 
-Secondly place the turned on drones on your environment. Be careful to put your drones at their right place (`init_xyzs` in your code) depending on their id to avoid any crash at start up.
+Secondly place the turned on drones on your environment, on the ground below the positions given to `init_flying_pos` in your code. Be careful to put your drones at their right place depending on their id to avoid any crash at start up.
 
 ### Tips
 

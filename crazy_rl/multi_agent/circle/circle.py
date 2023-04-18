@@ -17,22 +17,20 @@ class Circle(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: List[int],
-        init_xyzs: List[List[int]],
-        init_target_points: List[List[int]],
+        drone_ids: np.ndarray[int],
+        init_flying_pos: np.ndarray[int],
         render_mode=None,
-        render_fps: int = 5,
+        num_intermediate_points: int = 10,
         size: int = 4,
         swarm=None,
     ):
         """Circle environment for Crazyflies 2.
 
         Args:
-            drone_ids: List of drone ids
-            init_xyzs: List of initial positions of the drones
-            init_target_points: List of initial target points of the drones
+            drone_ids: Array of drone ids
+            init_flying_pos: Array of initial positions of the drones when they are flying
             render_mode: Render mode: "human", "real" or None
-            render_fps: Render fps
+            num_intermediate_points: Number of intermediate points in the target circle
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
@@ -40,12 +38,10 @@ class Circle(BaseParallelEnv):
 
         self._agent_location = dict()
         self._target_location = dict()
-        self._init_target_points = dict()
-        self._init_xyzs = dict()
-        self._agents_names = ["agent_" + str(i) for i in drone_ids]
+        self._init_flying_pos = dict()
+        self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
         self.timestep = 0
 
-        self.circle_time = np.zeros(self.num_drones, dtype=int)
         circle_radius = 0.5  # [m]
         # There are multiple ref points per agent, one for each timestep
         self.num_ref_points = np.zeros(self.num_drones, dtype=int)
@@ -54,34 +50,26 @@ class Circle(BaseParallelEnv):
         self.ref: List[np.ndarray] = []
 
         for i, agent in enumerate(self._agents_names):
-            if init_xyzs is None:
-                self._init_xyzs[agent] = np.zeros(3, dtype=float)
-            else:
-                self._init_xyzs[agent] = init_xyzs[i]
-            if init_target_points is None:
-                self._init_target_points[agent] = np.zeros(3, dtype=float)
-            else:
-                self._init_target_points[agent] = init_target_points[i]
+            self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
-            self.circle_time[i] = 2  # [s]
-            self.num_ref_points[i] = self.circle_time[i] * render_fps  # [1]
+            self.num_ref_points[i] = num_intermediate_points  # [1]
             ts = 2 * np.pi * np.arange(self.num_ref_points[i]) / self.num_ref_points[i]
 
             self.ref.append(np.zeros((self.num_ref_points[i], 3)))
-            self.ref[i][:, 2] = circle_radius * np.sin(ts) + (init_target_points[i][2])  # z-position
-            self.ref[i][:, 1] = init_target_points[i][1]  # y-position
-            self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_target_points[i][0] - circle_radius)  # x-position
+            self.ref[i][:, 2] = circle_radius * np.sin(ts) + (init_flying_pos[i][2])  # z-position
+            self.ref[i][:, 1] = init_flying_pos[i][1]  # y-position
+            self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_flying_pos[i][0] - circle_radius)  # x-position
 
-        self._agent_location = self._init_xyzs.copy()
-        self._target_location = self._init_target_points.copy()
+        self._agent_location = self._init_flying_pos.copy()
+        self._target_location = self._init_flying_pos.copy()
 
         self.size = size
 
         super().__init__(
             render_mode=render_mode,
             size=size,
-            init_xyzs=self._init_xyzs,
-            init_target_points=self._init_target_points,
+            init_flying_pos=self._init_flying_pos,
+            target_location=self._target_location,
             agents_names=self._agents_names,
             drone_ids=drone_ids,
             swarm=swarm,
@@ -160,19 +148,17 @@ if __name__ == "__main__":
 
     parallel_api_test(
         Circle(
-            drone_ids=[1, 2],
+            drone_ids=np.array([0, 1]),
             render_mode=None,
-            init_xyzs=[[0, 0, 0], [1, 1, 0]],
-            init_target_points=[[0, 0, 1], [1, 1, 1]],
+            init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
         ),
         num_cycles=10,
     )
 
     parallel_env = Circle(
-        drone_ids=[1, 2],
+        drone_ids=np.array([0, 1]),
         render_mode="human",
-        init_xyzs=[[0, 0, 0], [1, 1, 0]],
-        init_target_points=[[0, 0, 1], [2, 2, 1]],
+        init_flying_pos=np.array([[0, 0, 1], [2, 2, 1]]),
     )
 
     observations = parallel_env.reset()
@@ -184,4 +170,4 @@ if __name__ == "__main__":
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
         print("obs", observations, "reward", rewards)
-        time.sleep(0.02)
+        time.sleep(0.2)

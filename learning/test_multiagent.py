@@ -146,7 +146,7 @@ def play_episode(actor, env, init_obs, device):
         next_obs, _, terminateds, truncateds, infos = env.step(actions)
         print("Time for env step: ", time.time() - start)
 
-        time.sleep(0.5)
+        time.sleep(1)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
@@ -173,10 +173,10 @@ def replay_simu(args):
     print("Using ", device)
 
     env: ParallelEnv = Surround(
-        drone_ids=np.array([0, 1, 2, 3]),
+        drone_ids=np.array([0, 1, 2, 3, 4]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1], [0, 1, 1], [2, 2, 1]]),
-        target_location=np.array([1, 1, 1])
+        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        target_location=np.array([1, 1, 2.5])
     )
 
     obs = env.reset(seed=args.seed)
@@ -233,10 +233,10 @@ def replay_real(args):
         swarm.get_estimated_positions()
 
         env: ParallelEnv = Surround(
-            drone_ids=np.array([0, 1, 2, 3]),
+            drone_ids=np.array([0, 1, 2, 3, 4]),
             render_mode="real",
-            init_flying_pos=np.array([[0, 0, 1], [1, 1, 1], [0, 1, 1], [2, 2, 1]]),
-            target_location=np.array([1, 1, 1]),
+            init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+            target_location=np.array([1, 1, 2.5]),
             swarm=swarm,
         )
 
@@ -254,6 +254,9 @@ def replay_real(args):
 
 
 if __name__ == "__main__":
+
+    time.sleep(5)
+
     args = parse_args()
 
     if args.mode == "simu":

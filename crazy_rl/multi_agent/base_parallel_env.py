@@ -297,6 +297,7 @@ class BaseParallelEnv(ParallelEnv):
         field(self.size)
         axes()
 
+        ###print("target location", self._target_location)
         for target in self._target_location.values():
             glPushMatrix()
             target_point(np.array([target[0], target[1], target[2]]))

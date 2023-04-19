@@ -113,14 +113,15 @@ class Surround(BaseParallelEnv):
         for agent in self._agents_names:
             reward[agent] = 0
 
-            #for other_agent in self._agents_names:
-            #    if other_agent != agent:
-            #        reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2
+            for other_agent in self._agents_names:
+                if other_agent != agent:
+                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2
 
-            #reward[agent] /= self.num_drones - 1
-            #reward[agent] *= 0
+            reward[agent] /= self.num_drones - 1
 
-            reward[agent] -= 1 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2
+            reward[agent] *= 0.15
+
+            reward[agent] -= 0.85 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2
 
             for other_agent in self._agents_names:
                 if other_agent != agent and (
@@ -128,6 +129,9 @@ class Surround(BaseParallelEnv):
                     reward[agent] -= 100
 
             if self._agent_location[agent][2] < 0.2:
+                reward[agent] -= 100
+
+            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2:
                 reward[agent] -= 100
 
         return reward
@@ -145,6 +149,8 @@ class Surround(BaseParallelEnv):
                             np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2)
 
             terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
+            terminated[agent] = terminated[agent] or (np.linalg.norm(
+                self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2)
 
         return terminated
 
@@ -167,13 +173,16 @@ class Surround(BaseParallelEnv):
 if __name__ == "__main__":
 
     parallel_env = Surround(
-        drone_ids=np.array([0, 1, 2, 3]),
+        drone_ids=np.array([0, 1, 2, 3, 4]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1], [0, 1, 1], [2, 2, 1]]),
-        target_location=np.array([1, 1, 1])
+        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        target_location=np.array([1, 1, 2.5])
     )
 
     observations = parallel_env.reset()
+
+    global_step = 0
+    start_time = time.time()
 
     while parallel_env.agents:
         actions = {
@@ -181,5 +190,11 @@ if __name__ == "__main__":
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
-        print("obs", observations, "reward", rewards)
+
+        #print("obs", observations, "reward", rewards)
+
+        #if global_step % 100 == 0:
+        #    print("SPS:", int(global_step / (time.time() - start_time)))
+
+        global_step += 1
         time.sleep(0.02)

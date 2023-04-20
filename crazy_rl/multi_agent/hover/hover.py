@@ -93,7 +93,7 @@ class Hover(BaseParallelEnv):
     def _compute_reward(self):
         reward = dict()
         for agent in self._agents_names:
-            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent]) ** 2
+            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
         return reward
 
     @override

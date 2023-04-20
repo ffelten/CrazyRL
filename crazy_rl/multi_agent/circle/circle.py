@@ -43,8 +43,7 @@ class Circle(BaseParallelEnv):
         self.timestep = 0
 
         circle_radius = 0.5  # [m]
-        # There are multiple ref points per agent, one for each timestep
-        self.num_ref_points = np.zeros(self.num_drones, dtype=int)
+        self.num_intermediate_points = num_intermediate_points
         # Ref is a list of 2d arrays for each agent
         # each 2d array contains the reference points (xyz) for the agent at each timestep
         self.ref: List[np.ndarray] = []
@@ -52,10 +51,9 @@ class Circle(BaseParallelEnv):
         for i, agent in enumerate(self._agents_names):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
-            self.num_ref_points[i] = num_intermediate_points  # [1]
-            ts = 2 * np.pi * np.arange(self.num_ref_points[i]) / self.num_ref_points[i]
+            ts = 2 * np.pi * np.arange(num_intermediate_points) / num_intermediate_points
 
-            self.ref.append(np.zeros((self.num_ref_points[i], 3)))
+            self.ref.append(np.zeros((num_intermediate_points, 3)))
             self.ref[i][:, 2] = circle_radius * np.sin(ts) + (init_flying_pos[i][2])  # z-position
             self.ref[i][:, 1] = init_flying_pos[i][1]  # y-position
             self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_flying_pos[i][0] - circle_radius)  # x-position
@@ -94,7 +92,7 @@ class Circle(BaseParallelEnv):
     def _compute_obs(self):
         obs = dict()
         for i, agent in enumerate(self._agents_names):
-            t = self.timestep % self.num_ref_points[i]  # redo the circle if the end is reached
+            t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
             self._target_location[agent] = self.ref[i][t]
             obs[agent] = np.hstack([self._agent_location[agent], self._target_location[agent]]).reshape(
                 6,
@@ -119,7 +117,7 @@ class Circle(BaseParallelEnv):
         # Reward is based on the euclidean distance to the target point
         reward = dict()
         for agent in self._agents_names:
-            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent]) ** 2
+            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
         return reward
 
     @override

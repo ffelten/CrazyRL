@@ -90,8 +90,9 @@ class BaseParallelEnv(ParallelEnv):
         Args:
             agents_names (list): list of agent names use as key for the dict
             drone_ids (list): ids of the drones (ignored in simulation mode)
-            init_flying_pos (Dict, optional): (3)-shaped array containing the initial XYZ position of the flying drones.
-            target_location (Dict, optional): (3)-shaped array containing the XYZ position of the target.
+            init_flying_pos (Dict, optional): A dictionary containing the name of the agent as key and where each value
+                is a (3)-shaped array containing the initial XYZ position of the drones.
+            target_location (Dict, optional): A dictionary containing a (3)-shaped array for the XYZ position of the target.
             size (int, optional): Size of the area sides
             render_mode (str, optional): The mode to display the rendering of the environment. Can be real, human or None.
                 Real mode is used for real tests on the field, human mode is used to display the environment on a PyGame
@@ -101,7 +102,7 @@ class BaseParallelEnv(ParallelEnv):
         self.size = size  # The size of the square grid
         self._agent_location = init_flying_pos.copy()
         self._init_flying_pos = init_flying_pos
-        self._target_location = target_location  # to be defined in the child class
+        self._target_location = target_location
         self.possible_agents = agents_names.tolist()
         self.timestep = 0
         self.agents = []

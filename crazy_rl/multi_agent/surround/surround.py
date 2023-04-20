@@ -106,26 +106,31 @@ class Surround(BaseParallelEnv):
         for agent in self._agents_names:
             reward[agent] = 0
 
+            # mean distance to the other agents
             for other_agent in self._agents_names:
                 if other_agent != agent:
-                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2
+                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
 
             reward[agent] *= 0.15
 
-            reward[agent] -= 0.85 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2
+            # distance to the target
+            reward[agent] -= 0.85 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
 
+            # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent and (
-                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2
+                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                 ):
                     reward[agent] -= 100
 
+            # collision with the ground
             if self._agent_location[agent][2] < 0.2:
                 reward[agent] -= 100
 
-            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2:
+            # collision with the target
+            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
                 reward[agent] -= 100
 
         return reward
@@ -137,15 +142,19 @@ class Surround(BaseParallelEnv):
         for agent in self._agents_names:
             terminated[agent] = False
 
+            # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent:
                     terminated[agent] = terminated[agent] or (
-                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2
+                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                     )
 
+            # collision with the ground
             terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
+
+            # collision with the target
             terminated[agent] = terminated[agent] or (
-                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2
+                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
             )
 
         return terminated

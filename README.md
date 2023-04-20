@@ -27,27 +27,29 @@ The real-life example shown in the video is the result of executing the policies
 
 ## Environments
 
+The red balls represent the position of the drones.
+
 ### Hover
 
-The drones learn to [hover](crazy_rl.multi_agent.hover.hover.py) in a fixed position.
+The drones learn to [hover](crazy_rl/multi_agent/hover/hover.py) in a fixed position.
 
 <img src="hover.gif" alt="Hover" width="30%"/>
 
-The red balls represent the learning drones and the yellow ones the behaviour they have to fit.
+The yellow balls represent the target position of the drones.
 
 ### Circle
-The drones learn to perform a coordinated [circle](crazy_rl.multi_agent.circle.circle.py).
+The drones learn to perform a coordinated [circle](crazy_rl/multi_agent/circle/circle.py).
 
 <img src="circle.gif" alt="Circle" width="30%"/>
 
-The red balls represent the learning drones and the yellow ones the behaviour they have to fit.
+The yellow balls represent the target position of the drones.
 
 ### Surround
-The drones learn to [surround](crazy_rl.multi_agent.surround.surround.py) a fixed target point.
+The drones learn to [surround](crazy_rl/multi_agent/surround/surround.py) a fixed target point.
 
 <img src="surround.gif" alt="Surround" width="30%"/>
 
-The red balls represent the learning drones and the yellow one is the target they have to surround.
+The yellow ball represents the target the drones have to surround.
 
 ## API
 

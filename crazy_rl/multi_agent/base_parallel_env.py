@@ -2,7 +2,7 @@
 import functools
 import time
 from copy import copy
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from typing_extensions import override
 
 import numpy as np
@@ -91,6 +91,7 @@ class BaseParallelEnv(ParallelEnv):
             agents_names (list): list of agent names use as key for the dict
             drone_ids (list): ids of the drones (ignored in simulation mode)
             init_flying_pos (Dict, optional): (3)-shaped array containing the initial XYZ position of the flying drones.
+            target_location (Dict, optional): (3)-shaped array containing the XYZ position of the target.
             size (int, optional): Size of the area sides
             render_mode (str, optional): The mode to display the rendering of the environment. Can be real, human or None.
                 Real mode is used for real tests on the field, human mode is used to display the environment on a PyGame
@@ -297,7 +298,6 @@ class BaseParallelEnv(ParallelEnv):
         field(self.size)
         axes()
 
-        ###print("target location", self._target_location)
         for target in self._target_location.values():
             glPushMatrix()
             target_point(np.array([target[0], target[1], target[2]]))

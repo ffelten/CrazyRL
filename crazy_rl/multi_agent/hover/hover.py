@@ -1,6 +1,6 @@
 """Hover environment for Crazyflies 2."""
 import time
-from typing import Dict, List
+from typing import Dict
 from typing_extensions import override
 
 import numpy as np
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     parallel_api_test(
         Hover(
-            drone_ids=np.array([0,1]),
+            drone_ids=np.array([0, 1]),
             render_mode=None,
             init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
         ),

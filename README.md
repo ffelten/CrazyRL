@@ -8,11 +8,11 @@
 
 :warning: Work in progress, suggestions are welcome. :warning:
 
-A library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. 
+A library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones.
 
 It is:
 
-⚡️ A lightweight and fast simulator that is good enough to control [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/) in pratice;
+⚡️ A lightweight and fast simulator that is good enough to control [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/) in practice;
 
 🚁 A set of utilities based on the [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/) to control actual Crazyflies;
 
@@ -29,21 +29,21 @@ The real-life example shown in the video is the result of executing the policies
 
 ### Hover
 
-The drones learn to [hover](crazy_rl.multi_agent.hover.hover.py) in a fixed position. 
+The drones learn to [hover](crazy_rl.multi_agent.hover.hover.py) in a fixed position.
 
 <img src="hover.gif" alt="Hover" width="30%"/>
 
 The red balls represent the learning drones and the yellow ones the behaviour they have to fit.
 
 ### Circle
-The drones learn to perform a coordinated [circle](crazy_rl.multi_agent.circle.circle.py). 
+The drones learn to perform a coordinated [circle](crazy_rl.multi_agent.circle.circle.py).
 
 <img src="circle.gif" alt="Circle" width="30%"/>
 
 The red balls represent the learning drones and the yellow ones the behaviour they have to fit.
 
 ### Surround
-The drones learn to [surround](crazy_rl.multi_agent.surround.surround.py) a fixed target point. 
+The drones learn to [surround](crazy_rl.multi_agent.surround.surround.py) a fixed target point.
 
 <img src="surround.gif" alt="Surround" width="30%"/>
 

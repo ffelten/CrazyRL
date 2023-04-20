@@ -1,10 +1,9 @@
+"""Surround environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point."""
 import time
-from typing import List
 from typing_extensions import override
 
 import numpy as np
 from gymnasium import spaces
-from pettingzoo.test.parallel_test import parallel_api_test
 
 from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
 
@@ -43,12 +42,6 @@ class Surround(BaseParallelEnv):
         self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
         self.timestep = 0
 
-        # There are multiple ref points per agent, one for each timestep
-        self.num_ref_points = np.zeros(self.num_drones, dtype=int)
-        # Ref is a list of 2d arrays for each agent
-        # each 2d array contains the reference points (xyz) for the agent at each timestep
-        self.ref: List[np.ndarray] = []
-
         for i, agent in enumerate(self._agents_names):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
@@ -71,7 +64,7 @@ class Surround(BaseParallelEnv):
         return spaces.Box(
             low=np.tile(np.array([-self.size - 1, -self.size - 1, 0], dtype=np.float32), self.num_drones + 1),
             high=np.tile(np.array([self.size - 1, self.size - 1, self.size - 1], dtype=np.float32), self.num_drones + 1),
-            shape=(3*(self.num_drones + 1),),   # coordinates of the drones and the target
+            shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
             dtype=np.float32,
         )
 
@@ -125,7 +118,8 @@ class Surround(BaseParallelEnv):
 
             for other_agent in self._agents_names:
                 if other_agent != agent and (
-                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2):
+                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2
+                ):
                     reward[agent] -= 100
 
             if self._agent_location[agent][2] < 0.2:
@@ -146,11 +140,13 @@ class Surround(BaseParallelEnv):
             for other_agent in self._agents_names:
                 if other_agent != agent:
                     terminated[agent] = terminated[agent] or (
-                            np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2)
+                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2
+                    )
 
             terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
-            terminated[agent] = terminated[agent] or (np.linalg.norm(
-                self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2)
+            terminated[agent] = terminated[agent] or (
+                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2
+            )
 
         return terminated
 
@@ -176,7 +172,7 @@ if __name__ == "__main__":
         drone_ids=np.array([0, 1, 2, 3, 4]),
         render_mode="human",
         init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-        target_location=np.array([1, 1, 2.5])
+        target_location=np.array([1, 1, 2.5]),
     )
 
     observations = parallel_env.reset()
@@ -191,9 +187,9 @@ if __name__ == "__main__":
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
 
-        #print("obs", observations, "reward", rewards)
+        # print("obs", observations, "reward", rewards)
 
-        #if global_step % 100 == 0:
+        # if global_step % 100 == 0:
         #    print("SPS:", int(global_step / (time.time() - start_time)))
 
         global_step += 1

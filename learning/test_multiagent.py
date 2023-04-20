@@ -15,9 +15,7 @@ from cflib.crazyflie.swarm import CachedCfFactory, Swarm
 from pettingzoo import ParallelEnv
 from pettingzoo.utils.env import AgentID
 
-from crazy_rl.multi_agent.circle import Circle
 from crazy_rl.multi_agent.surround import Surround
-
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 
@@ -146,7 +144,7 @@ def play_episode(actor, env, init_obs, device):
         next_obs, _, terminateds, truncateds, infos = env.step(actions)
         print("Time for env step: ", time.time() - start)
 
-        time.sleep(1)
+        time.sleep(0.2)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
@@ -176,7 +174,7 @@ def replay_simu(args):
         drone_ids=np.array([0, 1, 2, 3, 4]),
         render_mode="human",
         init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-        target_location=np.array([1, 1, 2.5])
+        target_location=np.array([1, 1, 2.5]),
     )
 
     obs = env.reset(seed=args.seed)
@@ -255,7 +253,7 @@ def replay_real(args):
 
 if __name__ == "__main__":
 
-    time.sleep(5)
+    # time.sleep(5)
 
     args = parse_args()
 

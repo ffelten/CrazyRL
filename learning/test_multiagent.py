@@ -146,7 +146,7 @@ def play_episode(actor, env, init_obs, device, simu):
         print("Time for env step: ", time.time() - start)
 
         if simu:
-            time.sleep(0.2)
+            time.sleep(0.02)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())

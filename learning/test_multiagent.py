@@ -15,7 +15,7 @@ from cflib.crazyflie.swarm import CachedCfFactory, Swarm
 from pettingzoo import ParallelEnv
 from pettingzoo.utils.env import AgentID
 
-from crazy_rl.multi_agent.circle import Circle
+from crazy_rl.multi_agent.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 
@@ -115,14 +115,15 @@ def extract_agent_id(agent_str):
     return int(agent_str.split("_")[1])
 
 
-def play_episode(actor, env, init_obs, device):
+def play_episode(actor, env, init_obs, device, simu):
     """Play one episode.
 
     Args:
         actor: the actor network
         env: the environment
-        args: the arguments
+        init_obs: initial observations
         device: the device to use
+        simu: true if simulation, false if real
     """
     obs = init_obs
     done = False
@@ -143,6 +144,9 @@ def play_episode(actor, env, init_obs, device):
         start = time.time()
         next_obs, _, terminateds, truncateds, infos = env.step(actions)
         print("Time for env step: ", time.time() - start)
+
+        if simu:
+            time.sleep(0.02)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
@@ -168,11 +172,11 @@ def replay_simu(args):
 
     print("Using ", device)
 
-    env: ParallelEnv = Circle(
-        drone_ids=[0, 1],
+    env: ParallelEnv = Surround(
+        drone_ids=np.array([0, 1, 2, 3, 4]),
         render_mode="human",
-        init_xyzs=[[0, 0, 0], [1, 1, 0]],
-        init_target_points=[[0, 0, 1], [1, 1, 1]],
+        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        target_location=np.array([1, 1, 2.5]),
     )
 
     obs = env.reset(seed=args.seed)
@@ -186,7 +190,7 @@ def replay_simu(args):
         actor.load_state_dict(torch.load(args.model_filename))
         actor.eval()
 
-    play_episode(actor, env, obs, device)
+    play_episode(actor, env, obs, device, True)
     env.close()
 
 
@@ -227,11 +231,11 @@ def replay_real(args):
         # swarm.reset_estimators()
         swarm.get_estimated_positions()
 
-        env: ParallelEnv = Circle(
+        env: ParallelEnv = Surround(
+            drone_ids=np.array([0, 1, 2, 3, 4]),
             render_mode="real",
-            drone_ids=[0, 1],
-            init_xyzs=[[0, 0, 0], [1, 1, 0]],
-            init_target_points=[[0, 0, 1], [1, 1, 1]],
+            init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+            target_location=np.array([1, 1, 2.5]),
             swarm=swarm,
         )
 
@@ -243,12 +247,13 @@ def replay_real(args):
         actor.eval()
         print("Model loaded. Starting to play episode.")
 
-        play_episode(actor, env, obs, device)
+        play_episode(actor, env, obs, device, False)
 
         env.close()
 
 
 if __name__ == "__main__":
+
     args = parse_args()
 
     if args.mode == "simu":

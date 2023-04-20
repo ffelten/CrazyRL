@@ -2,7 +2,7 @@
 import functools
 import time
 from copy import copy
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from typing_extensions import override
 
 import numpy as np
@@ -77,10 +77,10 @@ class BaseParallelEnv(ParallelEnv):
 
     def __init__(
         self,
-        agents_names: List[str],
-        drone_ids: List[int],
-        init_xyzs: Optional[Dict[str, List[int]]] = None,
-        init_target_points: Optional[Dict[str, List[int]]] = None,
+        agents_names: np.ndarray[str],
+        drone_ids: np.ndarray[int],
+        init_flying_pos: Optional[Dict[str, np.ndarray[int]]] = None,
+        target_location: Optional[Dict[str, np.ndarray[int]]] = None,
         size: int = 4,
         render_mode: Optional[str] = None,
         swarm: Optional[Swarm] = None,
@@ -90,22 +90,22 @@ class BaseParallelEnv(ParallelEnv):
         Args:
             agents_names (list): list of agent names use as key for the dict
             drone_ids (list): ids of the drones (ignored in simulation mode)
-            init_xyzs (Dict, optional): (3)-shaped array containing the initial XYZ position of the drones.
-            init_target_points (Dict, optional): (3)-shaped array containing the initial target XYZ position.
+            init_flying_pos (Dict, optional): A dictionary containing the name of the agent as key and where each value
+                is a (3)-shaped array containing the initial XYZ position of the drones.
+            target_location (Dict, optional): A dictionary containing a (3)-shaped array for the XYZ position of the target.
             size (int, optional): Size of the area sides
-            render_mode (str, optional): The mode to display the rendering of the environment. Can be real, human or None. Real mode is used for real tests on the field, human mode is used to display the environment on a PyGame window and None mode is used to disable the rendering.
+            render_mode (str, optional): The mode to display the rendering of the environment. Can be real, human or None.
+                Real mode is used for real tests on the field, human mode is used to display the environment on a PyGame
+                window and None mode is used to disable the rendering.
             swarm (Swarm, optional): The Swarm object use in real mode to control all drones
         """
         self.size = size  # The size of the square grid
-        self._init_xyz = init_xyzs
-        self._agent_location = init_xyzs.copy()
-        self._init_target_point = init_target_points
-        self._target_location = init_target_points.copy()
-        self.possible_agents = agents_names
+        self._agent_location = init_flying_pos.copy()
+        self._init_flying_pos = init_flying_pos
+        self._target_location = target_location
+        self.possible_agents = agents_names.tolist()
         self.timestep = 0
         self.agents = []
-
-        print("init", self._init_xyz, init_xyzs)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -166,7 +166,7 @@ class BaseParallelEnv(ParallelEnv):
         self.agents = copy(self.possible_agents)
 
         if self._mode == "simu":
-            self._agent_location = self._init_xyz.copy()
+            self._agent_location = self._init_flying_pos.copy()
         elif self._mode == "real":
             # self.swarm.parallel_safe(reset_estimator)
             self._agent_location = self._get_drones_state()
@@ -176,7 +176,7 @@ class BaseParallelEnv(ParallelEnv):
             # dict target_position URI
             for id in self.drone_ids:
                 uri = "radio://0/4/2M/E7E7E7E7" + str(id).zfill(2)
-                target = self._init_target_point["agent_" + str(id)]
+                target = self._init_flying_pos["agent_" + str(id)]
                 agent = self._agent_location["agent_" + str(id)]
                 command[uri] = [[agent, target]]
 

@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# trained AI but doesn't work
+actor.pth
+
 # C extensions
 *.so
 
@@ -127,3 +130,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+.idea/
+poetry.lock

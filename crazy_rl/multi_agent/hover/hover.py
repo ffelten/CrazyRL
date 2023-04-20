@@ -1,6 +1,6 @@
 """Hover environment for Crazyflies 2."""
 import time
-from typing import Dict, List
+from typing import Dict
 from typing_extensions import override
 
 import numpy as np
@@ -17,18 +17,16 @@ class Hover(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: List[int],
-        init_xyzs: List[List[int]],
-        init_target_points: List[List[int]],
+        drone_ids: np.ndarray[int],
+        init_flying_pos: np.ndarray[int],
         render_mode=None,
         size: int = 4,
     ):
         """Hover environment for Crazyflies 2.
 
         Args:
-            drone_ids: List of drone ids
-            init_xyzs: List of initial positions of the drones
-            init_target_points: List of initial target points of the drones
+            drone_ids: Array of drone ids
+            init_flying_pos: Array of initial positions of the drones when they are flying
             render_mode: Render mode: "human", "real" or None
             size: Size of the map
         """
@@ -36,23 +34,15 @@ class Hover(BaseParallelEnv):
 
         self._agent_location = dict()
         self._target_location = dict()
-        self._init_target_points = dict()
-        self._init_xyzs = dict()
-        self._agents_names = ["agent_" + str(i) for i in drone_ids]
+        self._init_flying_pos = dict()
+        self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
         self.timestep = 0
 
         for i, agent in enumerate(self._agents_names):
-            if init_xyzs is None:
-                self._init_xyzs[agent] = np.zeros(3, dtype=float)
-            else:
-                self._init_xyzs[agent] = init_xyzs[i]
-            if init_target_points is None:
-                self._init_target_points[agent] = np.zeros(3, dtype=float)
-            else:
-                self._init_target_points[agent] = init_target_points[i]
+            self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
-        self._agent_location = self._init_xyzs.copy()
-        self._target_location = self._init_target_points.copy()
+        self._agent_location = self._init_flying_pos.copy()
+        self._target_location = self._init_flying_pos.copy()
 
         self.size = size
 
@@ -60,8 +50,8 @@ class Hover(BaseParallelEnv):
             render_mode=render_mode,
             size=size,
             agents_names=self._agents_names,
-            init_xyzs=self._init_xyzs,
-            init_target_points=self._init_target_points,
+            init_flying_pos=self._init_flying_pos,
+            target_location=self._target_location,
             drone_ids=drone_ids,
         )
 
@@ -103,7 +93,7 @@ class Hover(BaseParallelEnv):
     def _compute_reward(self):
         reward = dict()
         for agent in self._agents_names:
-            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent]) ** 2
+            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
         return reward
 
     @override
@@ -132,19 +122,17 @@ class Hover(BaseParallelEnv):
 if __name__ == "__main__":
     parallel_api_test(
         Hover(
-            drone_ids=[1, 2],
+            drone_ids=np.array([0, 1]),
             render_mode=None,
-            init_xyzs=[[0, 0, 0], [1, 1, 0]],
-            init_target_points=[[0, 0, 1], [1, 1, 1]],
+            init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
         ),
         num_cycles=10,
     )
 
     parallel_env = Hover(
-        drone_ids=[1, 2],
+        drone_ids=np.array([0, 1]),
         render_mode="human",
-        init_xyzs=[[0, 0, 0], [1, 1, 0]],
-        init_target_points=[[0, 0, 1], [1, 1, 1]],
+        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
     )
 
     observations = parallel_env.reset()
@@ -155,4 +143,4 @@ if __name__ == "__main__":
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         print("obs", observations, "reward", rewards)
-        time.sleep(1)
+        time.sleep(0.02)

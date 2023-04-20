@@ -115,14 +115,15 @@ def extract_agent_id(agent_str):
     return int(agent_str.split("_")[1])
 
 
-def play_episode(actor, env, init_obs, device):
+def play_episode(actor, env, init_obs, device, simu):
     """Play one episode.
 
     Args:
         actor: the actor network
         env: the environment
-        args: the arguments
+        init_obs: initial observations
         device: the device to use
+        simu: true if simulation, false if real
     """
     obs = init_obs
     done = False
@@ -144,7 +145,8 @@ def play_episode(actor, env, init_obs, device):
         next_obs, _, terminateds, truncateds, infos = env.step(actions)
         print("Time for env step: ", time.time() - start)
 
-        time.sleep(0.2)
+        if simu:
+            time.sleep(0.2)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
@@ -188,7 +190,7 @@ def replay_simu(args):
         actor.load_state_dict(torch.load(args.model_filename))
         actor.eval()
 
-    play_episode(actor, env, obs, device)
+    play_episode(actor, env, obs, device, True)
     env.close()
 
 
@@ -246,14 +248,12 @@ def replay_real(args):
         actor.eval()
         print("Model loaded. Starting to play episode.")
 
-        play_episode(actor, env, obs, device)
+        play_episode(actor, env, obs, device, False)
 
         env.close()
 
 
 if __name__ == "__main__":
-
-    # time.sleep(5)
 
     args = parse_args()
 

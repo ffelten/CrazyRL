@@ -116,7 +116,6 @@ class Hover(BaseParallelEnv):
 
 
 if __name__ == "__main__":
-
     parallel_api_test(
         Hover(
             drone_ids=np.array([0, 1]),

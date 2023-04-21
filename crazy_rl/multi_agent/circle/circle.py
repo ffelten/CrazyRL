@@ -139,7 +139,6 @@ class Circle(BaseParallelEnv):
 
 
 if __name__ == "__main__":
-
     parallel_api_test(
         Circle(
             drone_ids=np.array([0, 1]),

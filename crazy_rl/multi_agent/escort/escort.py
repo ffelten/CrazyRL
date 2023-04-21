@@ -42,7 +42,6 @@ class Escort(BaseParallelEnv):
         self._agent_location = dict()
 
         self._target_location = {"unique": init_target_location}  # unique target location for all agents
-        print("_target_location: ", self._target_location)
 
         self._init_flying_pos = dict()
         self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
@@ -58,8 +57,6 @@ class Escort(BaseParallelEnv):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
         for t in range(1, self.num_ref_points):
-            # print("self.ref: ", self.ref)
-
             self.ref = np.vstack(
                 (self.ref, [init_target_location + (final_target_location - init_target_location) * t / self.num_ref_points])
             )
@@ -132,25 +129,30 @@ class Escort(BaseParallelEnv):
         for agent in self._agents_names:
             reward[agent] = 0
 
+            # mean distance to the other agents
             for other_agent in self._agents_names:
                 if other_agent != agent:
-                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2
+                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
             reward[agent] *= 0
 
-            reward[agent] -= 1 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2
+            # distance to the target
+            reward[agent] -= 1 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
 
+            # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent and (
-                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2
+                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                 ):
                     reward[agent] -= 100
 
+            # collision with the ground
             if self._agent_location[agent][2] < 0.2:
                 reward[agent] -= 100
 
-            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2:
+            # collision with the target
+            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
                 reward[agent] -= 100
 
         return reward
@@ -164,16 +166,23 @@ class Escort(BaseParallelEnv):
                 self.timestep >= self.num_ref_points + 50
             )  # the game stops 50 steps after the target has stopped
 
+            # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent:
                     terminated[agent] = terminated[agent] or (
-                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) ** 2 < 0.2
+                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                     )
 
+            # collision with the ground
             terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
+
+            # collision with the target
             terminated[agent] = terminated[agent] or (
-                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) ** 2 < 0.2
+                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
             )
+
+            if terminated[agent]:
+                self.agents.remove(agent)
 
         return terminated
 

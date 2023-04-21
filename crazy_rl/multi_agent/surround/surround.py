@@ -113,7 +113,7 @@ class Surround(BaseParallelEnv):
 
             reward[agent] *= 0.10
 
-            # distance to the target
+            # a maximum value minus the distance to the target
             reward[agent] += 0.90 * (
                 2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
             )
@@ -157,6 +157,9 @@ class Surround(BaseParallelEnv):
                 np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
             )
 
+            if terminated[agent]:
+                self.agents.remove(agent)
+
         return terminated
 
     @override
@@ -186,8 +189,8 @@ if __name__ == "__main__":
 
     observations = parallel_env.reset()
 
-    global_step = 0
-    start_time = time.time()
+    # global_step = 0
+    # start_time = time.time()
 
     while parallel_env.agents:
         actions = {
@@ -201,5 +204,6 @@ if __name__ == "__main__":
         # if global_step % 100 == 0:
         #    print("SPS:", int(global_step / (time.time() - start_time)))
 
-        global_step += 1
-        time.sleep(0.02)
+        # global_step += 1
+
+        time.sleep(0.05)

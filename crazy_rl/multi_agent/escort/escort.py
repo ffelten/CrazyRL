@@ -56,9 +56,13 @@ class Escort(BaseParallelEnv):
         for i, agent in enumerate(self._agents_names):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
+        print("self.ref", self.ref)
+
         for t in range(1, self.num_ref_points):
-            self.ref = np.vstack(
-                (self.ref, [init_target_location + (final_target_location - init_target_location) * t / self.num_ref_points])
+            self.ref = np.append(
+                self.ref,
+                [init_target_location + (final_target_location - init_target_location) * t / self.num_ref_points],
+                axis=0,
             )
 
         self._agent_location = self._init_flying_pos.copy()
@@ -115,7 +119,7 @@ class Escort(BaseParallelEnv):
         target_point_action = dict()
         state = self._get_drones_state()
 
-        for agent in self._agents_names:
+        for agent in self.agents:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
             target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
 
@@ -161,13 +165,13 @@ class Escort(BaseParallelEnv):
     def _compute_terminated(self):
         terminated = dict()
 
-        for agent in self._agents_names:
+        for agent in self.agents:
             terminated[agent] = (
                 self.timestep >= self.num_ref_points + 50
             )  # the game stops 50 steps after the target has stopped
 
             # collision between two drones
-            for other_agent in self._agents_names:
+            for other_agent in self.agents:
                 if other_agent != agent:
                     terminated[agent] = terminated[agent] or (
                         np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
@@ -182,7 +186,9 @@ class Escort(BaseParallelEnv):
             )
 
             if terminated[agent]:
-                self.agents.remove(agent)
+                for other_agent in self.agents:
+                    terminated[other_agent] = True
+                self.agents = []
 
         return terminated
 

@@ -90,7 +90,7 @@ class Surround(BaseParallelEnv):
         target_point_action = dict()
         state = self._get_drones_state()
 
-        for agent in self._agents_names:
+        for agent in self.agents:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
             target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
 
@@ -105,16 +105,16 @@ class Surround(BaseParallelEnv):
             reward[agent] = 0
 
             # mean distance to the other agents
-            for other_agent in self._agents_names:
+            """for other_agent in self._agents_names:
                 if other_agent != agent:
                     reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
 
-            reward[agent] *= 0.10
+            reward[agent] *= 0"""
 
             # a maximum value minus the distance to the target
-            reward[agent] += 0.90 * (
+            reward[agent] += 1 * (
                 2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
             )
 
@@ -139,11 +139,11 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self):
         terminated = dict()
 
-        for agent in self._agents_names:
+        for agent in self.agents:
             terminated[agent] = False
 
             # collision between two drones
-            for other_agent in self._agents_names:
+            for other_agent in self.agents:
                 if other_agent != agent:
                     terminated[agent] = terminated[agent] or (
                         np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
@@ -158,7 +158,9 @@ class Surround(BaseParallelEnv):
             )
 
             if terminated[agent]:
-                self.agents.remove(agent)
+                for other_agent in self.agents:
+                    terminated[other_agent] = True
+                self.agents = []
 
         return terminated
 
@@ -190,19 +192,21 @@ if __name__ == "__main__":
 
     # global_step = 0
     # start_time = time.time()
+    for i in range(1):
+        while parallel_env.agents:
+            actions = {
+                agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
+            }  # this is where you would insert your policy
+            observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
+            parallel_env.render()
 
-    while parallel_env.agents:
-        actions = {
-            agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
-        }  # this is where you would insert your policy
-        observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
-        parallel_env.render()
+            print("obs", observations, "reward", rewards)
 
-        # print("obs", observations, "reward", rewards)
+            # if global_step % 100 == 0:
+            #    print("SPS:", int(global_step / (time.time() - start_time)))
 
-        # if global_step % 100 == 0:
-        #    print("SPS:", int(global_step / (time.time() - start_time)))
+            # global_step += 1
 
-        # global_step += 1
+            time.sleep(0.05)
 
-        time.sleep(0.05)
+        observations = parallel_env.reset()

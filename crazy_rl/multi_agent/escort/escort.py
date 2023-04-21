@@ -194,7 +194,6 @@ class Escort(BaseParallelEnv):
 
 
 if __name__ == "__main__":
-
     parallel_env = Escort(
         drone_ids=np.array([0, 1, 2, 3]),
         render_mode="human",

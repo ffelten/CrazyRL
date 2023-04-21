@@ -179,7 +179,6 @@ class Surround(BaseParallelEnv):
 
 
 if __name__ == "__main__":
-
     parallel_env = Surround(
         drone_ids=np.array([0, 1, 2, 3, 4]),
         render_mode="human",

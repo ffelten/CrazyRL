@@ -62,8 +62,8 @@ class Surround(BaseParallelEnv):
     @override
     def _observation_space(self, agent):
         return spaces.Box(
-            low=np.tile(np.array([-self.size - 1, -self.size - 1, 0], dtype=np.float32), self.num_drones + 1),
-            high=np.tile(np.array([self.size - 1, self.size - 1, self.size - 1], dtype=np.float32), self.num_drones + 1),
+            low=np.tile(np.array([-self.size, -self.size, 0], dtype=np.float32), self.num_drones + 1),
+            high=np.tile(np.array([self.size, self.size, self.size], dtype=np.float32), self.num_drones + 1),
             shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
             dtype=np.float32,
         )
@@ -111,11 +111,11 @@ class Surround(BaseParallelEnv):
 
             reward[agent] /= self.num_drones - 1
 
-            reward[agent] *= 0.15
+            reward[agent] *= 0.10
 
             # distance to the target
-            reward[agent] += 0.85 * (
-                4 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
+            reward[agent] += 0.90 * (
+                2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
             )
 
             # collision between two drones

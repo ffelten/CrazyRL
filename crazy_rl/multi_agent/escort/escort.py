@@ -81,8 +81,8 @@ class Escort(BaseParallelEnv):
     @override
     def _observation_space(self, agent):
         return spaces.Box(
-            low=np.tile(np.array([-self.size - 1, -self.size - 1, 0], dtype=np.float32), self.num_drones + 1),
-            high=np.tile(np.array([self.size - 1, self.size - 1, self.size - 1], dtype=np.float32), self.num_drones + 1),
+            low=np.tile(np.array([-self.size, -self.size, 0], dtype=np.float32), self.num_drones + 1),
+            high=np.tile(np.array([self.size, self.size, self.size], dtype=np.float32), self.num_drones + 1),
             shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
             dtype=np.float32,
         )
@@ -97,14 +97,11 @@ class Escort(BaseParallelEnv):
 
         t = self.timestep
 
-        print("self.ref", self.ref)
         if t < self.num_ref_points:
             self._target_location["unique"] = self.ref[t]
 
         else:
-            self._target_location["unique"] = self.ref[-1]  # final target location
-
-        print("self._target_location: ", self._target_location)
+            self._target_location["unique"] = self.ref[-1]  # stay in final location
 
         for agent in self._agents_names:
             obs[agent] = self._agent_location[agent].copy()
@@ -123,9 +120,7 @@ class Escort(BaseParallelEnv):
 
         for agent in self._agents_names:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-            target_point_action[agent] = np.clip(
-                state[agent] + actions[agent] * 0.2, [-self.size - 1, -self.size - 1, 0], self.size - 1
-            )
+            target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
 
         return target_point_action
 

@@ -40,7 +40,6 @@ class Catch(BaseParallelEnv):
         self._agent_location = dict()
 
         self._target_location = {"unique": init_target_location}  # unique target location for all agents
-        print("_target_location: ", self._target_location)
 
         self.target_speed = target_speed
 

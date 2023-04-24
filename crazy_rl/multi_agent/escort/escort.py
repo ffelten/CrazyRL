@@ -56,8 +56,6 @@ class Escort(BaseParallelEnv):
         for i, agent in enumerate(self._agents_names):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
-        print("self.ref", self.ref)
-
         for t in range(1, self.num_ref_points):
             self.ref = np.append(
                 self.ref,

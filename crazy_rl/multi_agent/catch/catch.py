@@ -95,23 +95,18 @@ class Catch(BaseParallelEnv):
         if dist > 0.2:
             self._target_location["unique"] += (self._target_location["unique"] - mean) / dist * self.target_speed
 
-        # if the mean of the agents is too close to the target, move slowly the target in a random direction
+        # if the mean of the agents is too close to the target, move the target in a random direction, slowly because
+        # it hesitates
         else:
             self._target_location["unique"] += np.random.random_sample(3) * self.target_speed * 0.1
 
         # if the target is out of the map, put it back in the map
-        if self._target_location["unique"][0] > self.size:
-            self._target_location["unique"][0] = self.size
-        if self._target_location["unique"][0] < -self.size:
-            self._target_location["unique"][0] = -self.size
-        if self._target_location["unique"][1] > self.size:
-            self._target_location["unique"][1] = self.size
-        if self._target_location["unique"][1] < -self.size:
-            self._target_location["unique"][1] = -self.size
-        if self._target_location["unique"][2] > self.size:
-            self._target_location["unique"][2] = self.size
-        if self._target_location["unique"][2] < 0.2:
-            self._target_location["unique"][2] = 0.2
+        np.clip(
+            self._target_location["unique"],
+            [-self.size, -self.size, 0.2],
+            [self.size, self.size, self.size],
+            out=self._target_location["unique"],
+        )
 
         for agent in self._agents_names:
             obs[agent] = self._agent_location[agent].copy()

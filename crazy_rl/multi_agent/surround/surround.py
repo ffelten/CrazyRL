@@ -111,10 +111,10 @@ class Surround(BaseParallelEnv):
 
             reward[agent] /= self.num_drones - 1
 
-            reward[agent] *= 0.05
+            reward[agent] *= 0.25
 
             # a maximum value minus the distance to the target
-            reward[agent] += 0.95 * (
+            reward[agent] += 0.75 * (
                 2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
             )
 

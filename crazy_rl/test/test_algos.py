@@ -2,6 +2,7 @@
 import numpy as np
 from pettingzoo.test.parallel_test import parallel_api_test
 
+from crazy_rl.multi_agent.catch.catch import Catch
 from crazy_rl.multi_agent.circle.circle import Circle
 from crazy_rl.multi_agent.escort.escort import Escort
 from crazy_rl.multi_agent.hover.hover import Hover
@@ -55,6 +56,20 @@ def test_escort():
             init_target_location=np.array([1, 1, 2.5]),
             final_target_location=np.array([-2, -2, 3]),
             num_intermediate_points=150,
+        ),
+        num_cycles=10,
+    )
+
+
+def test_catch():
+    """Test for the catch environment."""
+    parallel_api_test(
+        Catch(
+            drone_ids=np.array([0, 1, 2, 3]),
+            render_mode=None,
+            init_flying_pos=np.array([[0, 0, 1], [1, 1, 1], [0, 1, 1], [2, 2, 1]]),
+            init_target_location=np.array([1, 1, 2.5]),
+            target_speed=0.1,
         ),
         num_cycles=10,
     )

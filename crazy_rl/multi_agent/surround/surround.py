@@ -62,8 +62,8 @@ class Surround(BaseParallelEnv):
     @override
     def _observation_space(self, agent):
         return spaces.Box(
-            low=np.tile(np.array([-self.size - 1, -self.size - 1, 0], dtype=np.float32), self.num_drones + 1),
-            high=np.tile(np.array([self.size - 1, self.size - 1, self.size - 1], dtype=np.float32), self.num_drones + 1),
+            low=np.tile(np.array([-self.size, -self.size, 0], dtype=np.float32), self.num_drones + 1),
+            high=np.tile(np.array([self.size, self.size, self.size], dtype=np.float32), self.num_drones + 1),
             shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
             dtype=np.float32,
         )
@@ -90,11 +90,9 @@ class Surround(BaseParallelEnv):
         target_point_action = dict()
         state = self._get_drones_state()
 
-        for agent in self._agents_names:
+        for agent in self.agents:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-            target_point_action[agent] = np.clip(
-                state[agent] + actions[agent] * 0.2, [-self.size - 1, -self.size - 1, 0], self.size - 1
-            )
+            target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
 
         return target_point_action
 
@@ -107,16 +105,18 @@ class Surround(BaseParallelEnv):
             reward[agent] = 0
 
             # mean distance to the other agents
-            for other_agent in self._agents_names:
+            """for other_agent in self._agents_names:
                 if other_agent != agent:
                     reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
 
-            reward[agent] *= 0.15
+            reward[agent] *= 0"""
 
-            # distance to the target
-            reward[agent] -= 0.85 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
+            # a maximum value minus the distance to the target
+            reward[agent] += 1 * (
+                2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
+            )
 
             # collision between two drones
             for other_agent in self._agents_names:
@@ -139,11 +139,11 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self):
         terminated = dict()
 
-        for agent in self._agents_names:
+        for agent in self.agents:
             terminated[agent] = False
 
             # collision between two drones
-            for other_agent in self._agents_names:
+            for other_agent in self.agents:
                 if other_agent != agent:
                     terminated[agent] = terminated[agent] or (
                         np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
@@ -156,6 +156,11 @@ class Surround(BaseParallelEnv):
             terminated[agent] = terminated[agent] or (
                 np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
             )
+
+            if terminated[agent]:
+                for other_agent in self.agents:
+                    terminated[other_agent] = True
+                self.agents = []
 
         return terminated
 
@@ -185,9 +190,8 @@ if __name__ == "__main__":
 
     observations = parallel_env.reset()
 
-    global_step = 0
-    start_time = time.time()
-
+    # global_step = 0
+    # start_time = time.time()
     while parallel_env.agents:
         actions = {
             agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
@@ -195,10 +199,11 @@ if __name__ == "__main__":
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
 
-        # print("obs", observations, "reward", rewards)
+        print("obs", observations, "reward", rewards)
 
         # if global_step % 100 == 0:
         #    print("SPS:", int(global_step / (time.time() - start_time)))
 
-        global_step += 1
-        time.sleep(0.02)
+        # global_step += 1
+
+        time.sleep(0.05)

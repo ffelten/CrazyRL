@@ -52,6 +52,13 @@ The drones learn to [surround](crazy_rl/multi_agent/surround/surround.py) a fixe
 
 The yellow ball represents the target the drones have to surround.
 
+### Escort
+The drones learn to [escort](crazy_rl/multi_agent/escort/escort.py) a target moving straight to one point to another.
+
+<img src="escort.gif" alt="Escort" width="30%"/>
+
+The yellow ball represents the target the drones have to escort.
+
 ## API
 
 ### Training

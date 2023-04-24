@@ -76,10 +76,8 @@ class Circle(BaseParallelEnv):
     @override
     def _observation_space(self, agent):
         return spaces.Box(
-            low=np.array([-self.size - 1, -self.size - 1, 0, -self.size - 1, -self.size - 1, 0], dtype=np.float32),
-            high=np.array(
-                [self.size - 1, self.size - 1, self.size - 1, self.size - 1, self.size - 1, self.size - 1], dtype=np.float32
-            ),
+            low=np.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=np.float32),
+            high=np.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=np.float32),
             shape=(6,),
             dtype=np.float32,
         )
@@ -106,9 +104,7 @@ class Circle(BaseParallelEnv):
 
         for agent in self._agents_names:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-            target_point_action[agent] = np.clip(
-                state[agent] + actions[agent] * 0.2, [-self.size - 1, -self.size - 1, 0], self.size - 1
-            )
+            target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
 
         return target_point_action
 
@@ -167,4 +163,4 @@ if __name__ == "__main__":
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
         print("obs", observations, "reward", rewards)
-        time.sleep(0.2)
+        time.sleep(0.02)

@@ -146,7 +146,7 @@ def play_episode(actor, env, init_obs, device, simu):
         print("Time for env step: ", time.time() - start)
 
         if simu:
-            time.sleep(0.02)
+            time.sleep(0.05)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
@@ -173,9 +173,9 @@ def replay_simu(args):
     print("Using ", device)
 
     env: ParallelEnv = Surround(
-        drone_ids=np.array([0, 1, 2, 3, 4]),
+        drone_ids=np.array([0, 1, 2, 3]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1]]),
         target_location=np.array([1, 1, 2.5]),
     )
 

@@ -58,10 +58,8 @@ class Hover(BaseParallelEnv):
     @override
     def _observation_space(self, agent):
         return spaces.Box(
-            low=np.array([-self.size - 1, -self.size - 1, 0, -self.size - 1, -self.size - 1, 0], dtype=np.float32),
-            high=np.array(
-                [self.size - 1, self.size - 1, self.size - 1, self.size - 1, self.size - 1, self.size - 1], dtype=np.float32
-            ),
+            low=np.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=np.float32),
+            high=np.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=np.float32),
             shape=(6,),
             dtype=np.float32,
         )
@@ -84,9 +82,7 @@ class Hover(BaseParallelEnv):
         target_point_action = dict()
         state = self._get_drones_state()
         for agent in self._agents_names:
-            target_point_action[agent] = np.clip(
-                state[agent] + actions[agent], [-self.size - 1, -self.size - 1, 0], self.size - 1
-            )
+            target_point_action[agent] = np.clip(state[agent] + actions[agent], [-self.size, -self.size, 0], self.size)
         return target_point_action
 
     @override

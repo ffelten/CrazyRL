@@ -84,7 +84,7 @@ class Catch(BaseParallelEnv):
         # mean of the agent's positions
         mean = np.array([0, 0, 0])
 
-        for agent in self._agents_names:
+        for agent in self.agents:
             mean = mean + self._agent_location[agent]
 
         mean = mean / self.num_drones

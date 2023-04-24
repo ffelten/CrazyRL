@@ -59,6 +59,13 @@ The drones learn to [escort](crazy_rl/multi_agent/escort/escort.py) a target mov
 
 The yellow ball represents the target the drones have to escort.
 
+### Catch
+The drones learn to [catch](crazy_rl/multi_agent/catch/catch.py) a target trying to escape.
+
+<img src="catch.gif" alt="Catch" width="30%"/>
+
+The yellow ball represents the target the drones have to catch.
+
 ## API
 
 ### Training

@@ -105,16 +105,16 @@ class Surround(BaseParallelEnv):
             reward[agent] = 0
 
             # mean distance to the other agents
-            """for other_agent in self._agents_names:
+            for other_agent in self._agents_names:
                 if other_agent != agent:
                     reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
 
-            reward[agent] *= 0"""
+            reward[agent] *= 0.25
 
             # a maximum value minus the distance to the target
-            reward[agent] += 1 * (
+            reward[agent] += 0.75 * (
                 2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
             )
 

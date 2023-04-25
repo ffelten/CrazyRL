@@ -15,7 +15,7 @@ from cflib.crazyflie.swarm import CachedCfFactory, Swarm
 from pettingzoo import ParallelEnv
 from pettingzoo.utils.env import AgentID
 
-from crazy_rl.multi_agent.surround import Surround
+from crazy_rl.multi_agent.numpy.surround.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 

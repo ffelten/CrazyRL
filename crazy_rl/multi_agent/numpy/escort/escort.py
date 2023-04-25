@@ -6,7 +6,7 @@ from typing_extensions import override
 import numpy as np
 from gymnasium import spaces
 
-from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
 
 
 class Escort(BaseParallelEnv):

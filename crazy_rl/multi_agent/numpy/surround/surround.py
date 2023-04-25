@@ -5,7 +5,7 @@ from typing_extensions import override
 import numpy as np
 from gymnasium import spaces
 
-from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
 
 
 class Surround(BaseParallelEnv):
@@ -111,10 +111,10 @@ class Surround(BaseParallelEnv):
 
             reward[agent] /= self.num_drones - 1
 
-            reward[agent] *= 0.25
+            reward[agent] *= 0.05
 
             # a maximum value minus the distance to the target
-            reward[agent] += 0.75 * (
+            reward[agent] += 0.95 * (
                 2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
             )
 

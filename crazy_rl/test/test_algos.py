@@ -2,11 +2,11 @@
 import numpy as np
 from pettingzoo.test.parallel_test import parallel_api_test
 
-from crazy_rl.multi_agent.catch.catch import Catch
-from crazy_rl.multi_agent.circle.circle import Circle
-from crazy_rl.multi_agent.escort.escort import Escort
-from crazy_rl.multi_agent.hover.hover import Hover
-from crazy_rl.multi_agent.surround.surround import Surround
+from crazy_rl.multi_agent.numpy.catch.catch import Catch
+from crazy_rl.multi_agent.numpy.circle.circle import Circle
+from crazy_rl.multi_agent.numpy.escort.escort import Escort
+from crazy_rl.multi_agent.numpy.hover.hover import Hover
+from crazy_rl.multi_agent.numpy.surround.surround import Surround
 
 
 def test_hover():

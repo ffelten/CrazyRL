@@ -46,7 +46,7 @@ The drones learn to perform a coordinated [circle](crazy_rl/multi_agent/circle/c
 The yellow balls represent the target position of the drones.
 
 ### Surround
-The drones learn to [surround](crazy_rl/multi_agent/surround/surround.py) a fixed target point.
+The drones learn to [surround](crazy_rl/multi_agent/numpy/surround/surround.py) a fixed target point.
 
 <img src="surround.gif" alt="Surround" width="30%"/>
 

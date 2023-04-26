@@ -49,6 +49,9 @@ class Surround(BaseParallelEnv):
 
         self.size = size
 
+        self.crash = False
+        self.end = False
+
         super().__init__(
             render_mode=render_mode,
             size=size,
@@ -104,20 +107,25 @@ class Surround(BaseParallelEnv):
         for agent in self._agents_names:
             reward[agent] = 0
 
-            # mean distance to the other agents
-            for other_agent in self._agents_names:
-                if other_agent != agent:
-                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
+            if self.end:
+                # mean distance to the other agents
+                for other_agent in self._agents_names:
+                    if other_agent != agent:
+                        reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
-            reward[agent] /= self.num_drones - 1
+                reward[agent] /= self.num_drones - 1
 
-            reward[agent] *= 0.05
+                reward[agent] *= 0.35
 
-            # a maximum value minus the distance to the target
-            reward[agent] += 0.95 * (
-                2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
-            )
+                # a maximum value minus the distance to the target
+                reward[agent] += 0.65 * (
+                    2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
+                )
 
+            elif self.crash:
+                reward[agent] = -100
+
+            """
             # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent and (
@@ -132,6 +140,7 @@ class Surround(BaseParallelEnv):
             # collision with the target
             if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
                 reward[agent] -= 100
+            """
 
         return reward
 
@@ -139,28 +148,39 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self):
         terminated = dict()
 
-        for agent in self.agents:
-            terminated[agent] = False
-
-            # collision between two drones
-            for other_agent in self.agents:
-                if other_agent != agent:
-                    terminated[agent] = terminated[agent] or (
-                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-                    )
-
-            # collision with the ground
-            terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
-
-            # collision with the target
-            terminated[agent] = terminated[agent] or (
-                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
-            )
-
-            if terminated[agent]:
-                for other_agent in self.agents:
-                    terminated[other_agent] = True
+        # End of the game
+        if self.timestep == 100:
+            for agent in self.agents:
+                terminated[agent] = True
                 self.agents = []
+
+            self.end = True
+
+        else:
+            for agent in self.agents:
+                terminated[agent] = False
+
+                # collision between two drones
+                for other_agent in self.agents:
+                    if other_agent != agent:
+                        terminated[agent] = terminated[agent] or (
+                            np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
+                        )
+
+                # collision with the ground
+                terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
+
+                # collision with the target
+                terminated[agent] = terminated[agent] or (
+                    np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
+                )
+
+                if terminated[agent]:
+                    for other_agent in self.agents:
+                        terminated[other_agent] = True
+                    self.agents = []
+
+                    self.crash = True
 
         return terminated
 

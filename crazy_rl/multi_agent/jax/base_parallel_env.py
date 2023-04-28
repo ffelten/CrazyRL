@@ -1,11 +1,10 @@
 """The Base environment inheriting from pettingZoo Parallel environment class."""
 import functools
 import time
-from copy import copy
-from typing import Dict, Optional
+from typing import Optional
 from typing_extensions import override
 
-# import jax.numpy as jnp
+import jax.numpy as jnp
 import numpy as np
 import pygame
 from cflib.crazyflie.swarm import Swarm
@@ -78,10 +77,9 @@ class BaseParallelEnv(ParallelEnv):
 
     def __init__(
         self,
-        agents_names: np.ndarray[str],
-        drone_ids: np.ndarray[int],
-        init_flying_pos: Optional[Dict[str, np.ndarray[int]]] = None,
-        target_location: Optional[Dict[str, np.ndarray[int]]] = None,
+        num_drones: int,
+        init_flying_pos: Optional[jnp.ndarray] = None,
+        target_location: Optional[jnp.ndarray] = None,
         size: int = 4,
         render_mode: Optional[str] = None,
         swarm: Optional[Swarm] = None,
@@ -89,11 +87,10 @@ class BaseParallelEnv(ParallelEnv):
         """Initialization of a generic aviary environment.
 
         Args:
-            agents_names (list): list of agent names use as key for the dict
-            drone_ids (list): ids of the drones (ignored in simulation mode)
-            init_flying_pos (Dict, optional): A dictionary containing the name of the agent as key and where each value
-                is a (3)-shaped array containing the initial XYZ position of the drones.
-            target_location (Dict, optional): A dictionary containing a (3)-shaped array for the XYZ position of the target.
+            num_drones: ids of the drones (ignored in simulation mode)
+            init_flying_pos (array, optional): An array where each value is a (3)-shaped array containing the initial
+                XYZ position of the drones.
+            target_location (array, optional): An array containing a (3)-shaped array for the XYZ position of the target.
             size (int, optional): Size of the area sides
             render_mode (str, optional): The mode to display the rendering of the environment. Can be real, human or None.
                 Real mode is used for real tests on the field, human mode is used to display the environment on a PyGame
@@ -101,12 +98,15 @@ class BaseParallelEnv(ParallelEnv):
             swarm (Swarm, optional): The Swarm object use in real mode to control all drones
         """
         self.size = size  # The size of the square grid
-        self._agent_location = init_flying_pos.copy()
+        self._agent_location = jnp.copy(init_flying_pos)
         self._init_flying_pos = init_flying_pos
         self._target_location = target_location
-        self.possible_agents = agents_names.tolist()
         self.timestep = 0
-        self.agents = []
+        self.alive_agents = jnp.array([])
+        self.num_drones = num_drones
+
+        self.crash = jnp.array([False for _ in range(self.num_drones)])
+        self.end = False
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -117,7 +117,7 @@ class BaseParallelEnv(ParallelEnv):
             self.window = None
             self.clock = None
         elif self.render_mode == "real":
-            self.drone_ids = drone_ids
+            self.drone_ids = [i for i in range(num_drones)]
             assert swarm is not None, "Swarm object must be provided in real mode"
             self.swarm = swarm
             while not self.swarm:
@@ -128,7 +128,7 @@ class BaseParallelEnv(ParallelEnv):
         """Returns the observation space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _action_space(self, agent) -> spaces.Space:
+    def _action_space(self) -> spaces.Space:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -144,11 +144,11 @@ class BaseParallelEnv(ParallelEnv):
         """
         raise NotImplementedError
 
-    def _compute_reward(self):
+    def _compute_reward(self, crash, end):
         """Computes the current reward value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_terminated(self):
+    def _compute_terminated(self, alive_agents, crash, end):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -164,10 +164,11 @@ class BaseParallelEnv(ParallelEnv):
     @override
     def reset(self, seed=None, return_info=False, options=None):
         self.timestep = 0
-        self.agents = copy(self.possible_agents)
+        self.alive_agents = jnp.array([i for i in range(self.num_drones)])
 
         if self._mode == "simu":
-            self._agent_location = self._init_flying_pos.copy()
+            self._agent_location = jnp.copy(self._init_flying_pos)
+
         elif self._mode == "real":
             # self.swarm.parallel_safe(reset_estimator)
             self._agent_location = self._get_drones_state()
@@ -175,10 +176,10 @@ class BaseParallelEnv(ParallelEnv):
 
             command = dict()
             # dict target_position URI
-            for id in self.drone_ids:
-                uri = "radio://0/4/2M/E7E7E7E7" + str(id).zfill(2)
-                target = self._init_flying_pos["agent_" + str(id)]
-                agent = self._agent_location["agent_" + str(id)]
+            for agent in range(self.num_drones):
+                uri = "radio://0/4/2M/E7E7E7E7" + str(agent).zfill(2)
+                target = self._init_flying_pos[agent]
+                agent = self._agent_location[agent]
                 command[uri] = [[agent, target]]
 
             self.swarm.parallel_safe(run_take_off)
@@ -193,6 +194,9 @@ class BaseParallelEnv(ParallelEnv):
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
 
+        self.crash = False
+        self.end = False
+
         return observation
 
     @override
@@ -204,13 +208,14 @@ class BaseParallelEnv(ParallelEnv):
         if self._mode == "simu":
             self._agent_location = target_action
             self.render()
+
         elif self._mode == "real":
             command = dict()
             # dict target_position URI
-            for id in self.drone_ids:
-                uri = "radio://0/4/2M/E7E7E7E7" + str(id).zfill(2)
-                target = target_action["agent_" + str(id)]
-                current_location = self._agent_location["agent_" + str(id)]
+            for agent in range(self.num_drones):
+                uri = "radio://0/4/2M/E7E7E7E7" + str(agent).zfill(2)
+                target = target_action[agent]
+                current_location = self._agent_location[agent]
                 command[uri] = [[current_location, target]]
 
             start = time.time()
@@ -219,8 +224,10 @@ class BaseParallelEnv(ParallelEnv):
 
             self._agent_location = self._get_drones_state()
 
-        terminations = self._compute_terminated()
-        rewards = self._compute_reward()
+        terminations, self.alive_agents, self.crash, self.end = self._compute_terminated(
+            self.alive_agents, self.crash, self.end
+        )
+        rewards = self._compute_reward(self.crash, self.end)
         observations = self._compute_obs()
         infos = self._compute_info()
         truncations = self._compute_truncation()
@@ -290,9 +297,9 @@ class BaseParallelEnv(ParallelEnv):
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        for agent in self._agent_location.values():
+        for agent in self._agent_location:
             glPushMatrix()
-            point(np.array([agent[0], agent[1], agent[2]]))
+            point(np.copy(agent))
 
             glPopMatrix()
 
@@ -300,9 +307,9 @@ class BaseParallelEnv(ParallelEnv):
         field(self.size)
         axes()
 
-        for target in self._target_location.values():
+        for target in self._target_location:
             glPushMatrix()
-            target_point(np.array([target[0], target[1], target[2]]))
+            target_point(jnp.copy(target))
             glPopMatrix()
 
         pygame.event.pump()
@@ -310,8 +317,8 @@ class BaseParallelEnv(ParallelEnv):
 
     @override
     def state(self):
-        states = tuple(self._compute_obs()[agent].astype(np.float32) for agent in self.possible_agents)
-        return np.concatenate(states, axis=None)
+        states = jnp.array([self._compute_obs()[agent].astype(jnp.float32) for agent in range(self.num_drones)])
+        return jnp.concatenate(states, axis=None)
 
     @override
     def close(self):
@@ -329,8 +336,8 @@ class BaseParallelEnv(ParallelEnv):
 
     @functools.lru_cache(maxsize=None)
     @override
-    def action_space(self, agent):
-        return self._action_space(agent)
+    def action_space(self):
+        return self._action_space()
 
     def _get_drones_state(self):
         """Return the state of all drones (xyz position) inside a dict with the same keys of agent_location and target_location."""

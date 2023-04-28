@@ -49,7 +49,9 @@ class Surround(BaseParallelEnv):
 
         self.size = size
 
-        self.crash = False
+        self.crash = dict()
+        for agent in self._agents_names:
+            self.crash[agent] = False
         self.end = False
 
         super().__init__(
@@ -115,15 +117,15 @@ class Surround(BaseParallelEnv):
 
                 reward[agent] /= self.num_drones - 1
 
-                reward[agent] *= 0.35
+                reward[agent] *= 0.2
 
                 # a maximum value minus the distance to the target
-                reward[agent] += 0.65 * (
+                reward[agent] += 0.8 * (
                     2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
                 )
 
-            elif self.crash:
-                reward[agent] = -100
+            elif self.crash[agent]:
+                reward[agent] = -10
 
             """
             # collision between two drones
@@ -141,6 +143,8 @@ class Surround(BaseParallelEnv):
             if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
                 reward[agent] -= 100
             """
+            self.crash[agent] = False
+        self.end = False
 
         return reward
 
@@ -162,10 +166,12 @@ class Surround(BaseParallelEnv):
 
                 # collision between two drones
                 for other_agent in self.agents:
-                    if other_agent != agent:
-                        terminated[agent] = terminated[agent] or (
-                            np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-                        )
+                    if (
+                        other_agent != agent
+                        and np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
+                    ):
+                        terminated[agent] = True
+                        self.crash[other_agent] = True
 
                 # collision with the ground
                 terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
@@ -180,13 +186,13 @@ class Surround(BaseParallelEnv):
                         terminated[other_agent] = True
                     self.agents = []
 
-                    self.crash = True
+                    self.crash[agent] = True
 
         return terminated
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 200:
+        if self.timestep == 10000:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.timestep = 0
@@ -203,27 +209,30 @@ class Surround(BaseParallelEnv):
 if __name__ == "__main__":
     parallel_env = Surround(
         drone_ids=np.array([0, 1, 2, 3, 4]),
-        render_mode="human",
+        render_mode=None,
         init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
         target_location=np.array([1, 1, 2.5]),
     )
 
     observations = parallel_env.reset()
 
-    # global_step = 0
-    # start_time = time.time()
-    while parallel_env.agents:
-        actions = {
-            agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
-        }  # this is where you would insert your policy
-        observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
-        parallel_env.render()
+    global_step = 0
+    start_time = time.time()
 
-        print("obs", observations, "reward", rewards)
+    for i in range(10000):
+        while parallel_env.agents:
+            actions = {
+                agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
+            }  # this is where you would insert your policy
+            observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
+            parallel_env.render()
 
-        # if global_step % 100 == 0:
-        #    print("SPS:", int(global_step / (time.time() - start_time)))
+            # print("obs", observations, "reward", rewards)
 
-        # global_step += 1
+            if global_step % 100 == 0:
+                print("SPS:", int(global_step / (time.time() - start_time)))
 
-        time.sleep(0.05)
+            global_step += 1
+        observations = parallel_env.reset()
+
+        # time.sleep(0.05)

@@ -122,7 +122,7 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 200:
+        if self.timestep == 10000:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.timestep = 0
@@ -150,9 +150,12 @@ if __name__ == "__main__":
 
     parallel_env = Circle(
         drone_ids=np.array([0, 1]),
-        render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [2, 2, 1]]),
+        render_mode=None,
+        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
     )
+
+    global_step = 0
+    start_time = time.time()
 
     observations = parallel_env.reset()
 
@@ -162,5 +165,11 @@ if __name__ == "__main__":
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
-        print("obs", observations, "reward", rewards)
-        time.sleep(0.02)
+        # print("obs", observations, "reward", rewards)
+
+        if global_step % 100 == 0:
+            print("SPS:", int(global_step / (time.time() - start_time)))
+
+        global_step += 1
+
+        # time.sleep(0.02)

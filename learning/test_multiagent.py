@@ -15,6 +15,7 @@ from cflib.crazyflie.swarm import CachedCfFactory, Swarm
 from pettingzoo import ParallelEnv
 from pettingzoo.utils.env import AgentID
 
+from crazy_rl.multi_agent.numpy.circle.circle import Circle
 from crazy_rl.multi_agent.numpy.surround.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
@@ -172,11 +173,10 @@ def replay_simu(args):
 
     print("Using ", device)
 
-    env: ParallelEnv = Surround(
-        drone_ids=np.array([0, 1, 2, 3]),
+    env: ParallelEnv = Circle(
+        drone_ids=np.array([0, 1]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1]]),
-        target_location=np.array([1, 1, 2.5]),
+        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
     )
 
     obs = env.reset(seed=args.seed)

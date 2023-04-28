@@ -16,9 +16,9 @@ class Catch(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray[int],
-        init_flying_pos: np.ndarray[int],
-        init_target_location: np.ndarray[int],
+        drone_ids: np.ndarray,
+        init_flying_pos: np.ndarray,
+        init_target_location: np.ndarray,
         target_speed: float,
         render_mode=None,
         size: int = 4,

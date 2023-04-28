@@ -17,8 +17,8 @@ class Circle(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray[int],
-        init_flying_pos: np.ndarray[int],
+        drone_ids: np.ndarray,
+        init_flying_pos: np.ndarray,
         render_mode=None,
         num_intermediate_points: int = 10,
         size: int = 4,

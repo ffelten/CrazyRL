@@ -77,10 +77,10 @@ class BaseParallelEnv(ParallelEnv):
 
     def __init__(
         self,
-        agents_names: np.ndarray[str],
-        drone_ids: np.ndarray[int],
-        init_flying_pos: Optional[Dict[str, np.ndarray[int]]] = None,
-        target_location: Optional[Dict[str, np.ndarray[int]]] = None,
+        agents_names: np.ndarray,
+        drone_ids: np.ndarray,
+        init_flying_pos: Optional[Dict[str, np.ndarray]] = None,
+        target_location: Optional[Dict[str, np.ndarray]] = None,
         size: int = 4,
         render_mode: Optional[str] = None,
         swarm: Optional[Swarm] = None,

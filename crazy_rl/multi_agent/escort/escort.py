@@ -16,10 +16,10 @@ class Escort(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray[int],
-        init_flying_pos: np.ndarray[int],
-        init_target_location: np.ndarray[int],
-        final_target_location: np.ndarray[int],
+        drone_ids: np.ndarray,
+        init_flying_pos: np.ndarray,
+        init_target_location: np.ndarray,
+        final_target_location: np.ndarray,
         num_intermediate_points: int = 10,
         render_mode=None,
         size: int = 4,

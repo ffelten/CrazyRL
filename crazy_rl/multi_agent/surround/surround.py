@@ -15,9 +15,9 @@ class Surround(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray[int],
-        init_flying_pos: np.ndarray[int],
-        target_location: np.ndarray[int],
+        drone_ids: np.ndarray,
+        init_flying_pos: np.ndarray,
+        target_location: np.ndarray,
         render_mode=None,
         size: int = 4,
         swarm=None,

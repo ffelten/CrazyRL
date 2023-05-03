@@ -123,6 +123,9 @@ class BaseParallelEnv(ParallelEnv):
                 time.sleep(0.5)
                 print("Waiting for connection...")
 
+        self.nb_crash = 0
+        self.nb_end = 0
+
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
@@ -131,27 +134,28 @@ class BaseParallelEnv(ParallelEnv):
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_obs(self):
+    def _compute_obs(self, agent_location):
         """Returns the current observation of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_action(self, action):
+    def _compute_action(self, actions, state):
         """Computes the action passed to `.step()` into action matching the mode environment. Must be implemented in a subclass.
 
         Args:
-            action : ndarray | dict[..]. The input action for one drones
+            actions : ndarray | dict[..]. The input action for one drones
+            state : ndarray | dict[..]. The positions of the drones
         """
         raise NotImplementedError
 
-    def _compute_reward(self, crash, end):
+    def _compute_reward(self, crash, end, agent_location):
         """Computes the current reward value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_terminated(self, timestep, crash, end):
+    def _compute_terminated(self, timestep, crash, end, agent_location):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_truncation(self):
+    def _compute_truncation(self, timestep, end):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -187,7 +191,7 @@ class BaseParallelEnv(ParallelEnv):
 
             self._agent_location = self._get_drones_state()
 
-        observation = self._compute_obs()
+        observation = self._compute_obs(self._agent_location)
 
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
@@ -201,7 +205,8 @@ class BaseParallelEnv(ParallelEnv):
     def step(self, actions, mode):
         self.timestep += 1
 
-        target_action = self._compute_action(actions)
+        state = self._get_drones_state()
+        target_action = self._compute_action(actions, state)
 
         if mode == "simu":
             self._agent_location = target_action
@@ -222,11 +227,13 @@ class BaseParallelEnv(ParallelEnv):
 
             self._agent_location = self._get_drones_state()
 
-        terminations, self.crash, self.end = self._compute_terminated(self.timestep, self.crash, self.end)
-        rewards = self._compute_reward(self.crash, self.end)
-        observations = self._compute_obs()
+        terminations, self.crash, self.end = self._compute_terminated(
+            self.timestep, self.crash, self.end, self._agent_location
+        )
+        rewards = self._compute_reward(self.crash, self.end, self._agent_location)
+        observations = self._compute_obs(self._agent_location)
         infos = self._compute_info()
-        truncations = self._compute_truncation()
+        truncations, self.end = self._compute_truncation(self.timestep, self.end)
         # self.agents = [] # to pass the parallel test API from petting zoo
 
         return observations, rewards, terminations, truncations, infos

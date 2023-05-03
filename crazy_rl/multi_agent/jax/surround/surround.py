@@ -1,13 +1,12 @@
 """Surround environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point."""
 import time
-
-# from functools import partial
+from functools import partial
 from typing_extensions import override
 
 import jax.numpy as jnp
 import numpy as np
 from gymnasium import spaces
-from jax import jit
+from jax import jit, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
 
@@ -38,8 +37,6 @@ class Surround(BaseParallelEnv):
         """
         self.num_drones = num_drones
 
-        self.alive_agents = jnp.array([i for i in range(self.num_drones)])
-
         self._target_location = target_location  # unique target location for all agents
 
         self._init_flying_pos = init_flying_pos
@@ -49,6 +46,8 @@ class Surround(BaseParallelEnv):
         self.timestep = 0
 
         self.size = size
+
+        self.norm = vmap(jnp.linalg.norm)
 
         super().__init__(
             render_mode=render_mode,
@@ -60,7 +59,6 @@ class Surround(BaseParallelEnv):
         )
 
     @override
-    @jit  # fonctionne avec jit
     def _observation_space(self, agent):
         return spaces.Box(
             low=np.tile(np.array([-self.size, -self.size, 0], dtype=np.float32), self.num_drones + 1),
@@ -69,11 +67,11 @@ class Surround(BaseParallelEnv):
             dtype=jnp.float32,
         )
 
-    @override  # ne fonctionne pas avec jit (je crois que j'ai pas compris en fait)
+    @override
     def _action_space(self):
         return spaces.Box(low=-1 * np.ones(3, dtype=np.float32), high=np.ones(3, dtype=np.float32), dtype=np.float32)
 
-    @override  # ne fonctionne pas avec jit
+    @override
     def _compute_obs(self):
         obs = jnp.array([[] for _ in range(self.num_drones)])
 
@@ -90,20 +88,17 @@ class Surround(BaseParallelEnv):
 
     @override  # nope
     def _compute_action(self, actions):
-        target_point_action = np.zeros((self.num_drones, 3))
         state = self._get_drones_state()
 
-        for agent in self.alive_agents:
-            # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-            target_point_action[agent] = np.clip(
-                state[agent] + actions[agent] * 0.2, jnp.array([-self.size, -self.size, 0]), self.size
-            )
+        # Actions are clipped to stay in the map and scaled to do max 20cm in one step
+        target_point_action = jnp.clip(state + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
 
         return target_point_action
 
-    @override  # nope
+    @override
     def _compute_reward(self, crash, end):
         # Reward is the mean distance to the other agents minus the distance to the target
+
         rewards = jnp.zeros(self.num_drones)
 
         for agent in range(self.num_drones):
@@ -125,36 +120,16 @@ class Surround(BaseParallelEnv):
 
         rewards = rewards + crash * -10 * jnp.ones(self.num_drones)
 
-        """
-        # collision between two drones
-        for other_agent in range(self.num_drones):
-            if other_agent != agent and (
-                jnp.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-            ):
-                reward -= 100
-
-        # collision with the ground
-        if self._agent_location[agent][2] < 0.2:
-            reward -= 100
-
-        # collision with the target
-        if jnp.linalg.norm(self._agent_location[agent] - self._target_location) < 0.2:
-            reward -= 100
-        """
-
         return rewards
 
-    @override  # nope
-    # @partial(jit, static_argnums=(0,))
-    def _compute_terminated(self, alive_agents, crash, end):
-        # terminated = jnp.array([False for _ in range(self.num_drones)])
-        # agents = jnp.copy(self.alive_agents)
+    @override
+    @partial(jit, static_argnums=(0, 1))
+    def _compute_terminated(self, timestep, crash, end):
         crash = False
 
         # End of the game
-        if self.timestep == 100:
-            terminated = jnp.array([True for _ in range(self.num_drones)])
-            alive_agents = jnp.array([])
+        if timestep == 100:
+            terminated = jnp.ones(self.num_drones)
             end = True
 
         else:
@@ -163,34 +138,30 @@ class Surround(BaseParallelEnv):
                 self._agent_location[:, 2] < 0.2, jnp.linalg.norm(self._agent_location - self._target_location) < 0.2
             )
 
-            for agent in alive_agents:
-                terminated_agent = False
+            for agent in range(self.num_drones):
+                distances = self.norm(self._agent_location[agent] - self._agent_location)
+
                 # collision between two drones
-                for other_agent in alive_agents:
-                    terminated_agent = terminated_agent or (
-                        other_agent != agent
-                        and jnp.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-                    )
-                terminated = terminated.at[agent].set(terminated_agent)
+                terminated = terminated.at[agent].set(
+                    jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0, distances < 0.2)))
+                )
 
-            if jnp.any(terminated):
-                terminated = jnp.array([True for _ in range(self.num_drones)])
-                alive_agents = jnp.array([])
-                crash = True
+            crash = jnp.any(terminated)
+            terminated = crash * jnp.ones(self.num_drones)
 
-        return terminated, alive_agents, crash, end
+        return terminated, crash, end
 
-    @override  # nope
+    @override
     def _compute_truncation(self):
         if self.timestep == 200:
-            truncation = {agent: True for agent in range(self.num_drones)}
-            self.alive_agents = jnp.array([])
-            self.timestep = 0  # pareil ça c'est modifié
+            truncation = jnp.ones(self.num_drones)
+            self.end = True
+            self.timestep = 0
         else:
-            truncation = {agent: False for agent in range(self.num_drones)}
+            truncation = jnp.zeros(self.num_drones)
         return truncation
 
-    @override  # nope
+    @override
     def _compute_info(self):
         info = jnp.array([])
         return info
@@ -199,7 +170,7 @@ class Surround(BaseParallelEnv):
 if __name__ == "__main__":
     parallel_env = Surround(
         num_drones=5,
-        render_mode="human",
+        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
         target_location=jnp.array([[1, 1, 2.5]]),
     )
@@ -208,11 +179,11 @@ if __name__ == "__main__":
 
     global_step = 0
     start_time = time.time()
-    for i in range(1000):
-        while parallel_env.alive_agents.size > 0:
-            actions = jnp.array([parallel_env.action_space().sample() for agent in parallel_env.alive_agents])
+    for i in range(100):
+        while not parallel_env.end and not parallel_env.crash > 0:
+            actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
             # this is where you would insert your policy
-            observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
+            observations, rewards, terminations, truncations, infos = parallel_env.step(actions, parallel_env._mode)
             parallel_env.render()
 
             # print("obs", observations, "reward", rewards)
@@ -224,5 +195,5 @@ if __name__ == "__main__":
             global_step += 1
 
             # time.sleep(0.02)
-        # print("alive_agents", parallel_env.alive_agents)
+
         observations = parallel_env.reset()

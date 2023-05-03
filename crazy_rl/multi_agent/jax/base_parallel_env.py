@@ -102,10 +102,9 @@ class BaseParallelEnv(ParallelEnv):
         self._init_flying_pos = init_flying_pos
         self._target_location = target_location
         self.timestep = 0
-        self.alive_agents = jnp.array([])
         self.num_drones = num_drones
 
-        self.crash = jnp.array([False for _ in range(self.num_drones)])
+        self.crash = False
         self.end = False
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -148,7 +147,7 @@ class BaseParallelEnv(ParallelEnv):
         """Computes the current reward value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_terminated(self, alive_agents, crash, end):
+    def _compute_terminated(self, timestep, crash, end):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -164,7 +163,6 @@ class BaseParallelEnv(ParallelEnv):
     @override
     def reset(self, seed=None, return_info=False, options=None):
         self.timestep = 0
-        self.alive_agents = jnp.array([i for i in range(self.num_drones)])
 
         if self._mode == "simu":
             self._agent_location = jnp.copy(self._init_flying_pos)
@@ -200,16 +198,16 @@ class BaseParallelEnv(ParallelEnv):
         return observation
 
     @override
-    def step(self, actions):
+    def step(self, actions, mode):
         self.timestep += 1
 
         target_action = self._compute_action(actions)
 
-        if self._mode == "simu":
+        if mode == "simu":
             self._agent_location = target_action
             self.render()
 
-        elif self._mode == "real":
+        elif mode == "real":
             command = dict()
             # dict target_position URI
             for agent in range(self.num_drones):
@@ -224,9 +222,7 @@ class BaseParallelEnv(ParallelEnv):
 
             self._agent_location = self._get_drones_state()
 
-        terminations, self.alive_agents, self.crash, self.end = self._compute_terminated(
-            self.alive_agents, self.crash, self.end
-        )
+        terminations, self.crash, self.end = self._compute_terminated(self.timestep, self.crash, self.end)
         rewards = self._compute_reward(self.crash, self.end)
         observations = self._compute_obs()
         infos = self._compute_info()

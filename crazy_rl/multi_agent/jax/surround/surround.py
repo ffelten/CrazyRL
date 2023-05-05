@@ -11,6 +11,15 @@ from jax import jit, vmap
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
 
 
+# Would contain every modifiable variable but still unused (maybe used later)
+@override
+class State:
+    agent_location: jnp.ndarray
+    timestep: int
+    crash: bool
+    end: bool
+
+
 class Surround(BaseParallelEnv):
     """A Parallel Environment where drone learn how to surround a target point."""
 
@@ -35,19 +44,17 @@ class Surround(BaseParallelEnv):
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
+        self.state = State()
+
         self.num_drones = num_drones
 
         self._target_location = target_location  # unique target location for all agents
 
         self._init_flying_pos = init_flying_pos
 
-        self._agent_location = jnp.copy(init_flying_pos)
-
-        self.timestep = 0
-
         self.size = size
 
-        self.norm = vmap(jnp.linalg.norm)
+        self.norm = vmap(jnp.linalg.norm)  # function to compute the norm of each array in a matrix
 
         super().__init__(
             render_mode=render_mode,
@@ -56,6 +63,7 @@ class Surround(BaseParallelEnv):
             target_location=self._target_location,
             num_drones=self.num_drones,
             swarm=swarm,
+            state=self.state,
         )
 
     @override
@@ -89,24 +97,17 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_action(self, actions, state):
+    def _compute_action(self, actions, location):
         # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-        target_point_action = jnp.clip(state + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
+        target_point_action = jnp.clip(location + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
 
         return target_point_action
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, end, crash, agent_location):
-        # Reward is the mean distance to the other agents minus the distance to the target
-        """
-        rewards = jnp.zeros(self.num_drones)
+        # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
 
-        for agent in range(self.num_drones):
-
-            rewards = rewards.at[agent].set(jnp.sum(self.norm(self._agent_location[agent] - self._agent_location)))
-        """
-        # a maximum value minus the distance to the target
         rewards = end * (
             # mean distance to the other agents
             jnp.array([jnp.sum(self.norm(agent_location[agent] - agent_location)) for agent in range(self.num_drones)])
@@ -117,13 +118,6 @@ class Surround(BaseParallelEnv):
         )
         # negative reward if the drones crash
         +crash * -10 * jnp.ones(self.num_drones)
-
-        """
-        rewards = end * (
-                rewards * 0.05 / (self.num_drones - 1)
-                + 0.95 * (2 * self.size - self.norm(self._agent_location - self._target_location))
-        ) + crash * -10 * jnp.ones(self.num_drones)
-        """
 
         return rewards
 
@@ -160,7 +154,6 @@ class Surround(BaseParallelEnv):
         return truncation, end
 
     @override
-    # @partial(jit, static_argnums=(0,))
     def _compute_info(self):
         info = jnp.array([])
         return info
@@ -178,12 +171,23 @@ if __name__ == "__main__":
 
     global_step = 0
     start_time = time.time()
-    for i in range(100):
+    for i in range(500):
         while not parallel_env.end and not parallel_env.crash:
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
             # this is where you would insert your policy
-            observations, rewards, terminations, truncations, infos = parallel_env.step(actions, parallel_env._mode)
-            parallel_env.render()
+            (
+                observations,
+                rewards,
+                terminations,
+                truncations,
+                infos,
+                parallel_env.timestep,
+                parallel_env.crash,
+                parallel_env.end,
+                parallel_env.agent_location,
+            ) = parallel_env.step(actions)
+
+            # parallel_env.render()
 
             # print("obs", observations, "reward", rewards)
             # print("reward", rewards)

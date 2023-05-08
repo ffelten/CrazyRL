@@ -216,14 +216,15 @@ class BaseParallelEnv(ParallelEnv):
             self.swarm.parallel_safe(run_sequence, args_dict=command)
             print("Time to execute the run_sequence", time.time() - start)
 
-            self._agent_location = self._get_drones_state()
+            # (!) Updates of location are not relying on cflib because it is too slow in practice
+            # So yes, we assume the drones go where we tell them to go
+            self._agent_location = target_action
 
         terminations = self._compute_terminated()
         rewards = self._compute_reward()
         observations = self._compute_obs()
         infos = self._compute_info()
         truncations = self._compute_truncation()
-        # self.agents = [] # to pass the parallel test API from petting zoo
 
         return observations, rewards, terminations, truncations, infos
 

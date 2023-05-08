@@ -215,7 +215,7 @@ class BaseParallelEnv(ParallelEnv):
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
 
-        state = jdc.replace(state, crash=False, end=False)
+        state = jdc.replace(state, terminations=jnp.zeros(self.num_drones), truncations=jnp.zeros(self.num_drones))
 
         return state
 
@@ -224,11 +224,11 @@ class BaseParallelEnv(ParallelEnv):
         """Compute the action needed by step which don't depend on the mode."""
         state = jdc.replace(state, timestep=state.timestep+1)
 
+        state = self._compute_truncation(state)
         state = self._compute_terminated(state)
         state = self._compute_reward(state)
         state = self._compute_obs(state)
         state = self._compute_info(state)
-        state = self._compute_truncation(state)
         # self.agents = [] # to pass the parallel test API from petting zoo
 
         return state

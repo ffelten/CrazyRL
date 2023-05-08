@@ -19,8 +19,6 @@ class State:
     """State of the environment containing the modifiable variables."""
     agent_location: jnp.ndarray
     timestep: int
-    crash: bool
-    end: bool
     terminations: jnp.ndarray = jnp.array([])
     rewards: jnp.ndarray = jnp.array([])
     observations: jnp.ndarray = jnp.array([])
@@ -52,7 +50,7 @@ class Surround(BaseParallelEnv):
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
-        self.state = State(jnp.copy(init_flying_pos), 0, False, False)
+        self.state = State(jnp.copy(init_flying_pos), 0)
 
         # Constant variables
         self.num_drones = num_drones
@@ -117,7 +115,7 @@ class Surround(BaseParallelEnv):
     def _compute_reward(self, state):
         # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
 
-        rewards = state.end * (
+        rewards = jnp.any(state.truncations) * (
             # mean distance to the other agents
             jnp.array([jnp.sum(self.norm(state.agent_location[agent] - state.agent_location)) for agent in range(self.num_drones)])
             * 0.05
@@ -126,15 +124,13 @@ class Surround(BaseParallelEnv):
             + 0.95 * (2 * self.size - self.norm(state.agent_location - self._target_location))
         )
         # negative reward if the drones crash
-        + state.crash * -10 * jnp.ones(self.num_drones)
+        + jnp.any(state.terminations) * -10 * jnp.ones(self.num_drones)
 
         return jdc.replace(state, rewards=rewards)
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_terminated(self, state):
-        # End of the game
-        end = state.timestep >= 100
 
         # collision with the ground and the target
         terminated = jnp.logical_or(state.agent_location[:, 2] < 0.2, jnp.linalg.norm(state.agent_location - self._target_location) < 0.2)
@@ -147,20 +143,17 @@ class Surround(BaseParallelEnv):
                 jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < 0.2)))
             )
 
-        crash = (end - 1) * jnp.any(terminated)
+        terminated = ((jnp.any(state.truncations) - 1) * jnp.any(terminated)) * jnp.ones(self.num_drones)
 
-        terminated = (crash + end) * jnp.ones(self.num_drones)
-
-        return jdc.replace(state, crash=crash, end=end, terminations=terminated)
+        return jdc.replace(state, terminations=terminated)
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_truncation(self, state):
-        end = state.end + (state.timestep == 200)
 
-        truncations = end * jnp.ones(self.num_drones)
+        truncations = (state.timestep == 100) * jnp.ones(self.num_drones)
 
-        return jdc.replace(state, end=end, truncations=truncations)
+        return jdc.replace(state, truncations=truncations)
 
     @override
     def _compute_info(self, state):
@@ -182,7 +175,7 @@ if __name__ == "__main__":
     start_time = time.time()
     premier = True
     for i in range(500):
-        while not parallel_env.state.end and not parallel_env.state.crash:
+        while not jnp.any(parallel_env.state.truncations) and not jnp.any(parallel_env.state.terminations):
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
             # this is where you would insert your policy
             parallel_env.state = parallel_env.step(parallel_env.state, actions)
@@ -199,9 +192,8 @@ if __name__ == "__main__":
 
             # time.sleep(0.02)
 
-        if parallel_env.state.crash != 0:
-            parallel_env.nb_crash += 1
-        parallel_env.nb_end += parallel_env.state.end
+        parallel_env.nb_crash += jnp.any(parallel_env.state.terminations)
+        parallel_env.nb_end += jnp.any(parallel_env.state.truncations)
 
         parallel_env.state = parallel_env.reset(parallel_env.state)
 

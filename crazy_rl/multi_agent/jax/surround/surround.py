@@ -2,7 +2,9 @@
 import time
 from functools import partial
 from typing_extensions import override
+from dataclasses import dataclass
 
+import jax_dataclasses as jdc
 import jax.numpy as jnp
 import numpy as np
 from gymnasium import spaces
@@ -11,9 +13,10 @@ from jax import jit, vmap
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
 
 
-# Would contain every modifiable variable but still unused (maybe used later)
 @override
+@jdc.pytree_dataclass
 class State:
+    """State of the environment containing the modifiable variables."""
     agent_location: jnp.ndarray
     timestep: int
     crash: bool
@@ -44,8 +47,9 @@ class Surround(BaseParallelEnv):
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
-        self.state = State()
+        self.state = State(jnp.copy(init_flying_pos), 0, False, False)
 
+        # Constant variables
         self.num_drones = num_drones
 
         self._target_location = target_location  # unique target location for all agents
@@ -81,15 +85,15 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, agent_location):
+    def _compute_obs(self, state):
         obs = jnp.array([[] for _ in range(self.num_drones)])
 
         for agent in range(self.num_drones):
-            obs_agent = jnp.append(agent_location[agent], self._target_location)
+            obs_agent = jnp.append(state.agent_location[agent], self._target_location)
 
             for other_agent in range(self.num_drones):
                 if other_agent != agent:
-                    obs_agent = jnp.append(obs_agent, agent_location[other_agent])
+                    obs_agent = jnp.append(obs_agent, state.agent_location[other_agent])
 
             obs = obs.at[agent].set(obs_agent)
 
@@ -105,53 +109,57 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_reward(self, end, crash, agent_location):
+    def _compute_reward(self, state):
         # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
 
-        rewards = end * (
+        rewards = state.end * (
             # mean distance to the other agents
-            jnp.array([jnp.sum(self.norm(agent_location[agent] - agent_location)) for agent in range(self.num_drones)])
+            jnp.array([jnp.sum(self.norm(state.agent_location[agent] - state.agent_location)) for agent in range(self.num_drones)])
             * 0.05
             / (self.num_drones - 1)
             # a maximum value minus the distance to the target
-            + 0.95 * (2 * self.size - self.norm(agent_location - self._target_location))
+            + 0.95 * (2 * self.size - self.norm(state.agent_location - self._target_location))
         )
         # negative reward if the drones crash
-        +crash * -10 * jnp.ones(self.num_drones)
+        + state.crash * -10 * jnp.ones(self.num_drones)
 
         return rewards
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_terminated(self, timestep, crash, end, agent_location):
+    def _compute_terminated(self, state):
         # End of the game
-        end = timestep == 100
+        end = state.timestep >= 100
 
         # collision with the ground and the target
-        terminated = jnp.logical_or(agent_location[:, 2] < 0.2, jnp.linalg.norm(agent_location - self._target_location) < 0.2)
+        terminated = jnp.logical_or(state.agent_location[:, 2] < 0.2, jnp.linalg.norm(state.agent_location - self._target_location) < 0.2)
 
         for agent in range(self.num_drones):
-            distances = self.norm(agent_location[agent] - agent_location)
+            distances = self.norm(state.agent_location[agent] - state.agent_location)
 
             # collision between two drones
             terminated = terminated.at[agent].set(
                 jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < 0.2)))
             )
 
-        crash = jnp.any(terminated)
+        crash = (end - 1) * jnp.any(terminated)
 
         terminated = (crash + end) * jnp.ones(self.num_drones)
 
-        return terminated, crash, end
+        state = jdc.replace(state, crash=crash, end=end)
+
+        return terminated, state
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_truncation(self, timestep, end):
-        end = timestep == 200
+    def _compute_truncation(self, state):
+        end = state.end + (state.timestep == 200)
 
         truncation = end * jnp.ones(self.num_drones)
 
-        return truncation, end
+        state = jdc.replace(state, end=end)
+
+        return truncation, state
 
     @override
     def _compute_info(self):
@@ -167,12 +175,13 @@ if __name__ == "__main__":
         target_location=jnp.array([[1, 1, 2.5]]),
     )
 
-    observations = parallel_env.reset()
+    observations, parallel_env.state = parallel_env.reset(parallel_env.state)
 
     global_step = 0
     start_time = time.time()
+    premier = True
     for i in range(500):
-        while not parallel_env.end and not parallel_env.crash:
+        while not parallel_env.state.end and not parallel_env.state.crash:
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
             # this is where you would insert your policy
             (
@@ -181,28 +190,27 @@ if __name__ == "__main__":
                 terminations,
                 truncations,
                 infos,
-                parallel_env.timestep,
-                parallel_env.crash,
-                parallel_env.end,
-                parallel_env.agent_location,
-            ) = parallel_env.step(actions)
+                parallel_env.state
+            ) = parallel_env.step(parallel_env.state, actions)
 
             # parallel_env.render()
 
             # print("obs", observations, "reward", rewards)
             # print("reward", rewards)
 
-            if global_step % 100 == 0:
+            if global_step % 2000 == 0:
                 print("SPS:", int(global_step / (time.time() - start_time)))
 
             global_step += 1
 
             # time.sleep(0.02)
 
-        parallel_env.nb_crash += parallel_env.crash
-        parallel_env.nb_end += parallel_env.end
+        if parallel_env.state.crash != 0:
+            parallel_env.nb_crash += 1
+        parallel_env.nb_end += parallel_env.state.end
 
-        observations = parallel_env.reset()
+        observations, parallel_env.state = parallel_env.reset(parallel_env.state)
 
     print("nb_crash", parallel_env.nb_crash)
     print("nb_end", parallel_env.nb_end)
+    print("total", parallel_env.nb_end + parallel_env.nb_crash)

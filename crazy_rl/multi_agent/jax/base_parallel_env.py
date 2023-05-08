@@ -4,6 +4,7 @@ import time
 from functools import partial
 from typing import Optional
 from typing_extensions import override
+import jax_dataclasses as jdc
 
 import jax.numpy as jnp
 import numpy as np
@@ -54,9 +55,9 @@ from crazy_rl.utils.graphic import axes, field, point, target_point
 from crazy_rl.utils.utils import run_land, run_sequence, run_take_off
 
 
-# Would contain every modifiable variable but still unused (maybe used later)
+@jdc.pytree_dataclass
 class State:
-    """State of the environment."""
+    """State of the environment containing the modifiable variables."""
 
     timestep: int
     agent_location: jnp.ndarray
@@ -87,17 +88,18 @@ class BaseParallelEnv(ParallelEnv):
 
     def __init__(
         self,
+        state: State,
         num_drones: int,
         init_flying_pos: Optional[jnp.ndarray] = None,
         target_location: Optional[jnp.ndarray] = None,
         size: int = 4,
         render_mode: Optional[str] = None,
         swarm: Optional[Swarm] = None,
-        state: State = State(),
     ):
         """Initialization of a generic aviary environment.
 
         Args:
+            state: State containing modifiable variables of the environment
             num_drones: ids of the drones (ignored in simulation mode)
             init_flying_pos (array, optional): An array where each value is a (3)-shaped array containing the initial
                 XYZ position of the drones.
@@ -107,15 +109,21 @@ class BaseParallelEnv(ParallelEnv):
                 Real mode is used for real tests on the field, human mode is used to display the environment on a PyGame
                 window and None mode is used to disable the rendering.
             swarm (Swarm, optional): The Swarm object use in real mode to control all drones
-            state: State containing modifiable variables of the environment, still unused
         """
+
+        # State initialisation
         self.state = state
 
+        # Other initialisations
         self.size = size  # The size of the square grid
         self._init_flying_pos = init_flying_pos
         self._target_location = target_location
         self.num_drones = num_drones
 
+        self.nb_crash = 0
+        self.nb_end = 0
+
+        # Simulation and real drones initialisations
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
         self._mode = "real" if self.render_mode == "real" else "simu"
@@ -132,15 +140,6 @@ class BaseParallelEnv(ParallelEnv):
                 time.sleep(0.5)
                 print("Waiting for connection...")
 
-        self._agent_location = jnp.copy(init_flying_pos)
-
-        self.timestep = 0
-        self.crash = False
-        self.end = False
-
-        self.nb_crash = 0
-        self.nb_end = 0
-
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
@@ -149,7 +148,7 @@ class BaseParallelEnv(ParallelEnv):
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_obs(self, agent_location):
+    def _compute_obs(self, state):
         """Returns the current observation of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -162,15 +161,15 @@ class BaseParallelEnv(ParallelEnv):
         """
         raise NotImplementedError
 
-    def _compute_reward(self, crash, end, agent_location):
+    def _compute_reward(self, state):
         """Computes the current reward value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_terminated(self, timestep, crash, end, agent_location):
+    def _compute_terminated(self, state):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_truncation(self, timestep, end):
+    def _compute_truncation(self, state):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -180,18 +179,18 @@ class BaseParallelEnv(ParallelEnv):
 
     # PettingZoo API
     @override
-    def reset(self, seed=None, return_info=False, options=None):
+    def reset(self, state, seed=None, return_info=False, options=None):
         if self._mode == "real":
             # self.swarm.parallel_safe(reset_estimator)
-            self._agent_location = self._get_drones_state(self._mode, self._agent_location)
-            print("reset", self._agent_location)
+            state = jdc.replace(state, agent_location=self._get_drones_state(self._mode, state.agent_location))
+            print("reset", state.agent_location)
 
             command = dict()
             # dict target_position URI
             for agent in range(self.num_drones):
                 uri = "radio://0/4/2M/E7E7E7E7" + str(agent).zfill(2)
                 target = self._init_flying_pos[agent]
-                agent = self._agent_location[agent]
+                agent = state.agent_location[agent]
                 command[uri] = [[agent, target]]
 
             self.swarm.parallel_safe(run_take_off)
@@ -199,42 +198,41 @@ class BaseParallelEnv(ParallelEnv):
             print(f"Setting the drone positions to the initial positions. {command}")
             self.swarm.parallel_safe(run_sequence, args_dict=command)
 
-            self._agent_location = self._get_drones_state(self._mode, self._agent_location)
+            state = jdc.replace(state, agent_location=self._get_drones_state(self._mode, state.agent_location))
 
         else:
-            self._agent_location = jnp.copy(self._init_flying_pos)
+            state = jdc.replace(state, agent_location=jnp.copy(self._init_flying_pos))
 
-        self.timestep = 0
+        state = jdc.replace(state, timestep=0)
 
-        observation = self._compute_obs(self._agent_location)
+        observation = self._compute_obs(state)
 
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
 
-        self.crash = False
-        self.end = False
+        state = jdc.replace(state, crash=False, end=False)
 
-        return observation
+        return observation, state
 
     @partial(jit, static_argnums=(0,))
-    def compute_step(self, timestep, crash, end, agent_location):
+    def compute_step(self, state):
         """Compute the action needed by step which don't depend on the mode."""
-        timestep += 1
+        state = jdc.replace(state, timestep=state.timestep+1)
 
-        terminations, crash, end = self._compute_terminated(timestep, crash, end, agent_location)
-        rewards = self._compute_reward(crash, end, agent_location)
-        observations = self._compute_obs(agent_location)
+        terminations, state = self._compute_terminated(state)
+        rewards = self._compute_reward(state)
+        observations = self._compute_obs(state)
         infos = self._compute_info()
-        truncations, end = self._compute_truncation(timestep, end)
+        truncations, state = self._compute_truncation(state)
         # self.agents = [] # to pass the parallel test API from petting zoo
 
-        return observations, rewards, terminations, truncations, infos, timestep, crash, end, agent_location
+        return observations, rewards, terminations, truncations, infos, state
 
     @override
-    def step(self, actions):
-        self.timestep += 1
+    def step(self, state, actions):
+        # state = jdc.replace(state, timestep=state.timestep + 1)
 
-        target_action = self._compute_action(actions, self._get_drones_state(self._mode, self._agent_location))
+        target_action = self._compute_action(actions, self._get_drones_state(self._mode, state.agent_location))
 
         if self._mode == "real":
             command = dict()
@@ -242,21 +240,21 @@ class BaseParallelEnv(ParallelEnv):
             for agent in range(self.num_drones):
                 uri = "radio://0/4/2M/E7E7E7E7" + str(agent).zfill(2)
                 target = target_action[agent]
-                current_location = self._agent_location[agent]
+                current_location = state.agent_location[agent]
                 command[uri] = [[current_location, target]]
 
             start = time.time()
             self.swarm.parallel_safe(run_sequence, args_dict=command)
             print("Time to execute the run_sequence", time.time() - start)
 
-            self._agent_location = self._get_drones_state(self._mode, self._agent_location)
+            state = jdc.replace(state, agent_location = self._get_drones_state(self._mode, state.agent_location))
 
         else:
-            self._agent_location = target_action
+            state = jdc.replace(state, agent_location = target_action)
             if self.render_mode == "human":
                 self.render()
 
-        return self.compute_step(self.timestep, self.crash, self.end, self._agent_location)
+        return self.compute_step(state)
 
     @override
     def render(self):
@@ -320,7 +318,7 @@ class BaseParallelEnv(ParallelEnv):
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        for agent in self._agent_location:
+        for agent in self.state.agent_location:
             glPushMatrix()
             point(np.copy(agent))
 
@@ -341,7 +339,7 @@ class BaseParallelEnv(ParallelEnv):
     @override
     def state(self):
         states = jnp.array(
-            [self._compute_obs(self._agent_location)[agent].astype(jnp.float32) for agent in range(self.num_drones)]
+            [self._compute_obs(self.state.agent_location)[agent].astype(jnp.float32) for agent in range(self.num_drones)]
         )
         return jnp.concatenate(states, axis=None)
 

@@ -21,6 +21,11 @@ class State:
     timestep: int
     crash: bool
     end: bool
+    terminations: jnp.ndarray = jnp.array([])
+    rewards: jnp.ndarray = jnp.array([])
+    observations: jnp.ndarray = jnp.array([])
+    infos: jnp.ndarray = jnp.array([])
+    truncations: jnp.ndarray = jnp.array([])
 
 
 class Surround(BaseParallelEnv):
@@ -97,7 +102,7 @@ class Surround(BaseParallelEnv):
 
             obs = obs.at[agent].set(obs_agent)
 
-        return obs
+        return jdc.replace(state, observations=obs)
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -123,7 +128,7 @@ class Surround(BaseParallelEnv):
         # negative reward if the drones crash
         + state.crash * -10 * jnp.ones(self.num_drones)
 
-        return rewards
+        return jdc.replace(state, rewards=rewards)
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -146,25 +151,21 @@ class Surround(BaseParallelEnv):
 
         terminated = (crash + end) * jnp.ones(self.num_drones)
 
-        state = jdc.replace(state, crash=crash, end=end)
-
-        return terminated, state
+        return jdc.replace(state, crash=crash, end=end, terminations=terminated)
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_truncation(self, state):
         end = state.end + (state.timestep == 200)
 
-        truncation = end * jnp.ones(self.num_drones)
+        truncations = end * jnp.ones(self.num_drones)
 
-        state = jdc.replace(state, end=end)
-
-        return truncation, state
+        return jdc.replace(state, end=end, truncations=truncations)
 
     @override
-    def _compute_info(self):
+    def _compute_info(self, state):
         info = jnp.array([])
-        return info
+        return jdc.replace(state, infos=info)
 
 
 if __name__ == "__main__":
@@ -175,7 +176,7 @@ if __name__ == "__main__":
         target_location=jnp.array([[1, 1, 2.5]]),
     )
 
-    observations, parallel_env.state = parallel_env.reset(parallel_env.state)
+    parallel_env.state = parallel_env.reset(parallel_env.state)
 
     global_step = 0
     start_time = time.time()
@@ -184,19 +185,12 @@ if __name__ == "__main__":
         while not parallel_env.state.end and not parallel_env.state.crash:
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
             # this is where you would insert your policy
-            (
-                observations,
-                rewards,
-                terminations,
-                truncations,
-                infos,
-                parallel_env.state
-            ) = parallel_env.step(parallel_env.state, actions)
+            parallel_env.state = parallel_env.step(parallel_env.state, actions)
 
             # parallel_env.render()
 
-            # print("obs", observations, "reward", rewards)
-            # print("reward", rewards)
+            # print("obs", parallel_env.state.observations, "reward", parallel_env.state.rewards)
+            # print("reward", parallel_env.state.rewards)
 
             if global_step % 2000 == 0:
                 print("SPS:", int(global_step / (time.time() - start_time)))
@@ -209,7 +203,7 @@ if __name__ == "__main__":
             parallel_env.nb_crash += 1
         parallel_env.nb_end += parallel_env.state.end
 
-        observations, parallel_env.state = parallel_env.reset(parallel_env.state)
+        parallel_env.state = parallel_env.reset(parallel_env.state)
 
     print("nb_crash", parallel_env.nb_crash)
     print("nb_end", parallel_env.nb_end)

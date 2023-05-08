@@ -61,6 +61,11 @@ class State:
 
     timestep: int
     agent_location: jnp.ndarray
+    terminations: jnp.ndarray
+    rewards: jnp.ndarray
+    observations: jnp.ndarray
+    infos: jnp.ndarray
+    truncations: jnp.ndarray
 
 
 class BaseParallelEnv(ParallelEnv):
@@ -173,7 +178,7 @@ class BaseParallelEnv(ParallelEnv):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_info(self):
+    def _compute_info(self, state):
         """Computes the current info dict(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -205,28 +210,28 @@ class BaseParallelEnv(ParallelEnv):
 
         state = jdc.replace(state, timestep=0)
 
-        observation = self._compute_obs(state)
+        state = self._compute_obs(state)
 
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
 
         state = jdc.replace(state, crash=False, end=False)
 
-        return observation, state
+        return state
 
     @partial(jit, static_argnums=(0,))
     def compute_step(self, state):
         """Compute the action needed by step which don't depend on the mode."""
         state = jdc.replace(state, timestep=state.timestep+1)
 
-        terminations, state = self._compute_terminated(state)
-        rewards = self._compute_reward(state)
-        observations = self._compute_obs(state)
-        infos = self._compute_info()
-        truncations, state = self._compute_truncation(state)
+        state = self._compute_terminated(state)
+        state = self._compute_reward(state)
+        state = self._compute_obs(state)
+        state = self._compute_info(state)
+        state = self._compute_truncation(state)
         # self.agents = [] # to pass the parallel test API from petting zoo
 
-        return observations, rewards, terminations, truncations, infos, state
+        return state
 
     @override
     def step(self, state, actions):

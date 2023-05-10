@@ -16,7 +16,6 @@ from pettingzoo import ParallelEnv
 from pettingzoo.utils.env import AgentID
 
 from crazy_rl.multi_agent.numpy.circle.circle import Circle
-from crazy_rl.multi_agent.numpy.surround.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 
@@ -174,9 +173,9 @@ def replay_simu(args):
     print("Using ", device)
 
     env: ParallelEnv = Circle(
-        drone_ids=np.array([0, 1]),
+        drone_ids=np.array([0, 1, 2, 3]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
+        init_flying_pos=np.array([[0, 0, 1], [0, 1, 0.5], [0, -1, 0.5], [1, 0, 0.5]]),
     )
 
     obs = env.reset(seed=args.seed)
@@ -215,6 +214,8 @@ def replay_real(args):
     uris = {
         "radio://0/4/2M/E7E7E7E700",
         "radio://0/4/2M/E7E7E7E701",
+        "radio://0/4/2M/E7E7E7E702",
+        "radio://0/4/2M/E7E7E7E703",
         # Add more URIs if you want more copters in the swarm
     }
     # uri = 'radio://0/4/2M/E7E7E7E7' + str(id).zfill(2) # you can browse the drone_id and add as this code at the end of the uri
@@ -231,11 +232,10 @@ def replay_real(args):
         # swarm.reset_estimators()
         swarm.get_estimated_positions()
 
-        env: ParallelEnv = Surround(
-            drone_ids=np.array([0, 1, 2, 3, 4]),
+        env: ParallelEnv = Circle(
+            drone_ids=np.array([0, 1, 2, 3]),
             render_mode="real",
-            init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-            target_location=np.array([1, 1, 2.5]),
+            init_flying_pos=np.array([[0, 0, 1], [0, 1, 0.5], [0, -1, 0.5], [1, 0, 0.5]]),
             swarm=swarm,
         )
 

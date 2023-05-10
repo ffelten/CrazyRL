@@ -5,7 +5,6 @@ from typing_extensions import override
 
 import numpy as np
 from gymnasium import spaces
-from pettingzoo.test.parallel_test import parallel_api_test
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
 
@@ -42,7 +41,7 @@ class Circle(BaseParallelEnv):
         self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
         self.timestep = 0
 
-        circle_radius = 0.5  # [m]
+        circle_radius = 0.6  # [m]
         self.num_intermediate_points = num_intermediate_points
         # Ref is a list of 2d arrays for each agent
         # each 2d array contains the reference points (xyz) for the agent at each timestep
@@ -54,8 +53,8 @@ class Circle(BaseParallelEnv):
             ts = 2 * np.pi * np.arange(num_intermediate_points) / num_intermediate_points
 
             self.ref.append(np.zeros((num_intermediate_points, 3)))
-            self.ref[i][:, 2] = circle_radius * np.sin(ts) + (init_flying_pos[i][2])  # z-position
-            self.ref[i][:, 1] = init_flying_pos[i][1]  # y-position
+            self.ref[i][:, 2] = init_flying_pos[i][2]  # z-position
+            self.ref[i][:, 1] = circle_radius * np.sin(ts) + (init_flying_pos[i][1])  # y-position
             self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_flying_pos[i][0] - circle_radius)  # x-position
 
         self._agent_location = self._init_flying_pos.copy()
@@ -122,7 +121,7 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 200:
+        if self.timestep == 45:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.timestep = 0
@@ -132,26 +131,14 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_info(self):
-        info = dict()
-        for agent in self._agents_names:
-            info[agent] = {"distance": np.linalg.norm(self._agent_location[agent] - self._target_location[agent], ord=1)}
-        return info
+        return dict()
 
 
 if __name__ == "__main__":
-    parallel_api_test(
-        Circle(
-            drone_ids=np.array([0, 1]),
-            render_mode=None,
-            init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
-        ),
-        num_cycles=10,
-    )
-
     parallel_env = Circle(
-        drone_ids=np.array([0, 1]),
+        drone_ids=np.array([0, 1, 2, 3]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [2, 2, 1]]),
+        init_flying_pos=np.array([[0, 0, 1], [0, 1, 0.5], [0, -1, 0.5], [1, 0, 0.5]]),
     )
 
     observations = parallel_env.reset()
@@ -163,4 +150,4 @@ if __name__ == "__main__":
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
         print("obs", observations, "reward", rewards)
-        time.sleep(0.02)
+        time.sleep(0.1)

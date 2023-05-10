@@ -2,10 +2,9 @@
 import time
 from functools import partial
 from typing_extensions import override
-from dataclasses import dataclass
 
-import jax_dataclasses as jdc
 import jax.numpy as jnp
+import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
 from jax import jit, vmap
@@ -17,12 +16,12 @@ from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
 @jdc.pytree_dataclass
 class State:
     """State of the environment containing the modifiable variables."""
+
     agent_location: jnp.ndarray
     timestep: int
     terminations: jnp.ndarray = jnp.array([])
     rewards: jnp.ndarray = jnp.array([])
     observations: jnp.ndarray = jnp.array([])
-    infos: jnp.ndarray = jnp.array([])
     truncations: jnp.ndarray = jnp.array([])
 
 
@@ -117,23 +116,26 @@ class Surround(BaseParallelEnv):
 
         rewards = jnp.any(state.truncations) * (
             # mean distance to the other agents
-            jnp.array([jnp.sum(self.norm(state.agent_location[agent] - state.agent_location)) for agent in range(self.num_drones)])
+            jnp.array(
+                [jnp.sum(self.norm(state.agent_location[agent] - state.agent_location)) for agent in range(self.num_drones)]
+            )
             * 0.05
             / (self.num_drones - 1)
             # a maximum value minus the distance to the target
             + 0.95 * (2 * self.size - self.norm(state.agent_location - self._target_location))
         )
         # negative reward if the drones crash
-        + jnp.any(state.terminations) * -10 * jnp.ones(self.num_drones)
+        +jnp.any(state.terminations) * -10 * jnp.ones(self.num_drones)
 
         return jdc.replace(state, rewards=rewards)
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_terminated(self, state):
-
         # collision with the ground and the target
-        terminated = jnp.logical_or(state.agent_location[:, 2] < 0.2, jnp.linalg.norm(state.agent_location - self._target_location) < 0.2)
+        terminated = jnp.logical_or(
+            state.agent_location[:, 2] < 0.2, jnp.linalg.norm(state.agent_location - self._target_location) < 0.2
+        )
 
         for agent in range(self.num_drones):
             distances = self.norm(state.agent_location[agent] - state.agent_location)
@@ -150,15 +152,9 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_truncation(self, state):
-
         truncations = (state.timestep == 100) * jnp.ones(self.num_drones)
 
         return jdc.replace(state, truncations=truncations)
-
-    @override
-    def _compute_info(self, state):
-        info = jnp.array([])
-        return jdc.replace(state, infos=info)
 
 
 if __name__ == "__main__":

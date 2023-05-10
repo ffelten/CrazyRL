@@ -4,9 +4,9 @@ import time
 from functools import partial
 from typing import Optional
 from typing_extensions import override
-import jax_dataclasses as jdc
 
 import jax.numpy as jnp
+import jax_dataclasses as jdc
 import numpy as np
 import pygame
 from cflib.crazyflie.swarm import Swarm
@@ -64,7 +64,6 @@ class State:
     terminations: jnp.ndarray
     rewards: jnp.ndarray
     observations: jnp.ndarray
-    infos: jnp.ndarray
     truncations: jnp.ndarray
 
 
@@ -115,7 +114,6 @@ class BaseParallelEnv(ParallelEnv):
                 window and None mode is used to disable the rendering.
             swarm (Swarm, optional): The Swarm object use in real mode to control all drones
         """
-
         # State initialisation
         self.state = state
 
@@ -178,10 +176,6 @@ class BaseParallelEnv(ParallelEnv):
         """Computes the current done value(s). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_info(self, state):
-        """Computes the current info dict(s). Must be implemented in a subclass."""
-        raise NotImplementedError
-
     # PettingZoo API
     @override
     def reset(self, state, seed=None, return_info=False, options=None):
@@ -220,15 +214,14 @@ class BaseParallelEnv(ParallelEnv):
         return state
 
     @partial(jit, static_argnums=(0,))
-    def compute_step(self, state):
+    def _compute_step(self, state):
         """Compute the action needed by step which don't depend on the mode."""
-        state = jdc.replace(state, timestep=state.timestep+1)
+        state = jdc.replace(state, timestep=state.timestep + 1)
 
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
         state = self._compute_reward(state)
         state = self._compute_obs(state)
-        state = self._compute_info(state)
         # self.agents = [] # to pass the parallel test API from petting zoo
 
         return state
@@ -252,14 +245,14 @@ class BaseParallelEnv(ParallelEnv):
             self.swarm.parallel_safe(run_sequence, args_dict=command)
             print("Time to execute the run_sequence", time.time() - start)
 
-            state = jdc.replace(state, agent_location = self._get_drones_state(self._mode, state.agent_location))
+            state = jdc.replace(state, agent_location=self._get_drones_state(self._mode, state.agent_location))
 
         else:
-            state = jdc.replace(state, agent_location = target_action)
+            state = jdc.replace(state, agent_location=target_action)
             if self.render_mode == "human":
                 self.render()
 
-        return self.compute_step(state)
+        return self._compute_step(state)
 
     @override
     def render(self):

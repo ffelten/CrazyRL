@@ -105,29 +105,35 @@ class Surround(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _compute_action(self, actions, state):
         # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-        target_point_action = jnp.clip(state.agent_location + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
-
-        return jdc.replace(state, agent_location=target_point_action)
+        return jdc.replace(
+            state,
+            agent_location=jnp.clip(state.agent_location + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size),
+        )
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state):
         # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
 
-        rewards = jnp.any(state.truncations) * (
-            # mean distance to the other agents
-            jnp.array(
-                [jnp.sum(self.norm(state.agent_location[agent] - state.agent_location)) for agent in range(self.num_drones)]
+        return jdc.replace(
+            state,
+            rewards=jnp.any(state.truncations)
+            * (
+                # mean distance to the other agents
+                jnp.array(
+                    [
+                        jnp.sum(self.norm(state.agent_location[agent] - state.agent_location))
+                        for agent in range(self.num_drones)
+                    ]
+                )
+                * 0.05
+                / (self.num_drones - 1)
+                # a maximum value minus the distance to the target
+                + 0.95 * (2 * self.size - self.norm(state.agent_location - self._target_location))
             )
-            * 0.05
-            / (self.num_drones - 1)
-            # a maximum value minus the distance to the target
-            + 0.95 * (2 * self.size - self.norm(state.agent_location - self._target_location))
+            # negative reward if the drones crash
+            + jnp.any(state.terminations) * -10 * jnp.ones(self.num_drones),
         )
-        # negative reward if the drones crash
-        +jnp.any(state.terminations) * -10 * jnp.ones(self.num_drones)
-
-        return jdc.replace(state, rewards=rewards)
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -145,16 +151,14 @@ class Surround(BaseParallelEnv):
                 jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < 0.2)))
             )
 
-        terminated = ((jnp.any(state.truncations) - 1) * jnp.any(terminated)) * jnp.ones(self.num_drones)
-
-        return jdc.replace(state, terminations=terminated)
+        return jdc.replace(
+            state, terminations=((jnp.any(state.truncations) - 1) * jnp.any(terminated)) * jnp.ones(self.num_drones)
+        )
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_truncation(self, state):
-        truncations = (state.timestep == 100) * jnp.ones(self.num_drones)
-
-        return jdc.replace(state, truncations=truncations)
+        return jdc.replace(state, truncations=(state.timestep == 100) * jnp.ones(self.num_drones))
 
 
 if __name__ == "__main__":
@@ -167,9 +171,10 @@ if __name__ == "__main__":
 
     parallel_env.state = parallel_env.reset(parallel_env.state)
 
+    # to compute SPS
     global_step = 0
     start_time = time.time()
-    premier = True
+
     for i in range(500):
         while not jnp.any(parallel_env.state.truncations) and not jnp.any(parallel_env.state.terminations):
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])

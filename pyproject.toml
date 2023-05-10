@@ -37,6 +37,7 @@ optax = "^0.1.3"
 orbax-checkpoint = "*"
 jaxlib = "*"
 distrax = "^0.1.2"
+jax_dataclasses = "^1.5.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.6"

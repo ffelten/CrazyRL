@@ -3,6 +3,7 @@ import time
 from typing_extensions import override
 
 import numpy as np
+import numpy.typing as npt
 from gymnasium import spaces
 
 from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
@@ -15,9 +16,9 @@ class Surround(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray[int],
-        init_flying_pos: np.ndarray[int],
-        target_location: np.ndarray[int],
+        drone_ids: npt.NDArray[int],
+        init_flying_pos: npt.NDArray[int],
+        target_location: npt.NDArray[int],
         render_mode=None,
         size: int = 4,
         swarm=None,

@@ -4,6 +4,7 @@ import time
 from typing_extensions import override
 
 import numpy as np
+import numpy.typing as npt
 from gymnasium import spaces
 
 from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
@@ -16,10 +17,10 @@ class Escort(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray[int],
-        init_flying_pos: np.ndarray[int],
-        init_target_location: np.ndarray[int],
-        final_target_location: np.ndarray[int],
+        drone_ids: npt.NDArray[int],
+        init_flying_pos: npt.NDArray[int],
+        init_target_location: npt.NDArray[int],
+        final_target_location: npt.NDArray[int],
         num_intermediate_points: int = 10,
         render_mode=None,
         size: int = 4,

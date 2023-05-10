@@ -103,11 +103,11 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_action(self, actions, location):
+    def _compute_action(self, actions, state):
         # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-        target_point_action = jnp.clip(location + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
+        target_point_action = jnp.clip(state.agent_location + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
 
-        return target_point_action
+        return jdc.replace(state, agent_location=target_point_action)
 
     @override
     @partial(jit, static_argnums=(0,))

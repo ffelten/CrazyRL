@@ -1,6 +1,7 @@
 """The Base environment inheriting from pettingZoo Parallel environment class."""
 import functools
-import time
+
+# import time
 from functools import partial
 from typing import Optional
 from typing_extensions import override
@@ -52,7 +53,9 @@ from pettingzoo.utils.env import ParallelEnv
 from pygame import DOUBLEBUF, OPENGL
 
 from crazy_rl.utils.graphic import axes, field, point, target_point
-from crazy_rl.utils.utils import run_land, run_sequence, run_take_off
+
+
+# from crazy_rl.utils.utils import run_land, run_sequence, run_take_off
 
 
 @jdc.pytree_dataclass
@@ -135,6 +138,7 @@ class BaseParallelEnv(ParallelEnv):
             self.window_size = 900  # The size of the PyGame window
             self.window = None
             self.clock = None
+        """
         elif self.render_mode == "real":
             self.drone_ids = [i for i in range(num_drones)]
             assert swarm is not None, "Swarm object must be provided in real mode"
@@ -142,6 +146,7 @@ class BaseParallelEnv(ParallelEnv):
             while not self.swarm:
                 time.sleep(0.5)
                 print("Waiting for connection...")
+        """
 
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
@@ -155,12 +160,12 @@ class BaseParallelEnv(ParallelEnv):
         """Returns the current observation of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_action(self, actions, location):
+    def _compute_action(self, actions, state):
         """Computes the action passed to `.step()` into action matching the mode environment. Must be implemented in a subclass.
 
         Args:
             actions : ndarray | dict[..]. The input action for one drones
-            location : ndarray | dict[..]. The positions of the drones
+            state : the state of the environment (contains agent_location used in this function)
         """
         raise NotImplementedError
 
@@ -179,6 +184,7 @@ class BaseParallelEnv(ParallelEnv):
     # PettingZoo API
     @override
     def reset(self, state, seed=None, return_info=False, options=None):
+        """
         if self._mode == "real":
             # self.swarm.parallel_safe(reset_estimator)
             state = jdc.replace(state, agent_location=self._get_drones_state(self._mode, state.agent_location))
@@ -200,7 +206,8 @@ class BaseParallelEnv(ParallelEnv):
             state = jdc.replace(state, agent_location=self._get_drones_state(self._mode, state.agent_location))
 
         else:
-            state = jdc.replace(state, agent_location=jnp.copy(self._init_flying_pos))
+        """
+        state = jdc.replace(state, agent_location=jnp.copy(self._init_flying_pos))
 
         state = jdc.replace(state, timestep=0)
 
@@ -230,8 +237,9 @@ class BaseParallelEnv(ParallelEnv):
     def step(self, state, actions):
         # state = jdc.replace(state, timestep=state.timestep + 1)
 
-        target_action = self._compute_action(actions, self._get_drones_state(self._mode, state.agent_location))
+        # target_action = self._compute_action(actions, self._get_drones_state(self._mode, state.agent_location))
 
+        """
         if self._mode == "real":
             command = dict()
             # dict target_position URI
@@ -248,9 +256,12 @@ class BaseParallelEnv(ParallelEnv):
             state = jdc.replace(state, agent_location=self._get_drones_state(self._mode, state.agent_location))
 
         else:
-            state = jdc.replace(state, agent_location=target_action)
-            if self.render_mode == "human":
-                self.render()
+        """
+
+        state = self._compute_action(actions, state)
+
+        if self.render_mode == "human":
+            self.render()
 
         return self._compute_step(state)
 
@@ -347,8 +358,10 @@ class BaseParallelEnv(ParallelEnv):
             if self.window is not None:
                 pygame.display.quit()
                 pygame.quit()
+        """
         elif self._mode == "real":
             self.swarm.parallel_safe(run_land)
+        """
 
     @functools.lru_cache(maxsize=None)
     @override
@@ -360,10 +373,12 @@ class BaseParallelEnv(ParallelEnv):
     def action_space(self):
         return self._action_space()
 
+    # useless without real drones
     def _get_drones_state(self, mode, agent_location):
         """Return the state of all drones (xyz position) inside a dict with the same keys of agent_location and target_location."""
         if mode == "simu":
             return agent_location
+        """
         elif mode == "real":
             temp = dict()
             pos = self.swarm.get_estimated_positions()
@@ -371,3 +386,4 @@ class BaseParallelEnv(ParallelEnv):
                 temp["agent_" + uri[-1]] = np.array(pos[uri])
 
             return temp
+        """

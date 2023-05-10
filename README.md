@@ -32,14 +32,14 @@ The red balls represent the position of the drones.
 
 ### Hover
 
-The drones learn to [hover](crazy_rl/multi_agent/hover/hover.py) in a fixed position.
+The drones learn to [hover](crazy_rl/multi_agent/numpy/hover/hover.py) in a fixed position.
 
 <img src="hover.gif" alt="Hover" width="30%"/>
 
 The yellow balls represent the target position of the drones.
 
 ### Circle
-The drones learn to perform a coordinated [circle](crazy_rl/multi_agent/circle/circle.py).
+The drones learn to perform a coordinated [circle](crazy_rl/multi_agent/numpy/circle/circle.py).
 
 <img src="circle.gif" alt="Circle" width="30%"/>
 
@@ -53,14 +53,14 @@ The drones learn to [surround](crazy_rl/multi_agent/numpy/surround/surround.py) 
 The yellow ball represents the target the drones have to surround.
 
 ### Escort
-The drones learn to [escort](crazy_rl/multi_agent/escort/escort.py) a target moving straight to one point to another.
+The drones learn to [escort](crazy_rl/multi_agent/numpy/escort/escort.py) a target moving straight to one point to another.
 
 <img src="escort.gif" alt="Escort" width="30%"/>
 
 The yellow ball represents the target the drones have to escort.
 
 ### Catch
-The drones learn to [catch](crazy_rl/multi_agent/catch/catch.py) a target trying to escape.
+The drones learn to [catch](crazy_rl/multi_agent/numpy/catch/catch.py) a target trying to escape.
 
 <img src="catch.gif" alt="Catch" width="30%"/>
 

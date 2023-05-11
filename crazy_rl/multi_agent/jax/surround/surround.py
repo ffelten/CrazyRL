@@ -84,18 +84,14 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_obs(self, state):
-        obs = jnp.array([[] for _ in range(self.num_drones)])
-
-        for agent in range(self.num_drones):
-            obs_agent = jnp.append(state.agents_locations[agent], self._target_location)
-
-            for other_agent in range(self.num_drones):
-                if other_agent != agent:
-                    obs_agent = jnp.append(obs_agent, state.agents_locations[other_agent])
-
-            obs = obs.at[agent].set(obs_agent)
-
-        return jdc.replace(state, observations=obs)
+        return jdc.replace(
+            state,
+            observations=jnp.append(
+                jnp.column_stack((state.agents_locations, jnp.tile(self._target_location, (self.num_drones, 1)))),
+                jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
+                axis=1,
+            ),
+        )
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -192,7 +188,7 @@ if __name__ == "__main__":
 
             # parallel_env.render()
 
-            # print("obs", state.observations, "reward", state.rewards)
+            # print("obs", state.observations)
             # print("reward", state.rewards)
 
             if global_step % 2000 == 0:

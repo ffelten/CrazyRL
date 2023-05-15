@@ -1,12 +1,31 @@
 """Circle environment for Crazyflie 2. Each agent is supposed to learn to perform a circle around a target point."""
 import time
-from typing import List
+from functools import partial
 from typing_extensions import override
 
+import jax.numpy as jnp
+import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
+from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+
+
+@override
+@jdc.pytree_dataclass
+class State:
+    """State of the environment containing the modifiable variables."""
+
+    agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
+    timestep: int  # represents the number of steps already done in the game
+
+    observations: jnp.ndarray  # array containing the current observation of each agent
+    rewards: jnp.ndarray  # array containing the current reward of each agent
+    terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed
+    truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
+
+    target_location: jnp.ndarray  # 2D array containing x,y,z coordinates of the target of each agent
 
 
 class Circle(BaseParallelEnv):
@@ -16,138 +35,167 @@ class Circle(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray,
-        init_flying_pos: np.ndarray,
-        render_mode=None,
+        num_drones: int,
+        init_flying_pos: jnp.ndarray,
         num_intermediate_points: int = 10,
-        size: int = 4,
+        render_mode=None,
+        size: int = 3,
         swarm=None,
     ):
         """Circle environment for Crazyflies 2.
 
         Args:
-            drone_ids: Array of drone ids
+            num_drones: Number of drones
             init_flying_pos: Array of initial positions of the drones when they are flying
-            render_mode: Render mode: "human", "real" or None
             num_intermediate_points: Number of intermediate points in the target circle
+            render_mode: Render mode: "human", "real" or None
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
-        self.num_drones = len(drone_ids)
-
-        self._agent_location = dict()
-        self._target_location = dict()
-        self._init_flying_pos = dict()
-        self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
-        self.timestep = 0
-
-        circle_radius = 0.6  # [m]
-        self.num_intermediate_points = num_intermediate_points
-        # Ref is a list of 2d arrays for each agent
-        # each 2d array contains the reference points (xyz) for the agent at each timestep
-        self.ref: List[np.ndarray] = []
-
-        for i, agent in enumerate(self._agents_names):
-            self._init_flying_pos[agent] = init_flying_pos[i].copy()
-
-            ts = 2 * np.pi * np.arange(num_intermediate_points) / num_intermediate_points
-
-            self.ref.append(np.zeros((num_intermediate_points, 3)))
-            self.ref[i][:, 2] = init_flying_pos[i][2]  # z-position
-            self.ref[i][:, 1] = circle_radius * np.sin(ts) + (init_flying_pos[i][1])  # y-position
-            self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_flying_pos[i][0] - circle_radius)  # x-position
-
-        self._agent_location = self._init_flying_pos.copy()
-        self._target_location = self._init_flying_pos.copy()
+        self.num_drones = num_drones
 
         self.size = size
+
+        self._init_flying_pos = init_flying_pos
+
+        self.norm = vmap(jnp.linalg.norm)  # function to compute the norm of each array in a matrix
+
+        # Specific to circle
+
+        circle_radius = 0.5  # [m]
+
+        self.num_intermediate_points = num_intermediate_points
+
+        # Ref is a list of 2d arrays for each agent
+        # each 2d array contains the reference points (xyz) for the agent at each timestep
+        self.ref = jnp.zeros((num_intermediate_points, self.num_drones, 3))
+
+        ts = 2 * np.pi * np.arange(num_intermediate_points) / num_intermediate_points
+
+        for agent in range(self.num_drones):
+            self.ref = self.ref.at[:, agent, 0].set(
+                circle_radius * (1 - np.cos(ts)) + (init_flying_pos[agent][0] - circle_radius)
+            )
+            self.ref = self.ref.at[:, agent, 1].set(init_flying_pos[agent][1])
+            self.ref = self.ref.at[:, agent, 2].set(circle_radius * np.sin(ts) + (init_flying_pos[agent][2]))
+
+        print(self.ref)
 
         super().__init__(
             render_mode=render_mode,
             size=size,
             init_flying_pos=self._init_flying_pos,
-            target_location=self._target_location,
-            agents_names=self._agents_names,
-            drone_ids=drone_ids,
+            num_drones=self.num_drones,
             swarm=swarm,
         )
 
     @override
     def _observation_space(self, agent):
         return spaces.Box(
-            low=np.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=np.float32),
-            high=np.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=np.float32),
+            low=jnp.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=jnp.float32),
+            high=jnp.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=jnp.float32),
             shape=(6,),
-            dtype=np.float32,
+            dtype=jnp.float32,
         )
 
     @override
-    def _action_space(self, agent):
+    def _action_space(self):
         return spaces.Box(low=-1 * np.ones(3, dtype=np.float32), high=np.ones(3, dtype=np.float32), dtype=np.float32)
 
     @override
-    def _compute_obs(self):
-        obs = dict()
-        for i, agent in enumerate(self._agents_names):
-            t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
-            self._target_location[agent] = self.ref[i][t]
-            obs[agent] = np.hstack([self._agent_location[agent], self._target_location[agent]]).reshape(
-                6,
-            )
-        return obs
+    @partial(jit, static_argnums=(0,))
+    def _compute_obs(self, state):
+        target_location = self.ref[state.timestep % self.num_intermediate_points]  # redo the circle if the end is reached
+
+        return jdc.replace(
+            state, observations=vmap(jnp.append)(state.agents_locations, target_location), target_location=target_location
+        )
 
     @override
-    def _compute_action(self, actions):
-        target_point_action = dict()
-        state = self._get_drones_state()
-
-        for agent in self._agents_names:
-            # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-            target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
-
-        return target_point_action
+    def _compute_action(self, state, actions):
+        # Actions are clipped to stay in the map and scaled to do max 20cm in one step
+        return jdc.replace(
+            state,
+            agents_locations=jnp.clip(
+                state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size
+            ),
+        )
 
     @override
-    def _compute_reward(self):
+    @partial(jit, static_argnums=(0,))
+    def _compute_reward(self, state):
         # Reward is based on the euclidean distance to the target point
-        reward = dict()
-        for agent in self._agents_names:
-            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
-        return reward
+
+        return jdc.replace(state, rewards=-1 * self.norm(state.target_location - state.agents_locations))
 
     @override
-    def _compute_terminated(self):
-        return {agent: False for agent in self._agents_names}
+    @partial(jit, static_argnums=(0,))
+    def _compute_terminated(self, state):
+        return jdc.replace(state, terminations=jnp.zeros(self.num_drones, dtype=bool))
 
     @override
-    def _compute_truncation(self):
-        if self.timestep == 45:
-            truncation = {agent: True for agent in self._agents_names}
-            self.agents = []
-            self.timestep = 0
-        else:
-            truncation = {agent: False for agent in self._agents_names}
-        return truncation
+    @partial(jit, static_argnums=(0,))
+    def _compute_truncation(self, state):
+        return jdc.replace(state, truncations=(state.timestep == 100) * jnp.ones(self.num_drones))
 
     @override
-    def _compute_info(self):
-        return dict()
+    @partial(jit, static_argnums=(0,))
+    def _initialize_state(self):
+        return State(
+            self._init_flying_pos,
+            0,
+            jnp.array([]),
+            jnp.array([]),
+            jnp.zeros(self.num_drones),
+            jnp.zeros(self.num_drones),
+            jnp.array([]),
+        )
 
 
 if __name__ == "__main__":
     parallel_env = Circle(
-        drone_ids=np.array([0, 1, 2, 3]),
-        render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [0, 1, 0.5], [0, -1, 0.5], [1, 0, 0.5]]),
+        num_drones=5,
+        render_mode=None,
+        init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        num_intermediate_points=100,
     )
 
-    observations = parallel_env.reset()
+    # to verify the proportion of crash and avoid some mistakes
+    nb_crash = 0
+    nb_end = 0
 
-    while parallel_env.agents:
-        actions = {
-            agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
-        }  # this is where you would insert your policy
-        observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
-        parallel_env.render()
-        print("obs", observations, "reward", rewards)
-        time.sleep(0.1)
+    global_step = 0
+    start_time = time.time()
+
+    seed = 5
+
+    key = random.PRNGKey(seed)
+
+    state, key = parallel_env.reset(key)
+
+    parallel_env.render(state)
+
+    for i in range(100):
+        while not jnp.any(state.truncations) and not jnp.any(state.terminations):
+            actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
+
+            state, key = parallel_env.step(state, actions, key)
+
+            parallel_env.render(state)
+            # print("obs", observations, "reward", rewards)
+
+            if global_step % 1000 == 0:
+                print("SPS:", int(global_step / (time.time() - start_time)))
+
+            global_step += 1
+
+            # time.sleep(0.02)
+
+        nb_crash += jnp.any(state.terminations)
+        nb_end += jnp.any(state.truncations)
+
+        state, key = parallel_env.reset(key)
+
+    print("nb_crash", nb_crash)
+    print("nb_end", nb_end)
+    print("total", nb_end + nb_crash)

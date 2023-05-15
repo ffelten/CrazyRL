@@ -8,11 +8,10 @@ from typing_extensions import override
 
 import jax.numpy as jnp
 import jax_dataclasses as jdc
-import numpy as np
 import pygame
 from cflib.crazyflie.swarm import Swarm
 from gymnasium import spaces
-from jax import jit
+from jax import jit, random
 from OpenGL.GL import (
     GL_AMBIENT,
     GL_AMBIENT_AND_DIFFUSE,
@@ -184,7 +183,7 @@ class BaseParallelEnv(ParallelEnv):
 
     # PettingZoo API
     @override
-    def reset(self, seed=None, return_info=False, options=None):
+    def reset(self, key, seed=None, return_info=False, options=None):
         """
         if self._mode == "real":
             # self.swarm.parallel_safe(reset_estimator)
@@ -208,6 +207,9 @@ class BaseParallelEnv(ParallelEnv):
 
         else:
         """
+
+        key, subkey = random.split(key)
+
         state = self._initialize_state()
 
         state = self._compute_obs(state)
@@ -215,11 +217,11 @@ class BaseParallelEnv(ParallelEnv):
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame(state)
 
-        return state
+        return state, key
 
     @override
     @partial(jit, static_argnums=(0,))
-    def step(self, state, actions):
+    def step(self, state, actions, key):
         # state = jdc.replace(state, timestep=state.timestep + 1)
 
         # target_action = self._compute_action(actions, self._get_drones_state(self._mode, state.agent_location))
@@ -243,10 +245,14 @@ class BaseParallelEnv(ParallelEnv):
         else:
         """
 
+        key, subkey = random.split(key)
+
         state = self._compute_action(state, actions)
 
+        """
         if self.render_mode == "human":
             self.render(state)
+        """
 
         state = jdc.replace(state, timestep=state.timestep + 1)
 
@@ -255,7 +261,7 @@ class BaseParallelEnv(ParallelEnv):
         state = self._compute_reward(state)
         state = self._compute_obs(state)
 
-        return state
+        return state, key
 
     @override
     def render(self, state):
@@ -319,9 +325,9 @@ class BaseParallelEnv(ParallelEnv):
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        for agent in state.agent_location:
+        for agent in state.agents_locations:
             glPushMatrix()
-            point(np.copy(agent))
+            point(jnp.copy(agent))
 
             glPopMatrix()
 
@@ -329,7 +335,7 @@ class BaseParallelEnv(ParallelEnv):
         field(self.size)
         axes()
 
-        for target in self._target_location:
+        for target in state.target_location:
             glPushMatrix()
             target_point(jnp.copy(target))
             glPopMatrix()

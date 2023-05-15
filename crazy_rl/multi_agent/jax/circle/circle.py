@@ -79,8 +79,6 @@ class Circle(BaseParallelEnv):
             self.ref = self.ref.at[:, agent, 1].set(init_flying_pos[agent][1])
             self.ref = self.ref.at[:, agent, 2].set(circle_radius * np.sin(ts) + (init_flying_pos[agent][2]))
 
-        print(self.ref)
-
         super().__init__(
             render_mode=render_mode,
             size=size,
@@ -131,7 +129,8 @@ class Circle(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_terminated(self, state):
-        return jdc.replace(state, terminations=jnp.zeros(self.num_drones, dtype=bool))
+        # the drones never crash. Terminations initialized to jnp.zeros() and then never changes
+        return state
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -184,7 +183,7 @@ if __name__ == "__main__":
             parallel_env.render(state)
             # print("obs", observations, "reward", rewards)
 
-            if global_step % 1000 == 0:
+            if global_step % 2000 == 0:
                 print("SPS:", int(global_step / (time.time() - start_time)))
 
             global_step += 1

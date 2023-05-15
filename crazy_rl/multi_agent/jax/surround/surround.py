@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
-from jax import jit, vmap
+from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
 
@@ -19,10 +19,13 @@ class State:
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game
+
     observations: jnp.ndarray  # array containing the current observation of each agent
     rewards: jnp.ndarray  # array containing the current reward of each agent
     terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed
     truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
+
+    target_location: jnp.ndarray  # 2D array containing x,y,z coordinates of the unique target
 
 
 class Surround(BaseParallelEnv):
@@ -36,7 +39,7 @@ class Surround(BaseParallelEnv):
         init_flying_pos: jnp.ndarray,
         target_location: jnp.ndarray,
         render_mode=None,
-        size: int = 4,
+        size: int = 3,
         swarm=None,
     ):
         """Surround environment for Crazyflies 2.
@@ -87,7 +90,7 @@ class Surround(BaseParallelEnv):
         return jdc.replace(
             state,
             observations=jnp.append(
-                jnp.column_stack((state.agents_locations, jnp.tile(self._target_location, (self.num_drones, 1)))),
+                jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
                 jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
                 axis=1,
             ),
@@ -123,7 +126,7 @@ class Surround(BaseParallelEnv):
                 * 0.05
                 / (self.num_drones - 1)
                 # a maximum value minus the distance to the target
-                + 0.95 * (2 * self.size - self.norm(state.agents_locations - self._target_location))
+                + 0.95 * (2 * self.size - self.norm(state.agents_locations - state.target_location))
             )
             # negative reward if the drones crash
             + jnp.any(state.terminations) * -10 * jnp.ones(self.num_drones),
@@ -134,7 +137,7 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self, state):
         # collision with the ground and the target
         terminated = jnp.logical_or(
-            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - self._target_location) < 0.2
+            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - state.target_location) < 0.2
         )
 
         for agent in range(self.num_drones):
@@ -158,19 +161,25 @@ class Surround(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _initialize_state(self):
         return State(
-            self._init_flying_pos, 0, jnp.array([]), jnp.array([]), jnp.zeros(self.num_drones), jnp.zeros(self.num_drones)
+            self._init_flying_pos,
+            0,
+            jnp.array([]),
+            jnp.array([]),
+            jnp.zeros(self.num_drones),
+            jnp.zeros(self.num_drones),
+            self._target_location,
         )
 
 
-if __name__ == "__main__":
-    parallel_env = Surround(
-        num_drones=5,
-        render_mode=None,
-        init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-        target_location=jnp.array([[1, 1, 2.5]]),
-    )
+def test_loop(seed):
+    """Main loop of the file, in a function to be vmapped."""
+    print(seed)
 
-    state = parallel_env.reset()
+    key = random.PRNGKey(seed)
+
+    state, key = parallel_env.reset(key)
+
+    parallel_env.render(state)
 
     # to verify the proportion of crash and avoid some mistakes
     nb_crash = 0
@@ -182,11 +191,14 @@ if __name__ == "__main__":
 
     for i in range(500):
         while not jnp.any(state.truncations) and not jnp.any(state.terminations):
+            # key, subkey = random.split(key)
+            # actions = random.choice(subkey, action_space.sample(), (parallel_env.num_drones, 3))
+            # print(actions)
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
             # this is where you would insert your policy
-            state = parallel_env.step(state, actions)
+            state, key = parallel_env.step(state, actions, key)
 
-            # parallel_env.render()
+            parallel_env.render(state)
 
             # print("obs", state.observations)
             # print("reward", state.rewards)
@@ -201,8 +213,33 @@ if __name__ == "__main__":
         nb_crash += jnp.any(state.terminations)
         nb_end += jnp.any(state.truncations)
 
-        state = parallel_env.reset()
+        state, key = parallel_env.reset(key)
+
+        # print("SPS:", int(global_step / (time.time() - start_time)))
+
+    return nb_crash, nb_end
+
+
+if __name__ == "__main__":
+    parallel_env = Surround(
+        num_drones=5,
+        render_mode=None,
+        init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        target_location=jnp.array([[1, 1, 2.5]]),
+    )
+
+    start = time.time()
+
+    n = 5  # number of states in parallel
+
+    seeds = jnp.arange(n)  # test value
+
+    # nb_crash, nb_end = vmap(test_loop)(seeds)
+
+    nb_crash, nb_end = test_loop(5)
 
     print("nb_crash", nb_crash)
     print("nb_end", nb_end)
     print("total", nb_end + nb_crash)
+
+    print("total duration :", time.time() - start)

@@ -103,19 +103,24 @@ class Escort(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state):
+    def _compute_obs(self, state, key):
         finished = state.timestep < self.num_ref_points
 
         target_location = jnp.array([finished * self.ref[state.timestep] + (1 - finished) * self.ref[-1]])
 
-        return jdc.replace(
-            state,
-            observations=jnp.append(
-                jnp.column_stack((state.agents_locations, jnp.tile(target_location, (self.num_drones, 1)))),
-                jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
-                axis=1,
+        return (
+            jdc.replace(
+                state,
+                observations=jnp.append(
+                    jnp.column_stack((state.agents_locations, jnp.tile(target_location, (self.num_drones, 1)))),
+                    jnp.array(
+                        [jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]
+                    ),
+                    axis=1,
+                ),
+                target_location=target_location,
             ),
-            target_location=target_location,
+            key,
         )
 
     @override

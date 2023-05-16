@@ -86,14 +86,19 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state):
-        return jdc.replace(
-            state,
-            observations=jnp.append(
-                jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
-                jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
-                axis=1,
+    def _compute_obs(self, state, key):
+        return (
+            jdc.replace(
+                state,
+                observations=jnp.append(
+                    jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
+                    jnp.array(
+                        [jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]
+                    ),
+                    axis=1,
+                ),
             ),
+            key,
         )
 
     @override

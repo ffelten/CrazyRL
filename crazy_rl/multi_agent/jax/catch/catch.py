@@ -91,7 +91,9 @@ class Catch(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state):
+    def _compute_obs(self, state, key):
+        key, subkey = random.split(key)
+
         # mean of the agent's positions
         mean = state.agents_locations.sum() / self.num_drones
 
@@ -113,7 +115,7 @@ class Catch(BaseParallelEnv):
                 # if the mean of the agents is too close to the target, move the target in a random
                 # direction, slowly because it hesitates
                 surrounded
-                * np.random.random_sample(3)
+                * random.uniform(subkey, (3,), minval=-1, maxval=1)
                 * self.target_speed
                 * 0.1
             ),
@@ -121,14 +123,19 @@ class Catch(BaseParallelEnv):
             jnp.array([self.size, self.size, self.size]),
         )
 
-        return jdc.replace(
-            state,
-            observations=jnp.append(
-                jnp.column_stack((state.agents_locations, jnp.tile(target_location, (self.num_drones, 1)))),
-                jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
-                axis=1,
+        return (
+            jdc.replace(
+                state,
+                observations=jnp.append(
+                    jnp.column_stack((state.agents_locations, jnp.tile(target_location, (self.num_drones, 1)))),
+                    jnp.array(
+                        [jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]
+                    ),
+                    axis=1,
+                ),
+                target_location=target_location,
             ),
-            target_location=target_location,
+            key,
         )
 
     @override

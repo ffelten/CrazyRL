@@ -102,11 +102,14 @@ class Circle(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state):
+    def _compute_obs(self, state, key):
         target_location = self.ref[state.timestep % self.num_intermediate_points]  # redo the circle if the end is reached
 
-        return jdc.replace(
-            state, observations=vmap(jnp.append)(state.agents_locations, target_location), target_location=target_location
+        return (
+            jdc.replace(
+                state, observations=vmap(jnp.append)(state.agents_locations, target_location), target_location=target_location
+            ),
+            key,
         )
 
     @override

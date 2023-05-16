@@ -152,7 +152,7 @@ class BaseParallelEnv(ParallelEnv):
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_obs(self, state):
+    def _compute_obs(self, state, key):
         """Computes the current observation of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -212,7 +212,7 @@ class BaseParallelEnv(ParallelEnv):
 
         state = self._initialize_state()
 
-        state = self._compute_obs(state)
+        state, key = self._compute_obs(state, key)
 
         return state, key
 
@@ -256,7 +256,7 @@ class BaseParallelEnv(ParallelEnv):
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
         state = self._compute_reward(state)
-        state = self._compute_obs(state)
+        state, key = self._compute_obs(state, key)
 
         return state, key
 

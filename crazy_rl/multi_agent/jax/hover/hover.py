@@ -81,8 +81,8 @@ class Hover(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state):
-        return jdc.replace(state, observations=vmap(jnp.append)(state.agents_locations, state.target_location))
+    def _compute_obs(self, state, key):
+        return jdc.replace(state, observations=vmap(jnp.append)(state.agents_locations, state.target_location)), key
 
     @override
     @partial(jit, static_argnums=(0,))

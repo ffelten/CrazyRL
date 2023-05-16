@@ -214,9 +214,6 @@ class BaseParallelEnv(ParallelEnv):
 
         state = self._compute_obs(state)
 
-        if self.render_mode == "human" and self._mode == "simu":
-            self._render_frame(state)
-
         return state, key
 
     @override

@@ -1,12 +1,32 @@
 """Escort environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point moving to one point to another."""
 
 import time
+from functools import partial
 from typing_extensions import override
 
+import jax.numpy as jnp
+import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
+from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+
+
+@override
+@jdc.pytree_dataclass
+class State:
+    """State of the environment containing the modifiable variables."""
+
+    agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
+    timestep: int  # represents the number of steps already done in the game
+
+    observations: jnp.ndarray  # array containing the current observation of each agent
+    rewards: jnp.ndarray  # array containing the current reward of each agent
+    terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed
+    truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
+
+    target_location: jnp.ndarray  # 2D array containing x,y,z coordinates of the target of each agent
 
 
 class Escort(BaseParallelEnv):
@@ -16,19 +36,19 @@ class Escort(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray,
-        init_flying_pos: np.ndarray,
-        init_target_location: np.ndarray,
-        final_target_location: np.ndarray,
+        num_drones: int,
+        init_flying_pos: jnp.ndarray,
+        init_target_location: jnp.ndarray,
+        final_target_location: jnp.ndarray,
         num_intermediate_points: int = 10,
         render_mode=None,
-        size: int = 4,
+        size: int = 3,
         swarm=None,
     ):
         """Escort environment for Crazyflies 2.
 
         Args:
-            drone_ids: Array of drone ids
+            num_drones: Number of drones
             init_flying_pos: Array of initial positions of the drones when they are flying
             init_target_location: Array of the initial position of the moving target
             final_target_location: Array of the final position of the moving target
@@ -37,43 +57,34 @@ class Escort(BaseParallelEnv):
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
-        self.num_drones = len(drone_ids)
+        self.num_drones = num_drones
 
-        self._agent_location = dict()
+        self._target_location = init_target_location  # unique target location for all agents
 
-        self._target_location = {"unique": init_target_location}  # unique target location for all agents
-
-        self._init_flying_pos = dict()
-        self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
-        self.timestep = 0
+        self._init_flying_pos = init_flying_pos
 
         # There are two more ref points than intermediate points, one for the initial and final target locations
         self.num_ref_points = num_intermediate_points + 2
         # Ref is a 2d arrays for the target
         # it contains the reference points (xyz) for the target at each timestep
-        self.ref: np.ndarray = np.array([init_target_location])
 
-        for i, agent in enumerate(self._agents_names):
-            self._init_flying_pos[agent] = init_flying_pos[i].copy()
-
-        for t in range(1, self.num_ref_points):
-            self.ref = np.append(
-                self.ref,
-                [init_target_location + (final_target_location - init_target_location) * t / self.num_ref_points],
-                axis=0,
-            )
-
-        self._agent_location = self._init_flying_pos.copy()
+        self.ref = jnp.array(
+            [
+                init_target_location + ((final_target_location - init_target_location) * t / self.num_ref_points)
+                for t in range(self.num_ref_points)
+            ]
+        )
 
         self.size = size
+
+        self.norm = vmap(jnp.linalg.norm)  # function to compute the norm of each array in a matrix
 
         super().__init__(
             render_mode=render_mode,
             size=size,
             init_flying_pos=self._init_flying_pos,
             target_location=self._target_location,
-            agents_names=self._agents_names,
-            drone_ids=drone_ids,
+            num_drones=num_drones,
             swarm=swarm,
         )
 
@@ -87,142 +98,147 @@ class Escort(BaseParallelEnv):
         )
 
     @override
-    def _action_space(self, agent):
+    def _action_space(self):
         return spaces.Box(low=-1 * np.ones(3, dtype=np.float32), high=np.ones(3, dtype=np.float32), dtype=np.float32)
 
     @override
-    def _compute_obs(self):
-        obs = dict()
+    @partial(jit, static_argnums=(0,))
+    def _compute_obs(self, state):
+        finished = state.timestep < self.num_ref_points
 
-        t = self.timestep
+        target_location = jnp.array([finished * self.ref[state.timestep] + (1 - finished) * self.ref[-1]])
 
-        if t < self.num_ref_points:
-            self._target_location["unique"] = self.ref[t]
-
-        else:
-            self._target_location["unique"] = self.ref[-1]  # stay in final location
-
-        for agent in self._agents_names:
-            obs[agent] = self._agent_location[agent].copy()
-            obs[agent] = np.append(obs[agent], self._target_location["unique"])
-
-            for other_agent in self._agents_names:
-                if other_agent != agent:
-                    obs[agent] = np.append(obs[agent], self._agent_location[other_agent])
-
-        return obs
+        return jdc.replace(
+            state,
+            observations=jnp.append(
+                jnp.column_stack((state.agents_locations, jnp.tile(target_location, (self.num_drones, 1)))),
+                jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
+                axis=1,
+            ),
+            target_location=target_location,
+        )
 
     @override
-    def _compute_action(self, actions):
-        target_point_action = dict()
-        state = self._get_drones_state()
-
-        for agent in self.agents:
-            # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-            target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
-
-        return target_point_action
+    @partial(jit, static_argnums=(0,))
+    def _compute_action(self, state, actions):
+        # Actions are clipped to stay in the map and scaled to do max 20cm in one step
+        return jdc.replace(
+            state,
+            agents_locations=jnp.clip(
+                state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size
+            ),
+        )
 
     @override
-    def _compute_reward(self):
-        # Reward is the mean distance to the other agents minus the distance to the target
-        reward = dict()
+    @partial(jit, static_argnums=(0,))
+    def _compute_reward(self, state):
+        # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
 
-        for agent in self._agents_names:
-            reward[agent] = 0
+        return jdc.replace(
+            state,
+            rewards=jnp.any(state.truncations)
+            * (
+                # mean distance to the other agents
+                jnp.array(
+                    [
+                        jnp.sum(self.norm(state.agents_locations[agent] - state.agents_locations))
+                        for agent in range(self.num_drones)
+                    ]
+                )
+                * 0.05
+                / (self.num_drones - 1)
+                # a maximum value minus the distance to the target
+                + 0.95 * (2 * self.size - self.norm(state.agents_locations - state.target_location))
+            )
+            # negative reward if the drones crash
+            + jnp.any(state.terminations) * -10 * jnp.ones(self.num_drones),
+        )
 
-            # mean distance to the other agents
-            for other_agent in self._agents_names:
-                if other_agent != agent:
-                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
+    @override
+    @partial(jit, static_argnums=(0,))
+    def _compute_terminated(self, state):
+        # collision with the ground and the target
+        terminated = jnp.logical_or(
+            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - state.target_location) < 0.2
+        )
 
-            reward[agent] /= self.num_drones - 1
-            reward[agent] *= 0
-
-            # distance to the target
-            reward[agent] -= 1 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
+        for agent in range(self.num_drones):
+            distances = self.norm(state.agents_locations[agent] - state.agents_locations)
 
             # collision between two drones
-            for other_agent in self._agents_names:
-                if other_agent != agent and (
-                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-                ):
-                    reward[agent] -= 100
-
-            # collision with the ground
-            if self._agent_location[agent][2] < 0.2:
-                reward[agent] -= 100
-
-            # collision with the target
-            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
-                reward[agent] -= 100
-
-        return reward
-
-    @override
-    def _compute_terminated(self):
-        terminated = dict()
-
-        for agent in self.agents:
-            terminated[agent] = (
-                self.timestep >= self.num_ref_points + 50
-            )  # the game stops 50 steps after the target has stopped
-
-            # collision between two drones
-            for other_agent in self.agents:
-                if other_agent != agent:
-                    terminated[agent] = terminated[agent] or (
-                        np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-                    )
-
-            # collision with the ground
-            terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
-
-            # collision with the target
-            terminated[agent] = terminated[agent] or (
-                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
+            terminated = terminated.at[agent].set(
+                jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < 0.2)))
             )
 
-            if terminated[agent]:
-                for other_agent in self.agents:
-                    terminated[other_agent] = True
-                self.agents = []
-
-        return terminated
+        return jdc.replace(
+            state, terminations=((jnp.any(state.truncations) - 1) * jnp.any(terminated)) * jnp.ones(self.num_drones)
+        )
 
     @override
-    def _compute_truncation(self):
-        if self.timestep == 200:
-            truncation = {agent: True for agent in self._agents_names}
-            self.agents = []
-            self.timestep = 0
-        else:
-            truncation = {agent: False for agent in self._agents_names}
-        return truncation
+    @partial(jit, static_argnums=(0,))
+    def _compute_truncation(self, state):
+        return jdc.replace(state, truncations=(state.timestep == 100) * jnp.ones(self.num_drones))
 
     @override
-    def _compute_info(self):
-        info = dict()
-        return info
+    @partial(jit, static_argnums=(0,))
+    def _initialize_state(self):
+        return State(
+            self._init_flying_pos,
+            0,
+            jnp.array([]),
+            jnp.array([]),
+            jnp.zeros(self.num_drones),
+            jnp.zeros(self.num_drones),
+            jnp.array([self._target_location]),
+        )
 
 
 if __name__ == "__main__":
     parallel_env = Escort(
-        drone_ids=np.array([0, 1, 2, 3]),
-        render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1], [0, 1, 1], [2, 2, 1]]),
-        init_target_location=np.array([1, 1, 2.5]),
-        final_target_location=np.array([-2, -2, 3]),
+        num_drones=5,
+        render_mode=None,
+        init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        init_target_location=jnp.array([1, 1, 2.5]),
+        final_target_location=jnp.array([-2, -2, 3]),
         num_intermediate_points=150,
     )
 
-    observations = parallel_env.reset()
+    # to verify the proportion of crash and avoid some mistakes
+    nb_crash = 0
+    nb_end = 0
 
-    while parallel_env.agents:
-        actions = {
-            agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
-        }  # this is where you would insert your policy
-        observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
-        parallel_env.render()
-        print("obs", observations, "reward", rewards)
-        time.sleep(0.02)
+    global_step = 0
+    start_time = time.time()
+
+    seed = 5
+
+    key = random.PRNGKey(seed)
+
+    state, key = parallel_env.reset(key)
+
+    parallel_env.render(state)
+
+    for i in range(500):
+        while not jnp.any(state.truncations) and not jnp.any(state.terminations):
+            actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
+
+            state, key = parallel_env.step(state, actions, key)
+
+            parallel_env.render(state)
+            # print("obs", observations, "reward", rewards)
+
+            if global_step % 2000 == 0:
+                print("SPS:", int(global_step / (time.time() - start_time)))
+
+            global_step += 1
+
+            # time.sleep(0.02)
+
+        nb_crash += jnp.any(state.terminations)
+        nb_end += jnp.any(state.truncations)
+
+        state, key = parallel_env.reset(key)
+
+    print("nb_crash", nb_crash)
+    print("nb_end", nb_end)
+    print("total", nb_end + nb_crash)

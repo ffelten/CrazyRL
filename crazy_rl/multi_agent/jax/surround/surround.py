@@ -142,7 +142,7 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self, state):
         # collision with the ground and the target
         terminated = jnp.logical_or(
-            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - state.target_location) < 0.2
+            state.agents_locations[:, 2] < 0.2, self.norm(state.agents_locations - state.target_location) < 0.2
         )
 
         for agent in range(self.num_drones):

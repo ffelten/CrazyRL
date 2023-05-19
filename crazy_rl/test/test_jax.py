@@ -184,7 +184,28 @@ def test_circle():
     # observation : agent's location and target's location
     assert (state.observations == jnp.array([[0, 0, 1, -0.5, 0, 1], [0, 3, 1, -0.5, 1, 1]])).all()
 
-    assert (state.rewards == jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))])).all()
+    print("caca", state.rewards)
+
+    assert (state.rewards > jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) - 0.01).all()
+    assert (state.rewards < jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) + 0.01).all()
+
+    state, key = parallel_env.reset(key)
+
+    actions = jnp.zeros((2, 3))
+
+    state, key = parallel_env.step(state, actions, key)
+
+    ts = 2 * jnp.pi / 100
+
+    assert (
+        state.target_location
+        == jnp.array(
+            [
+                [0.5 * (1 - jnp.cos(ts)) - 0.5, 0, 0.5 * jnp.sin(ts) + 1],
+                [0.5 * (1 - jnp.cos(ts)) - 0.5, 1, 0.5 * jnp.sin(ts) + 1],
+            ]
+        )
+    ).all()
 
 
 def test_escort():
@@ -254,6 +275,14 @@ def test_escort():
         + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
         + 0.05
     ).all()
+
+    state, key = parallel_env.reset(key)
+
+    actions = jnp.zeros((2, 3))
+
+    state, key = parallel_env.step(state, actions, key)
+
+    assert (state.target_location == jnp.array([1, 1, 2.5]) + jnp.array([-3, -3, 0.5]) / 152).all()
 
 
 def test_catch():

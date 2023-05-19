@@ -70,14 +70,14 @@ class Circle(BaseParallelEnv):
         # each 2d array contains the reference points (xyz) for the agent at each timestep
         self.ref = jnp.zeros((num_intermediate_points, self.num_drones, 3))
 
-        ts = 2 * np.pi * np.arange(num_intermediate_points) / num_intermediate_points
+        ts = 2 * jnp.pi * jnp.arange(num_intermediate_points) / num_intermediate_points
 
         for agent in range(self.num_drones):
             self.ref = self.ref.at[:, agent, 0].set(
-                circle_radius * (1 - np.cos(ts)) + (init_flying_pos[agent][0] - circle_radius)
+                circle_radius * (1 - jnp.cos(ts)) + (init_flying_pos[agent][0] - circle_radius)
             )
             self.ref = self.ref.at[:, agent, 1].set(init_flying_pos[agent][1])
-            self.ref = self.ref.at[:, agent, 2].set(circle_radius * np.sin(ts) + (init_flying_pos[agent][2]))
+            self.ref = self.ref.at[:, agent, 2].set(circle_radius * jnp.sin(ts) + (init_flying_pos[agent][2]))
 
         super().__init__(
             render_mode=render_mode,

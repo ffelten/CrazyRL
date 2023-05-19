@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import jax.random as random
 
+from crazy_rl.multi_agent.jax.catch.catch import Catch
 from crazy_rl.multi_agent.jax.circle.circle import Circle
 from crazy_rl.multi_agent.jax.escort.escort import Escort
 from crazy_rl.multi_agent.jax.hover.hover import Hover
@@ -83,7 +84,7 @@ def leave_the_map(parallel_env, key):
     return state, key
 
 
-def test_jax_surround():
+def test_surround():
     """Test for the Surround environment in jax version."""
     parallel_env = Surround(
         num_drones=2,
@@ -205,15 +206,13 @@ def test_escort():
 
     state, key = two_drones_crash(parallel_env, key)
 
-    # 3rd round : one drone crashes with the ground
+    # 2nd round : one drone crashes with the ground
 
     state, key = crash_ground(parallel_env, key)
 
-    # xième round : the drones never crash and one tries to leave the map
+    # 3rd round : the drones never crash and one tries to leave the map
 
     state, key = leave_the_map(parallel_env, key)
-
-    print(state.target_location)
 
     # observation : agent's location, target's location and other agent's location
     assert (
@@ -255,3 +254,100 @@ def test_escort():
         + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
         + 0.05
     ).all()
+
+
+def test_catch():
+    """Test for the Catch environment in jax version."""
+    parallel_env = Catch(
+        num_drones=2,
+        render_mode=None,
+        init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
+        init_target_location=jnp.array([1, 1, 2.5]),
+        target_speed=0.1,
+    )
+
+    seed = 5
+
+    key = random.PRNGKey(seed)
+
+    # 1st round : the two drones crash
+
+    state, key = two_drones_crash(parallel_env, key)
+
+    # 2nd round : one drone crashes with the ground
+
+    state, key = crash_ground(parallel_env, key)
+
+    # 3rd round : the drones never crash and one tries to leave the map
+
+    state, key = leave_the_map(parallel_env, key)
+
+    # observation : agent's location, target's location and other agent's location
+    assert (
+        state.observations
+        == jnp.array(
+            [
+                [0, 0, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 3, 1],
+                [0, 3, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 0, 1],
+            ]
+        )
+    ).all()
+
+    # not exactly the same due to approximations
+    assert (
+        state.rewards
+        > (
+            6
+            - jnp.array(
+                [
+                    jnp.linalg.norm(jnp.array([0, 0, 1]) - state.target_location),
+                    jnp.linalg.norm(jnp.array([0, 3, 1]) - state.target_location),
+                ]
+            )
+        )
+        * 0.95
+        + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
+        - 0.1
+    ).all()
+
+    assert (
+        state.rewards
+        < (
+            6
+            - jnp.array(
+                [
+                    jnp.linalg.norm(jnp.array([0, 0, 1]) - state.target_location),
+                    jnp.linalg.norm(jnp.array([0, 3, 1]) - state.target_location),
+                ]
+            )
+        )
+        * 0.95
+        + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
+        + 0.1
+    ).all()
+
+    # Tests the target
+
+    parallel_env = Catch(
+        num_drones=2,
+        render_mode=None,
+        init_flying_pos=jnp.array([[1, -1, 1], [1, 1, 1]]),
+        init_target_location=jnp.array([0, 0, 1]),
+        target_speed=0.1,
+    )
+
+    state, key = parallel_env.reset(key)
+
+    assert (state.target_location == jnp.array([[-0.1, 0, 1]])).all()
+
+    parallel_env = Catch(
+        num_drones=2,
+        render_mode=None,
+        init_flying_pos=jnp.array([[1, -1, 1], [1, 1, 1]]),
+        init_target_location=jnp.array([1.001, 0, 1]),
+        target_speed=0.1,
+    )
+
+    state, key = parallel_env.reset(key)
+
+    assert jnp.linalg.norm(state.target_location - jnp.array([1, 0, 1])) <= 0.01

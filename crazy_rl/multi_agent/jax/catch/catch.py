@@ -95,9 +95,14 @@ class Catch(BaseParallelEnv):
         key, subkey = random.split(key)
 
         # mean of the agent's positions
-        mean = state.agents_locations.sum() / self.num_drones
+        mean = jnp.zeros(3)
 
-        dist = jnp.linalg.norm(mean - state.target_location)
+        for agent in range(self.num_drones):
+            mean += state.agents_locations[agent]
+
+        mean /= self.num_drones
+
+        dist = jnp.linalg.norm(mean - state.target_location[0])
 
         surrounded = dist <= 0.2
 
@@ -214,6 +219,7 @@ class Catch(BaseParallelEnv):
 
 
 if __name__ == "__main__":
+    """
     parallel_env = Catch(
         num_drones=5,
         render_mode=None,
@@ -221,16 +227,15 @@ if __name__ == "__main__":
         init_target_location=jnp.array([1, 1, 2.5]),
         target_speed=0.1,
     )
-
     """
+
     parallel_env = Catch(
-        num_drones=1,
+        num_drones=2,
         render_mode="human",
-        init_flying_pos=jnp.array([[0, 0, 1]]),
-        init_target_location=jnp.array([1, 1, 2.5]),
+        init_flying_pos=jnp.array([[1, -1, 1], [1, 1, 1]]),
+        init_target_location=jnp.array([1.001, 0, 1]),
         target_speed=0.1,
     )
-    """
 
     # to verify the proportion of crash and avoid some mistakes
     nb_crash = 0
@@ -243,6 +248,27 @@ if __name__ == "__main__":
 
     key = random.PRNGKey(seed)
 
+    key, subkey = random.split(key)
+    """
+    print(state.target_location
+            + (
+                # go to the opposite direction of the mean of the agents
+                (1 - surrounded)
+                * (state.target_location - mean)
+                / dist
+                * self.target_speed
+            )
+            + (
+                # if the mean of the agents is too close to the target, move the target in a random
+                # direction, slowly because it hesitates
+                surrounded
+                * random.uniform(subkey, (3,), minval=-1, maxval=1)
+                * self.target_speed
+                * 0.1
+            )
+        )
+
+    """
     state, key = parallel_env.reset(key)
 
     parallel_env.render(state)

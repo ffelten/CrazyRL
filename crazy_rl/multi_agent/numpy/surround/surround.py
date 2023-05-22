@@ -153,50 +153,42 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self):
         terminated = dict()
 
-        # End of the game
-        if self.timestep == 100:
-            for agent in self.agents:
-                terminated[agent] = True
+        for agent in self.agents:
+            terminated[agent] = False
+
+        for agent in self.agents:
+            # collision between two drones
+            for other_agent in self.agents:
+                if (
+                    other_agent != agent
+                    and np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
+                ):
+                    terminated[agent] = True
+                    self.crash[other_agent] = True
+
+            # collision with the ground
+            terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
+
+            # collision with the target
+            terminated[agent] = terminated[agent] or (
+                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
+            )
+
+            if terminated[agent]:
+                for other_agent in self.agents:
+                    terminated[other_agent] = True
                 self.agents = []
 
-            self.end = True
-
-        else:
-            for agent in self.agents:
-                terminated[agent] = False
-
-            for agent in self.agents:
-                # collision between two drones
-                for other_agent in self.agents:
-                    if (
-                        other_agent != agent
-                        and np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-                    ):
-                        terminated[agent] = True
-                        self.crash[other_agent] = True
-
-                # collision with the ground
-                terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
-
-                # collision with the target
-                terminated[agent] = terminated[agent] or (
-                    np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
-                )
-
-                if terminated[agent]:
-                    for other_agent in self.agents:
-                        terminated[other_agent] = True
-                    self.agents = []
-
-                    self.crash[agent] = True
+                self.crash[agent] = True
 
         return terminated
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 10000:
+        if self.timestep == 100:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
+            self.end = True
             self.timestep = 0
         else:
             truncation = {agent: False for agent in self._agents_names}
@@ -221,7 +213,7 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
 
-    for i in range(10000):
+    for i in range(500):
         while parallel_env.agents:
             actions = {
                 agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
@@ -231,7 +223,7 @@ if __name__ == "__main__":
 
             # print("obs", observations, "reward", rewards)
 
-            if global_step % 100 == 0:
+            if global_step % 2000 == 0:
                 print("SPS:", int(global_step / (time.time() - start_time)))
 
             global_step += 1

@@ -165,6 +165,7 @@ class Surround(BaseParallelEnv):
             for agent in self.agents:
                 terminated[agent] = False
 
+            for agent in self.agents:
                 # collision between two drones
                 for other_agent in self.agents:
                     if (

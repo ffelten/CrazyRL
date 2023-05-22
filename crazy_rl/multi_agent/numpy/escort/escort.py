@@ -169,6 +169,7 @@ class Escort(BaseParallelEnv):
                 self.timestep >= self.num_ref_points + 50
             )  # the game stops 50 steps after the target has stopped
 
+        for agent in self.agents:
             # collision between two drones
             for other_agent in self.agents:
                 if other_agent != agent:

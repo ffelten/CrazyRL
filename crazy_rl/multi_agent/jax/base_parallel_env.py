@@ -181,6 +181,13 @@ class BaseParallelEnv(ParallelEnv):
         """Creates a new states with initial values. Must be implemented in a subclass."""
         raise NotImplementedError
 
+    def auto_reset(self, state, key):
+        """Reset if needed (doesn't work)."""
+        if jnp.any(state.truncations) or jnp.any(state.terminations):
+            return self.reset(key)
+        else:
+            return state, key
+
     # PettingZoo API
     @override
     def reset(self, key, seed=None, return_info=False, options=None):

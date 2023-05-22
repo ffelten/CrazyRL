@@ -241,7 +241,50 @@ if __name__ == "__main__":
 
     # nb_crash, nb_end = vmap(test_loop)(seeds)
 
-    nb_crash, nb_end = test_loop(5)
+    # nb_crash, nb_end = test_loop(5)
+
+    keys = vmap(random.PRNGKey)(seeds)
+
+    states, keys = vmap(parallel_env.reset)(keys)
+
+    # parallel_env.render(state)
+
+    # to verify the proportion of crash and avoid some mistakes
+    nb_crash = jnp.zeros(n)
+    nb_end = jnp.zeros(n)
+
+    # to compute SPS
+    global_step = 0
+    start_time = time.time()
+
+    for i in range(5000):
+        keys = vmap(random.split)(keys)
+        subkeys = keys[:, 1]
+        keys = keys[:, 0]
+
+        actions = jnp.zeros((n, 3))
+        # actions = vmap(random.choice)(subkeys, jnp.array([parallel_env.action_space() for _ in range(n)]), (parallel_env.num_drones, 3))
+        # print(actions)
+        # actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
+        # this is where you would insert your policy
+        states, keys = vmap(parallel_env.step)(states, actions, keys)
+
+        # parallel_env.render(state)
+
+        # print("obs", state.observations)
+        # print("reward", state.rewards)
+
+        if global_step % 2000 == 0:
+            print("SPS:", int(global_step / (time.time() - start_time)))
+
+        global_step += 1
+
+        # time.sleep(0.02)
+
+        nb_crash += jnp.any(states.terminations)
+        nb_end += jnp.any(states.truncations)
+
+        states, keys = vmap(parallel_env.auto_reset)(states, keys)
 
     print("nb_crash", nb_crash)
     print("nb_end", nb_end)

@@ -11,7 +11,7 @@ import jax_dataclasses as jdc
 import pygame
 from cflib.crazyflie.swarm import Swarm
 from gymnasium import spaces
-from jax import jit, random
+from jax import jit
 from OpenGL.GL import (
     GL_AMBIENT,
     GL_AMBIENT_AND_DIFFUSE,
@@ -181,12 +181,9 @@ class BaseParallelEnv(ParallelEnv):
         """Creates a new states with initial values. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def auto_reset(self, state, key):
+    def auto_reset(self, state):
         """Reset if needed (doesn't work)."""
-        if jnp.any(state.truncations) or jnp.any(state.terminations):
-            return self.reset(key)
-        else:
-            return state, key
+        raise NotImplementedError
 
     # PettingZoo API
     @override
@@ -215,13 +212,11 @@ class BaseParallelEnv(ParallelEnv):
         else:
         """
 
-        key, subkey = random.split(key)
-
         state = self._initialize_state()
 
-        state, key = self._compute_obs(state, key)
+        state = self._compute_obs(state, key)
 
-        return state, key
+        return state
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -249,8 +244,6 @@ class BaseParallelEnv(ParallelEnv):
         else:
         """
 
-        key, subkey = random.split(key)
-
         state = self._compute_action(state, actions)
 
         """
@@ -263,9 +256,9 @@ class BaseParallelEnv(ParallelEnv):
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
         state = self._compute_reward(state)
-        state, key = self._compute_obs(state, key)
+        state = self._compute_obs(state, key)
 
-        return state, key
+        return state
 
     @override
     def render(self, state):

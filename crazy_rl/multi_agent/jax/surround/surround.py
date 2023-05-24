@@ -98,7 +98,6 @@ class Surround(BaseParallelEnv):
                     axis=1,
                 ),
             ),
-            key,
         )
 
     @override
@@ -154,7 +153,7 @@ class Surround(BaseParallelEnv):
             )
 
         return jdc.replace(
-            state, terminations=((jnp.any(state.truncations) - 1) * jnp.any(terminated)) * jnp.ones(self.num_drones)
+            state, terminations=((1 - jnp.any(state.truncations)) * jnp.any(terminated)) * jnp.ones(self.num_drones)
         )
 
     @override
@@ -175,54 +174,36 @@ class Surround(BaseParallelEnv):
             self._target_location,
         )
 
+    @override
+    def auto_reset(self, **state):
+        """Reset if needed (doesn't work)."""
+        done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
-def test_loop(seed):
-    """Main loop of the file, in a function to be vmapped."""
-    print(seed)
+        return State(
+            done * self._init_flying_pos + (1 - done) * state["agents_locations"],
+            (1 - done) * state["timestep"],
+            (1 - done) * state["observations"],
+            (1 - done) * state["rewards"],
+            (1 - done) * state["terminations"],
+            (1 - done) * state["truncations"],
+            done * self._target_location + (1 - done) * state["target_location"],
+        )
 
-    key = random.PRNGKey(seed)
+    def state_to_dict(self, state):
+        """Translates the State into a dict."""
+        return {
+            "agents_locations": state.agents_locations,
+            "timestep": state.timestep,
+            "observations": state.observations,
+            "rewards": state.rewards,
+            "terminations": state.terminations,
+            "truncations": state.truncations,
+            "target_location": state.target_location,
+        }
 
-    state, key = parallel_env.reset(key)
-
-    parallel_env.render(state)
-
-    # to verify the proportion of crash and avoid some mistakes
-    nb_crash = 0
-    nb_end = 0
-
-    # to compute SPS
-    global_step = 0
-    start_time = time.time()
-
-    for i in range(500):
-        while not jnp.any(state.truncations) and not jnp.any(state.terminations):
-            # key, subkey = random.split(key)
-            # actions = random.choice(subkey, action_space.sample(), (parallel_env.num_drones, 3))
-            # print(actions)
-            actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
-            # this is where you would insert your policy
-            state, key = parallel_env.step(state, actions, key)
-
-            parallel_env.render(state)
-
-            # print("obs", state.observations)
-            # print("reward", state.rewards)
-
-            if global_step % 2000 == 0:
-                print("SPS:", int(global_step / (time.time() - start_time)))
-
-            global_step += 1
-
-            # time.sleep(0.02)
-
-        nb_crash += jnp.any(state.terminations)
-        nb_end += jnp.any(state.truncations)
-
-        state, key = parallel_env.reset(key)
-
-        # print("SPS:", int(global_step / (time.time() - start_time)))
-
-    return nb_crash, nb_end
+    def step_vmap(self, action, key, **state_val):
+        """Calls step with a State and is called by vmap without State object."""
+        return self.step(State(**state_val), action, key)
 
 
 if __name__ == "__main__":
@@ -237,15 +218,23 @@ if __name__ == "__main__":
 
     n = 5  # number of states in parallel
 
-    seeds = jnp.arange(n)  # test value
+    seed = 5  # test value
 
-    # nb_crash, nb_end = vmap(test_loop)(seeds)
+    key = random.PRNGKey(seed)
 
-    # nb_crash, nb_end = test_loop(5)
+    key, *subkeys = random.split(key, n + 1)
 
-    keys = vmap(random.PRNGKey)(seeds)
+    (states,) = vmap(parallel_env.reset)(jnp.stack(subkeys))
 
-    states, keys = vmap(parallel_env.reset)(keys)
+    # print(states)
+
+    # states = jnp.array([state for _ in range(n)])
+
+    # print(key, jnp.stack(subkeys))
+
+    # states = parallel_env.reset(subkeys)
+
+    # print(states)
 
     # parallel_env.render(state)
 
@@ -257,34 +246,38 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
 
-    for i in range(5000):
-        keys = vmap(random.split)(keys)
-        subkeys = keys[:, 1]
-        keys = keys[:, 0]
+    num = jnp.arange(n)
 
-        actions = jnp.zeros((n, 3))
+    for i in range(1000):
+        # key, *subkeys = random.split(key, n + 1)
+
+        # actions = jnp.zeros((n, 3))
+        actions = random.uniform(key, (n, parallel_env.num_drones, 3), minval=-0.2, maxval=0.2)
         # actions = vmap(random.choice)(subkeys, jnp.array([parallel_env.action_space() for _ in range(n)]), (parallel_env.num_drones, 3))
         # print(actions)
         # actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
         # this is where you would insert your policy
-        states, keys = vmap(parallel_env.step)(states, actions, keys)
+
+        key, *subkeys = random.split(key, n + 1)
+
+        (states,) = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
         # parallel_env.render(state)
 
         # print("obs", state.observations)
         # print("reward", state.rewards)
 
-        if global_step % 2000 == 0:
+        if global_step % 200 == 0:
             print("SPS:", int(global_step / (time.time() - start_time)))
 
         global_step += 1
 
         # time.sleep(0.02)
 
-        nb_crash += jnp.any(states.terminations)
-        nb_end += jnp.any(states.truncations)
+        nb_crash += vmap(jnp.any)(states.terminations)
+        nb_end += vmap(jnp.any)(states.truncations)
 
-        states, keys = vmap(parallel_env.auto_reset)(states, keys)
+        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
 
     print("nb_crash", nb_crash)
     print("nb_end", nb_end)

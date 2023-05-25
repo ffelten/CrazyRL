@@ -38,9 +38,7 @@ class Surround(BaseParallelEnv):
         num_drones: int,
         init_flying_pos: jnp.ndarray,
         target_location: jnp.ndarray,
-        render_mode=None,
         size: int = 3,
-        swarm=None,
     ):
         """Surround environment for Crazyflies 2.
 
@@ -48,9 +46,7 @@ class Surround(BaseParallelEnv):
             num_drones: Number of drones
             init_flying_pos: Array of initial positions of the drones when they are flying
             target_location: Array of the position of the target point
-            render_mode: Render mode: "human", "real" or None
             size: Size of the map
-            swarm: Swarm object, used for real tests. Ignored otherwise.
         """
         self.num_drones = num_drones
 
@@ -63,12 +59,10 @@ class Surround(BaseParallelEnv):
         self.norm = vmap(jnp.linalg.norm)  # function to compute the norm of each array in a matrix
 
         super().__init__(
-            render_mode=render_mode,
             size=size,
             init_flying_pos=self._init_flying_pos,
             target_location=self._target_location,
             num_drones=self.num_drones,
-            swarm=swarm,
         )
 
     @override
@@ -175,8 +169,9 @@ class Surround(BaseParallelEnv):
         )
 
     @override
+    @partial(jit, static_argnums=(0,))
     def auto_reset(self, **state):
-        """Reset if needed (doesn't work)."""
+        """Resets if the game has ended, or returns state."""
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
         return State(
@@ -189,6 +184,7 @@ class Surround(BaseParallelEnv):
             done * self._target_location + (1 - done) * state["target_location"],
         )
 
+    @partial(jit, static_argnums=(0,))
     def state_to_dict(self, state):
         """Translates the State into a dict."""
         return {
@@ -201,6 +197,7 @@ class Surround(BaseParallelEnv):
             "target_location": state.target_location,
         }
 
+    @partial(jit, static_argnums=(0,))
     def step_vmap(self, action, key, **state_val):
         """Calls step with a State and is called by vmap without State object."""
         return self.step(State(**state_val), action, key)
@@ -209,7 +206,6 @@ class Surround(BaseParallelEnv):
 if __name__ == "__main__":
     parallel_env = Surround(
         num_drones=5,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
         target_location=jnp.array([[1, 1, 2.5]]),
     )
@@ -217,26 +213,11 @@ if __name__ == "__main__":
     start = time.time()
 
     n = 5  # number of states in parallel
-
     seed = 5  # test value
-
     key = random.PRNGKey(seed)
-
     key, *subkeys = random.split(key, n + 1)
 
-    (states,) = vmap(parallel_env.reset)(jnp.stack(subkeys))
-
-    # print(states)
-
-    # states = jnp.array([state for _ in range(n)])
-
-    # print(key, jnp.stack(subkeys))
-
-    # states = parallel_env.reset(subkeys)
-
-    # print(states)
-
-    # parallel_env.render(state)
+    states = vmap(parallel_env.reset)(jnp.stack(subkeys))
 
     # to verify the proportion of crash and avoid some mistakes
     nb_crash = jnp.zeros(n)
@@ -246,33 +227,16 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
 
-    num = jnp.arange(n)
-
     for i in range(1000):
-        # key, *subkeys = random.split(key, n + 1)
-
-        # actions = jnp.zeros((n, 3))
-        actions = random.uniform(key, (n, parallel_env.num_drones, 3), minval=-0.2, maxval=0.2)
-        # actions = vmap(random.choice)(subkeys, jnp.array([parallel_env.action_space() for _ in range(n)]), (parallel_env.num_drones, 3))
-        # print(actions)
-        # actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
-        # this is where you would insert your policy
+        actions = random.uniform(key, (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
 
         key, *subkeys = random.split(key, n + 1)
 
-        (states,) = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
-
-        # parallel_env.render(state)
-
-        # print("obs", state.observations)
-        # print("reward", state.rewards)
+        states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
         if global_step % 200 == 0:
             print("SPS:", int(global_step / (time.time() - start_time)))
-
         global_step += 1
-
-        # time.sleep(0.02)
 
         nb_crash += vmap(jnp.any)(states.terminations)
         nb_end += vmap(jnp.any)(states.truncations)
@@ -282,5 +246,4 @@ if __name__ == "__main__":
     print("nb_crash", nb_crash)
     print("nb_end", nb_end)
     print("total", nb_end + nb_crash)
-
     print("total duration :", time.time() - start)

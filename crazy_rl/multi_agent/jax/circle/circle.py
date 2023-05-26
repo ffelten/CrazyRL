@@ -76,8 +76,8 @@ class Circle(BaseParallelEnv):
             self.ref = self.ref.at[:, agent, 0].set(
                 circle_radius * (1 - jnp.cos(ts)) + (init_flying_pos[agent][0] - circle_radius)
             )
-            self.ref = self.ref.at[:, agent, 1].set(init_flying_pos[agent][1])
-            self.ref = self.ref.at[:, agent, 2].set(circle_radius * jnp.sin(ts) + (init_flying_pos[agent][2]))
+            self.ref = self.ref.at[:, agent, 1].set(circle_radius * jnp.sin(ts) + (init_flying_pos[agent][1]))
+            self.ref = self.ref.at[:, agent, 2].set(init_flying_pos[agent][2])
 
         super().__init__(
             render_mode=render_mode,
@@ -125,7 +125,7 @@ class Circle(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state):
-        # Reward is based on the euclidean distance to the target point
+        # Reward is based on the Euclidean distance to the target point
 
         return jdc.replace(state, rewards=-1 * self.norm(state.target_location - state.agents_locations))
 

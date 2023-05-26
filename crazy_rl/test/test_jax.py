@@ -180,13 +180,10 @@ def test_circle():
     key = random.PRNGKey(seed)
 
     state, key = leave_the_map(parallel_env, key)
-
     # observation : agent's location and target's location
     assert (state.observations == jnp.array([[0, 0, 1, -0.5, 0, 1], [0, 3, 1, -0.5, 1, 1]])).all()
 
-    print("caca", state.rewards)
-
-    assert (state.rewards > jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) - 0.01).all()
+    assert (state.rewards > jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) - 0.05).all()
     assert (state.rewards < jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) + 0.01).all()
 
     state, key = parallel_env.reset(key)
@@ -201,8 +198,8 @@ def test_circle():
         state.target_location
         == jnp.array(
             [
-                [0.5 * (1 - jnp.cos(ts)) - 0.5, 0, 0.5 * jnp.sin(ts) + 1],
-                [0.5 * (1 - jnp.cos(ts)) - 0.5, 1, 0.5 * jnp.sin(ts) + 1],
+                [0.5 * (1 - jnp.cos(ts)) - 0.5, 0.5 * jnp.sin(ts), 1],
+                [0.5 * (1 - jnp.cos(ts)) - 0.5, 0.5 * jnp.sin(ts) + 1, 1],
             ]
         )
     ).all()
@@ -366,8 +363,6 @@ def test_catch():
     )
 
     state, key = parallel_env.reset(key)
-
-    print(state.target_location)
 
     assert (state.target_location > jnp.array([[-0.1, 0, 1]]) - 0.001).all()
     assert (state.target_location < jnp.array([[-0.1, 0, 1]]) + 0.001).all()

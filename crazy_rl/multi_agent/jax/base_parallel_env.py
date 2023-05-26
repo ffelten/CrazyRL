@@ -125,7 +125,7 @@ class BaseParallelEnv(ParallelEnv):
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
         state = self._compute_reward(state)
-        (state,) = self._compute_obs(state, key)
+        state = self._compute_obs(state, key)
 
         return state
 

@@ -6,9 +6,8 @@ from typing_extensions import override
 
 import jax.numpy as jnp
 import jax_dataclasses as jdc
-import pygame
 from gymnasium import spaces
-from jax import jit, random, vmap
+from jax import jit, random
 from pettingzoo.utils.env import ParallelEnv
 
 
@@ -66,7 +65,6 @@ class BaseParallelEnv(ParallelEnv):
         self._init_flying_pos = init_flying_pos
         self._target_location = target_location
         self.num_drones = num_drones
-        self.norm = vmap(jnp.linalg.norm)  # function to compute the norm of each array in a matrix
 
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
@@ -107,7 +105,7 @@ class BaseParallelEnv(ParallelEnv):
 
     # PettingZoo API
     @override
-    def reset(self, key, seed=None, return_info=False, options=None):
+    def reset(self, key):
         key, subkey = random.split(key)
 
         state = self._initialize_state()
@@ -138,13 +136,6 @@ class BaseParallelEnv(ParallelEnv):
             [self._compute_obs(state.agent_location)[agent].astype(jnp.float32) for agent in range(self.num_drones)]
         )
         return jnp.concatenate(states, axis=None)
-
-    @override
-    def close(self):
-        if self._mode == "simu" and self.render_mode == "human":
-            if self.window is not None:
-                pygame.display.quit()
-                pygame.quit()
 
     @functools.lru_cache(maxsize=None)
     @override

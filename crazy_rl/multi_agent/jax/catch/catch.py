@@ -10,12 +10,11 @@ import numpy as np
 from gymnasium import spaces
 from jax import jit, random
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 
 
-@override
 @jdc.pytree_dataclass
-class State:
+class State(State):
     """State of the environment containing the modifiable variables."""
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
@@ -96,21 +95,11 @@ class Catch(BaseParallelEnv):
         # if the target is out of the map, put it back in the map
         target_location = jnp.clip(
             state.target_location
-            + (
-                # go to the opposite direction of the mean of the agents
-                (1 - surrounded)
-                * (state.target_location - mean)
-                / dist
-                * self.target_speed
-            )
-            + (
-                # if the mean of the agents is too close to the target, move the target in a random
-                # direction, slowly because it hesitates
-                surrounded
-                * random.uniform(subkey, (3,), minval=-1, maxval=1)
-                * self.target_speed
-                * 0.1
-            ),
+            # go to the opposite direction of the mean of the agents
+            + ((1 - surrounded) * (state.target_location - mean) / dist * self.target_speed)
+            # if the mean of the agents is too close to the target, move the target in a random direction,
+            # slowly because it hesitates
+            + (surrounded * random.uniform(subkey, (3,), minval=-1, maxval=1) * self.target_speed * 0.1),
             jnp.array([-self.size, -self.size, 0.2]),
             jnp.array([self.size, self.size, self.size]),
         )
@@ -156,14 +145,14 @@ class Catch(BaseParallelEnv):
                 # mean distance to the other agents
                 jnp.array(
                     [
-                        jnp.sum(self.norm(state.agents_locations[agent] - state.agents_locations))
+                        jnp.sum(jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1))
                         for agent in range(self.num_drones)
                     ]
                 )
                 * 0.05
                 / (self.num_drones - 1)
                 # a maximum value minus the distance to the target
-                + 0.95 * (2 * self.size - self.norm(state.agents_locations - state.target_location))
+                + 0.95 * (2 * self.size - jnp.linalg.norm(state.agents_locations - state.target_location, axis=1))
             )
             # negative reward if the drones crash
             + jnp.any(state.terminations) * (1 - jnp.any(state.truncations)) * -10 * jnp.ones(self.num_drones),
@@ -178,7 +167,7 @@ class Catch(BaseParallelEnv):
         )
 
         for agent in range(self.num_drones):
-            distances = self.norm(state.agents_locations[agent] - state.agents_locations)
+            distances = jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1)
 
             # collision between two drones
             terminated = terminated.at[agent].set(

@@ -9,12 +9,11 @@ import numpy as np
 from gymnasium import spaces
 from jax import jit, random
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 
 
-@override
 @jdc.pytree_dataclass
-class State:
+class State(State):
     """State of the environment containing the modifiable variables."""
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
@@ -118,14 +117,14 @@ class Surround(BaseParallelEnv):
             * (
                 jnp.array(
                     [  # mean distance to the other agents
-                        jnp.sum(self.norm(state.agents_locations[agent] - state.agents_locations))
+                        jnp.sum(jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1))
                         for agent in range(self.num_drones)
                     ]
                 )
                 * 0.05
                 / (self.num_drones - 1)
                 # a maximum value minus the distance to the target
-                + 0.95 * (2 * self.size - self.norm(state.agents_locations - state.target_location))
+                + 0.95 * (2 * self.size - jnp.linalg.norm(state.agents_locations - state.target_location, axis=1))
             )
             # negative reward if the drones crash
             + jnp.any(state.terminations) * (1 - jnp.any(state.truncations)) * -10 * jnp.ones(self.num_drones),
@@ -136,11 +135,11 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self, state):
         # collision with the ground and the target
         terminated = jnp.logical_or(
-            state.agents_locations[:, 2] < 0.2, self.norm(state.agents_locations - state.target_location) < 0.2
+            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - state.target_location, axis=1) < 0.2
         )
 
         for agent in range(self.num_drones):
-            distances = self.norm(state.agents_locations[agent] - state.agents_locations)
+            distances = jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1)
 
             # collision between two drones
             terminated = terminated.at[agent].set(

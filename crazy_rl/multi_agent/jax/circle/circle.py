@@ -9,12 +9,11 @@ import numpy as np
 from gymnasium import spaces
 from jax import jit, random, vmap
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 
 
-@override
 @jdc.pytree_dataclass
-class State:
+class State(State):
     """State of the environment containing the modifiable variables."""
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
@@ -119,7 +118,7 @@ class Circle(BaseParallelEnv):
     def _compute_reward(self, state):
         # Reward is based on the euclidean distance to the target point
 
-        return jdc.replace(state, rewards=-1 * self.norm(state.target_location - state.agents_locations))
+        return jdc.replace(state, rewards=-1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1))
 
     @override
     @partial(jit, static_argnums=(0,))

@@ -367,13 +367,16 @@ def test_catch():
 
     state, key = parallel_env.reset(key)
 
-    assert (state.target_location == jnp.array([[-0.1, 0, 1]])).all()
+    print(state.target_location)
+
+    assert (state.target_location > jnp.array([[-0.1, 0, 1]]) - 0.001).all()
+    assert (state.target_location < jnp.array([[-0.1, 0, 1]]) + 0.001).all()
 
     parallel_env = Catch(
         num_drones=2,
         render_mode=None,
         init_flying_pos=jnp.array([[1, -1, 1], [1, 1, 1]]),
-        init_target_location=jnp.array([1.001, 0, 1]),
+        init_target_location=jnp.array([1, 0, 1]),
         target_speed=0.1,
     )
 

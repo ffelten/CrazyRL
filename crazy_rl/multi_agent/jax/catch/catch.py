@@ -113,7 +113,7 @@ class Catch(BaseParallelEnv):
                 # go to the opposite direction of the mean of the agents
                 (1 - surrounded)
                 * (state.target_location - mean)
-                / dist
+                / (dist + 0.0001)
                 * self.target_speed
             )
             + (

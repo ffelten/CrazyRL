@@ -86,9 +86,14 @@ class Catch(BaseParallelEnv):
         key, subkey = random.split(key)
 
         # mean of the agent's positions
-        mean = state.agents_locations.sum() / self.num_drones
+        mean = jnp.zeros(3)
 
-        dist = jnp.linalg.norm(mean - state.target_location)
+        for agent in range(self.num_drones):
+            mean += state.agents_locations[agent]
+
+        mean /= self.num_drones
+
+        dist = jnp.linalg.norm(mean - state.target_location[0])
 
         surrounded = dist <= 0.2
 
@@ -96,7 +101,7 @@ class Catch(BaseParallelEnv):
         target_location = jnp.clip(
             state.target_location
             # go to the opposite direction of the mean of the agents
-            + ((1 - surrounded) * (state.target_location - mean) / dist * self.target_speed)
+            + ((1 - surrounded) * (state.target_location - mean) / (dist + 0.0001) * self.target_speed)
             # if the mean of the agents is too close to the target, move the target in a random direction,
             # slowly because it hesitates
             + (surrounded * random.uniform(subkey, (3,), minval=-1, maxval=1) * self.target_speed * 0.1),
@@ -213,6 +218,8 @@ if __name__ == "__main__":
     seed = 5
 
     key = random.PRNGKey(seed)
+
+    key, subkey = random.split(key)
 
     state, key = parallel_env.reset(key)
 

@@ -116,7 +116,7 @@ class Circle(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state):
-        # Reward is based on the euclidean distance to the target point
+        # Reward is based on the Euclidean distance to the target point
 
         return jdc.replace(state, rewards=-1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1))
 

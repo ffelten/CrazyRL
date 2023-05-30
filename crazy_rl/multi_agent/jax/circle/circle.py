@@ -9,12 +9,11 @@ import numpy as np
 from gymnasium import spaces
 from jax import jit, random, vmap
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 
 
-@override
 @jdc.pytree_dataclass
-class State:
+class State(State):
     """State of the environment containing the modifiable variables."""
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
@@ -31,16 +30,14 @@ class State:
 class Circle(BaseParallelEnv):
     """A Parallel Environment where drone learn how to perform a circle."""
 
-    metadata = {"render_modes": ["human", "real"], "is_parallelizable": True, "render_fps": 20}
+    metadata = {"is_parallelizable": True, "render_fps": 20}
 
     def __init__(
         self,
         num_drones: int,
         init_flying_pos: jnp.ndarray,
         num_intermediate_points: int = 10,
-        render_mode=None,
         size: int = 3,
-        swarm=None,
     ):
         """Circle environment for Crazyflies 2.
 
@@ -48,17 +45,13 @@ class Circle(BaseParallelEnv):
             num_drones: Number of drones
             init_flying_pos: Array of initial positions of the drones when they are flying
             num_intermediate_points: Number of intermediate points in the target circle
-            render_mode: Render mode: "human", "real" or None
             size: Size of the map
-            swarm: Swarm object, used for real tests. Ignored otherwise.
         """
         self.num_drones = num_drones
 
         self.size = size
 
         self._init_flying_pos = init_flying_pos
-
-        self.norm = vmap(jnp.linalg.norm)  # function to compute the norm of each array in a matrix
 
         # Specific to circle
 
@@ -80,11 +73,9 @@ class Circle(BaseParallelEnv):
             self.ref = self.ref.at[:, agent, 2].set(init_flying_pos[agent][2])
 
         super().__init__(
-            render_mode=render_mode,
             size=size,
             init_flying_pos=self._init_flying_pos,
             num_drones=self.num_drones,
-            swarm=swarm,
         )
 
     @override
@@ -127,7 +118,7 @@ class Circle(BaseParallelEnv):
     def _compute_reward(self, state):
         # Reward is based on the Euclidean distance to the target point
 
-        return jdc.replace(state, rewards=-1 * self.norm(state.target_location - state.agents_locations))
+        return jdc.replace(state, rewards=-1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1))
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -144,20 +135,19 @@ class Circle(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _initialize_state(self):
         return State(
-            self._init_flying_pos,
-            0,
-            jnp.array([]),
-            jnp.array([]),
-            jnp.zeros(self.num_drones),
-            jnp.zeros(self.num_drones),
-            jnp.array([]),
+            agents_locations=self._init_flying_pos,
+            timestep=0,
+            observations=jnp.array([]),
+            rewards=jnp.array([]),
+            terminations=jnp.zeros(self.num_drones),
+            truncations=jnp.zeros(self.num_drones),
+            target_location=jnp.array([]),
         )
 
 
 if __name__ == "__main__":
     parallel_env = Circle(
         num_drones=5,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
         num_intermediate_points=100,
     )
@@ -175,23 +165,16 @@ if __name__ == "__main__":
 
     state, key = parallel_env.reset(key)
 
-    parallel_env.render(state)
-
     for i in range(100):
         while not jnp.any(state.truncations) and not jnp.any(state.terminations):
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
 
             state, key = parallel_env.step(state, actions, key)
 
-            parallel_env.render(state)
-            # print("obs", observations, "reward", rewards)
-
             if global_step % 2000 == 0:
                 print("SPS:", int(global_step / (time.time() - start_time)))
 
             global_step += 1
-
-            # time.sleep(0.02)
 
         nb_crash += jnp.any(state.terminations)
         nb_end += jnp.any(state.truncations)

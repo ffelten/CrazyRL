@@ -9,12 +9,11 @@ import numpy as np
 from gymnasium import spaces
 from jax import jit, random, vmap
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 
 
-@override
 @jdc.pytree_dataclass
-class State:
+class State(State):
     """State of the environment containing the modifiable variables."""
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
@@ -31,24 +30,20 @@ class State:
 class Hover(BaseParallelEnv):
     """A Parallel Environment where drone learn how to hover around a target point."""
 
-    metadata = {"render_modes": ["human", "real"], "is_parallelizable": True, "render_fps": 20}
+    metadata = {"is_parallelizable": True, "render_fps": 20}
 
     def __init__(
         self,
         num_drones: int,
         init_flying_pos: jnp.ndarray,
-        render_mode=None,
         size: int = 3,
-        swarm=None,
     ):
         """Hover environment for Crazyflies 2.
 
         Args:
             num_drones: Number of drones
             init_flying_pos: Array of initial positions of the drones when they are flying
-            render_mode: Render mode: "human", "real" or None
             size: Size of the map
-            swarm: Swarm object, used for real tests. Ignored otherwise.
         """
         self.num_drones = num_drones
 
@@ -56,14 +51,10 @@ class Hover(BaseParallelEnv):
 
         self.size = size
 
-        self.norm = vmap(jnp.linalg.norm)  # function to compute the norm of each array in a matrix
-
         super().__init__(
             num_drones=num_drones,
-            render_mode=render_mode,
             size=size,
             init_flying_pos=self._init_flying_pos,
-            swarm=swarm,
         )
 
     @override
@@ -97,7 +88,7 @@ class Hover(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state):
-        return jdc.replace(state, rewards=-1 * self.norm(state.target_location - state.agents_locations))
+        return jdc.replace(state, rewards=-1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1))
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -114,20 +105,19 @@ class Hover(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _initialize_state(self):
         return State(
-            self._init_flying_pos,
-            0,
-            jnp.array([]),
-            jnp.array([]),
-            jnp.zeros(self.num_drones),  # terminations
-            jnp.zeros(self.num_drones),  # truncations
-            jnp.copy(self._init_flying_pos),  # target_location
+            agents_locations=self._init_flying_pos,
+            timestep=0,
+            observations=jnp.array([]),
+            rewards=jnp.array([]),
+            terminations=jnp.zeros(self.num_drones),
+            truncations=jnp.zeros(self.num_drones),
+            target_location=jnp.copy(self._init_flying_pos),
         )
 
 
 if __name__ == "__main__":
     parallel_env = Hover(
         num_drones=5,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
     )
 
@@ -144,23 +134,16 @@ if __name__ == "__main__":
 
     state, key = parallel_env.reset(key)
 
-    parallel_env.render(state)
-
     for i in range(100):
         while not jnp.any(state.truncations) and not jnp.any(state.terminations):
             actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
 
             state, key = parallel_env.step(state, actions, key)
 
-            parallel_env.render(state)
-            # print("obs", observations, "reward", rewards)
-
             if global_step % 2000 == 0:
                 print("SPS:", int(global_step / (time.time() - start_time)))
 
             global_step += 1
-
-            # time.sleep(0.02)
 
         nb_crash += jnp.any(state.terminations)
         nb_end += jnp.any(state.truncations)

@@ -220,7 +220,7 @@ if __name__ == "__main__":
     key = random.PRNGKey(seed)
 
     key, subkey = random.split(key)
-    
+
     state, key = parallel_env.reset(key)
 
     for i in range(500):

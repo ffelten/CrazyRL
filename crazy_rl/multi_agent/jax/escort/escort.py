@@ -104,7 +104,7 @@ class Escort(BaseParallelEnv):
                 state,
                 observations=jnp.append(
                     # each row contains the location of one agent and the location of the target
-                    jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
+                    jnp.column_stack((state.agents_locations, jnp.tile(target_location, (self.num_drones, 1)))),
                     # then we add agents_locations to each row without the agent which is already in the row
                     # and make it only one dimension
                     jnp.array(

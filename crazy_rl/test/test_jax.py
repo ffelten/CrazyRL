@@ -88,7 +88,6 @@ def test_surround():
     """Test for the Surround environment in jax version."""
     parallel_env = Surround(
         num_drones=2,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
         target_location=jnp.array([[1, 1, 2.5]]),
     )
@@ -150,7 +149,6 @@ def test_hover():
     """Test for the Hover environment in jax version."""
     parallel_env = Hover(
         num_drones=2,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
     )
 
@@ -170,7 +168,6 @@ def test_circle():
     """Test for the Circle environment in jax version."""
     parallel_env = Circle(
         num_drones=2,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
         num_intermediate_points=100,
     )
@@ -209,7 +206,6 @@ def test_escort():
     """Test for the Escort environment in jax version."""
     parallel_env = Escort(
         num_drones=2,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
         init_target_location=jnp.array([1, 1, 2.5]),
         final_target_location=jnp.array([-2, -2, 3]),
@@ -236,7 +232,10 @@ def test_escort():
     assert (
         state.observations
         == jnp.array(
-            [[0, 0, 1, -0.9736842, -0.9736842, 2.8289473, 0, 3, 1], [0, 3, 1, -0.9736842, -0.9736842, 2.8289473, 0, 0, 1]]
+            [
+                [0, 0, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 3, 1],
+                [0, 3, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 0, 1],
+            ]
         )
     ).all()
 
@@ -286,7 +285,6 @@ def test_catch():
     """Test for the Catch environment in jax version."""
     parallel_env = Catch(
         num_drones=2,
-        render_mode=None,
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
         init_target_location=jnp.array([1, 1, 2.5]),
         target_speed=0.1,
@@ -356,7 +354,6 @@ def test_catch():
 
     parallel_env = Catch(
         num_drones=2,
-        render_mode=None,
         init_flying_pos=jnp.array([[1, -1, 1], [1, 1, 1]]),
         init_target_location=jnp.array([0, 0, 1]),
         target_speed=0.1,
@@ -369,7 +366,6 @@ def test_catch():
 
     parallel_env = Catch(
         num_drones=2,
-        render_mode=None,
         init_flying_pos=jnp.array([[1, -1, 1], [1, 1, 1]]),
         init_target_location=jnp.array([1, 0, 1]),
         target_speed=0.1,

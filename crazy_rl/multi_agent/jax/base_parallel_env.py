@@ -8,7 +8,6 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 from gymnasium import spaces
 from jax import jit, random
-from pettingzoo.utils.env import ParallelEnv
 
 
 @jdc.pytree_dataclass
@@ -23,8 +22,8 @@ class State:
     truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
 
 
-class BaseParallelEnv(ParallelEnv):
-    """The Base environment inheriting from pettingZoo Parallel environment class.
+class BaseParallelEnv:
+    """The Base environment.
 
     The main API methods of this class are:
     - step

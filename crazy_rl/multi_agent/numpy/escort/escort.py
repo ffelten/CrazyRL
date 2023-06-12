@@ -217,7 +217,7 @@ if __name__ == "__main__":
         num_intermediate_points=150,
     )
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
     while parallel_env.agents:
         actions = {

@@ -192,7 +192,7 @@ class BaseParallelEnv(ParallelEnv):
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
 
-        return observation
+        return observation, self._compute_info()
 
     @override
     def step(self, actions):

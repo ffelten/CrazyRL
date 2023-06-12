@@ -158,7 +158,7 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
     while parallel_env.agents:
         actions = {

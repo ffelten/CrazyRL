@@ -208,7 +208,7 @@ if __name__ == "__main__":
         target_location=np.array([1, 1, 2.5]),
     )
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
     global_step = 0
     start_time = time.time()
@@ -227,6 +227,6 @@ if __name__ == "__main__":
                 print("SPS:", int(global_step / (time.time() - start_time)))
 
             global_step += 1
-        observations = parallel_env.reset()
+        observations, infos = parallel_env.reset()
 
         # time.sleep(0.05)

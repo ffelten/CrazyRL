@@ -3,13 +3,16 @@ import time
 from functools import partial
 from typing_extensions import override
 
+import jax
 import jax.numpy as jnp
 import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
-from jax import jit, random, vmap
+from jax import jit, random, vmap, profiler
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
+
+
 
 
 @override
@@ -129,6 +132,7 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_terminated(self, state):
+
         # collision with the ground and the target
         terminated = jnp.logical_or(
             state.agents_locations[:, 2] < 0.2, self.norm(state.agents_locations - state.target_location) < 0.2
@@ -200,46 +204,47 @@ class Surround(BaseParallelEnv):
 
 
 if __name__ == "__main__":
+
+    from jax.lib import xla_bridge
+
+    jax.config.update('jax_platform_name', 'cpu')
+
+    print(xla_bridge.get_backend().platform)
+
     parallel_env = Surround(
         num_drones=5,
         init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
         target_location=jnp.array([[1, 1, 2.5]]),
     )
 
-    start = time.time()
-
-    n = 5  # number of states in parallel
+    n = 200  # number of states in parallel
     seed = 5  # test value
     key = random.PRNGKey(seed)
-    key, *subkeys = random.split(key, n + 1)
 
-    states = vmap(parallel_env.reset)(jnp.stack(subkeys))
-
-    # to verify the proportion of crash and avoid some mistakes
-    nb_crash = jnp.zeros(n)
-    nb_end = jnp.zeros(n)
-
-    # to compute SPS
-    global_step = 0
-    start_time = time.time()
-
-    for i in range(1000):
-        actions = random.uniform(key, (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
+    @jit
+    def play(key):
 
         key, *subkeys = random.split(key, n + 1)
 
-        states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
+        states = vmap(parallel_env.reset)(jnp.stack(subkeys))
 
-        if global_step % 200 == 0:
-            print("SPS:", int(global_step / (time.time() - start_time)))
-        global_step += 1
+        for i in range(500):
+            actions = random.uniform(key, (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
 
-        nb_crash += vmap(jnp.any)(states.terminations)
-        nb_end += vmap(jnp.any)(states.truncations)
+            key, *subkeys = random.split(key, n + 1)
 
-        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+            states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
-    print("nb_crash", nb_crash)
-    print("nb_end", nb_end)
-    print("total", nb_end + nb_crash)
+            states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+
+        return key
+
+    key = play(key)     # compilation of the function
+
+    start = time.time()
+
+    play(key)
+
     print("total duration :", time.time() - start)
+    
+    # with profiler.trace("/tmp/jax-trace", create_perfetto_link=True):

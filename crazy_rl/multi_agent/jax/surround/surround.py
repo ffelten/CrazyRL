@@ -8,11 +8,9 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
-from jax import jit, random, vmap, profiler
+from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv
-
-
 
 
 @override
@@ -132,7 +130,6 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_terminated(self, state):
-
         # collision with the ground and the target
         terminated = jnp.logical_or(
             state.agents_locations[:, 2] < 0.2, self.norm(state.agents_locations - state.target_location) < 0.2
@@ -204,10 +201,9 @@ class Surround(BaseParallelEnv):
 
 
 if __name__ == "__main__":
-
     from jax.lib import xla_bridge
 
-    jax.config.update('jax_platform_name', 'cpu')
+    jax.config.update("jax_platform_name", "cpu")
 
     print(xla_bridge.get_backend().platform)
 
@@ -223,7 +219,7 @@ if __name__ == "__main__":
 
     @jit
     def play(key):
-
+        """Execution of the environment with random actions."""
         key, *subkeys = random.split(key, n + 1)
 
         states = vmap(parallel_env.reset)(jnp.stack(subkeys))
@@ -239,12 +235,12 @@ if __name__ == "__main__":
 
         return key
 
-    key = play(key)     # compilation of the function
+    key = play(key)  # compilation of the function
 
     start = time.time()
 
     play(key)
 
     print("total duration :", time.time() - start)
-    
+
     # with profiler.trace("/tmp/jax-trace", create_perfetto_link=True):

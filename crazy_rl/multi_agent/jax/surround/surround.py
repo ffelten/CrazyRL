@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
-from jax import jit, random
+from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 
@@ -79,19 +79,15 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_obs(self, state, key):
-        return (
-            jdc.replace(
-                state,
-                observations=jnp.append(
-                    # each row contains the location of one agent and the location of the target
-                    jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
-                    # then we add agents_locations to each row without the agent which is already in the row
-                    # and make it only one dimension
-                    jnp.array(
-                        [jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]
-                    ),
-                    axis=1,
-                ),
+        return jdc.replace(
+            state,
+            observations=jnp.append(
+                # each row contains the location of one agent and the location of the target
+                jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
+                # then we add agents_locations to each row without the agent which is already in the row
+                # and make it only one dimension
+                jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
+                axis=1,
             ),
         )
 
@@ -199,7 +195,7 @@ class Surround(BaseParallelEnv):
     def step_vmap(self, action, key, **state_val):
         """Calls step with a State and is called by vmap without State object."""
         return self.step(State(**state_val), action, key)
-      
+
 
 if __name__ == "__main__":
     from jax.lib import xla_bridge

@@ -8,7 +8,6 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 from gymnasium import spaces
 from jax import jit
-from pettingzoo.utils.env import ParallelEnv
 
 
 @jdc.pytree_dataclass
@@ -111,7 +110,6 @@ class BaseParallelEnv:
 
     # PettingZoo API
     @override
-
     @partial(jit, static_argnums=(0,))
     def reset(self, key, seed=None, return_info=False, options=None):
         return self._initialize_state()
@@ -119,7 +117,6 @@ class BaseParallelEnv:
     @override
     @partial(jit, static_argnums=(0,))
     def step(self, state, actions, key):
-
         state = self._compute_action(state, actions)
 
         state = jdc.replace(state, timestep=state.timestep + 1)

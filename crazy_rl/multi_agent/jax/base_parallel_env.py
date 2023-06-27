@@ -7,7 +7,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 import jax_dataclasses as jdc
 from gymnasium import spaces
-from jax import jit, random
+from jax import jit
 
 
 @jdc.pytree_dataclass
@@ -37,6 +37,8 @@ class BaseParallelEnv:
         _compute_reward: Computes the current reward value(s).
         _compute_terminated: Computes if the game must be stopped because the agents crashed.
         _compute_truncation: Computes if the game must be stopped because it is too long.
+        _initialize_state: Initialize the State of the environment.
+        auto_reset: Returns the State reinitialized if needed, else the actual State.
     """
 
     metadata = {
@@ -102,22 +104,19 @@ class BaseParallelEnv:
         """Creates a new states with initial values. Must be implemented in a subclass."""
         raise NotImplementedError
 
+    def auto_reset(self, state):
+        """Reset if needed (doesn't work)."""
+        raise NotImplementedError
+
     # PettingZoo API
     @override
-    def reset(self, key):
-        key, subkey = random.split(key)
-
-        state = self._initialize_state()
-
-        state, key = self._compute_obs(state, key)
-
-        return state, key
+    @partial(jit, static_argnums=(0,))
+    def reset(self, key, seed=None, return_info=False, options=None):
+        return self._initialize_state()
 
     @override
     @partial(jit, static_argnums=(0,))
     def step(self, state, actions, key):
-        key, subkey = random.split(key)
-
         state = self._compute_action(state, actions)
 
         state = jdc.replace(state, timestep=state.timestep + 1)
@@ -125,9 +124,9 @@ class BaseParallelEnv:
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
         state = self._compute_reward(state)
-        state, key = self._compute_obs(state, key)
+        state = self._compute_obs(state, key)
 
-        return state, key
+        return state
 
     @override
     def state(self, state):

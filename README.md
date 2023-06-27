@@ -92,7 +92,7 @@ I suggest to have a look at [MASAC](https://github.com/ffelten/MASAC) for traini
         obs, _, _, _, _ = env.step(actions)
 ```
 
-You can have a look at the [test_multiagent](learning/test_multiagent.py) file. The path to the save model MASAC and the mode to "real" has to be set on the main.
+You can have a look at the [test_multiagent](learning/exec_multiagent.py) file. The path to the save model MASAC and the mode to "real" has to be set on the main.
 
 ## Install & run
 ```shell

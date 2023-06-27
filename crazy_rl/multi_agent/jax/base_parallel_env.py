@@ -23,8 +23,8 @@ class State:
     truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
 
 
-class BaseParallelEnv(ParallelEnv):
-    """The Base environment inheriting from pettingZoo Parallel environment class.
+class BaseParallelEnv:
+    """The Base environment.
 
     The main API methods of this class are:
     - step
@@ -111,6 +111,7 @@ class BaseParallelEnv(ParallelEnv):
 
     # PettingZoo API
     @override
+
     @partial(jit, static_argnums=(0,))
     def reset(self, key, seed=None, return_info=False, options=None):
         return self._initialize_state()
@@ -118,6 +119,7 @@ class BaseParallelEnv(ParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def step(self, state, actions, key):
+
         state = self._compute_action(state, actions)
 
         state = jdc.replace(state, timestep=state.timestep + 1)

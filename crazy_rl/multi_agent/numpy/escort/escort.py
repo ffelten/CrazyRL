@@ -165,9 +165,7 @@ class Escort(BaseParallelEnv):
         terminated = dict()
 
         for agent in self.agents:
-            terminated[agent] = (
-                self.timestep >= self.num_ref_points + 50
-            )  # the game stops 50 steps after the target has stopped
+            terminated[agent] = False
 
         for agent in self.agents:
             # collision between two drones
@@ -194,7 +192,8 @@ class Escort(BaseParallelEnv):
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 200:
+        # the game stops 50 steps after the target has stopped
+        if self.timestep == self.num_ref_points + 50:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.timestep = 0

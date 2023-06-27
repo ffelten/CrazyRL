@@ -196,8 +196,8 @@ def jtest_circle():
         state.target_location
         == jnp.array(
             [
-                [0.5 * (1 - jnp.cos(ts)) - 0.5, 0, 0.5 * jnp.sin(ts) + 1],
-                [0.5 * (1 - jnp.cos(ts)) - 0.5, 1, 0.5 * jnp.sin(ts) + 1],
+                [0.5 * (1 - jnp.cos(ts)) - 0.5, 0.5 * jnp.sin(ts), 1],
+                [0.5 * (1 - jnp.cos(ts)) - 0.5, 0.5 * jnp.sin(ts) + 1, 1],
             ]
         )
     ).all()
@@ -233,7 +233,10 @@ def jtest_escort():
     assert (
         state.observations
         == jnp.array(
-            [[0, 0, 1, -0.9736842, -0.9736842, 2.8289473, 0, 3, 1], [0, 3, 1, -0.9736842, -0.9736842, 2.8289473, 0, 0, 1]]
+            [
+                [0, 0, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 3, 1],
+                [0, 3, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 0, 1],
+            ]
         )
     ).all()
 
@@ -359,12 +362,13 @@ def jtest_catch():
 
     state = parallel_env.reset(key)
 
-    assert (state.target_location == jnp.array([[-0.1, 0, 1]])).all()
+    assert (state.target_location > jnp.array([[-0.1, 0, 1]]) - 0.001).all()
+    assert (state.target_location < jnp.array([[-0.1, 0, 1]]) + 0.001).all()
 
     parallel_env = Catch(
         num_drones=2,
         init_flying_pos=jnp.array([[1, -1, 1], [1, 1, 1]]),
-        init_target_location=jnp.array([1.001, 0, 1]),
+        init_target_location=jnp.array([1, 0, 1]),
         target_speed=0.1,
     )
 

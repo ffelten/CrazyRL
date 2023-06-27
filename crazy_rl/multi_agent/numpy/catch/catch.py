@@ -220,7 +220,7 @@ if __name__ == "__main__":
         target_speed=0.1,
     )
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
     while parallel_env.agents:
         actions = {

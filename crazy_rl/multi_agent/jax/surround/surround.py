@@ -156,13 +156,13 @@ class Surround(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _initialize_state(self):
         return State(
-            self._init_flying_pos,
-            0,
-            jnp.array([]),
-            jnp.array([]),
-            jnp.zeros(self.num_drones),
-            jnp.zeros(self.num_drones),
-            self._target_location,
+            agents_locations=self._init_flying_pos,
+            timestep=0,
+            observations=jnp.zeros((self.num_drones, (self.num_drones + 1) * 3)),
+            rewards=jnp.zeros(self.num_drones),
+            terminations=jnp.zeros(self.num_drones),
+            truncations=jnp.zeros(self.num_drones),
+            target_location=self._target_location,
         )
 
     @override
@@ -209,13 +209,26 @@ if __name__ == "__main__":
 
     parallel_env = Surround(
         num_drones=5,
-        init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-        target_location=jnp.array([[1, 1, 2.5]]),
+        init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [2.0, 1.0, 1.0], [0.0, 1.0, 1.0], [2.0, 2.0, 1.0], [1.0, 0.0, 1.0]]),
+        target_location=jnp.array([[1.0, 1.0, 2.5]]),
     )
 
-    n = 200  # number of states in parallel
+    n = 100  # number of states in parallel
     seed = 5  # test value
     key = random.PRNGKey(seed)
+
+    @jit
+    def body(i, states_key):
+        """Body of the fori_loop of play."""
+        actions = random.uniform(states_key[1], (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
+
+        key, *subkeys = random.split(states_key[1], n + 1)
+
+        states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states_key[0]))
+
+        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+
+        return (states, key)
 
     @jit
     def play(key):
@@ -224,23 +237,29 @@ if __name__ == "__main__":
 
         states = vmap(parallel_env.reset)(jnp.stack(subkeys))
 
-        for i in range(500):
-            actions = random.uniform(key, (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
+        states, key = jax.lax.fori_loop(0, 5000, body, (states, key))
 
-            key, *subkeys = random.split(key, n + 1)
+        return key, states
 
-            states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
+    key, states = play(key)  # compilation of the function
 
-            states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+    durations = np.zeros(10)
 
-        return key
+    print("start")
 
-    key = play(key)  # compilation of the function
+    for i in range(10):
+        start = time.time()
 
-    start = time.time()
+        key, states = play(key)
 
-    play(key)
+        jax.block_until_ready(states)
 
-    print("total duration :", time.time() - start)
+        end = time.time() - start
+
+        # print("t", i, " : ", end)
+
+        durations[i] = end
+
+    print("durations : ", durations)
 
     # with profiler.trace("/tmp/jax-trace", create_perfetto_link=True):

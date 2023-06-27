@@ -216,25 +216,40 @@ if __name__ == "__main__":
         target_location=np.array([1, 1, 2.5]),
     )
 
-    observations = parallel_env.reset()
+    steps = 250000
 
-    global_step = 0
-    start_time = time.time()
+    def play():
+        """Execution of the environment with random actions."""
+        observations, infos = parallel_env.reset()
+        global_step = 0
 
-    for i in range(10000):
-        while parallel_env.agents:
-            actions = {
-                agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
-            }  # this is where you would insert your policy
-            observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
-            parallel_env.render()
+        while global_step < steps:
+            while global_step < steps and parallel_env.agents:
+                actions = {
+                    agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
+                }  # this is where you would insert your policy
+                observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
+                # parallel_env.render()
 
-            # print("obs", observations, "reward", rewards)
+                # print("obs", observations, "reward", rewards)
 
-            if global_step % 100 == 0:
-                print("SPS:", int(global_step / (time.time() - start_time)))
+                # if global_step % 100 == 0:
+                # print("SPS:", int(global_step / (time.time() - start_time)))
 
-            global_step += 1
-        observations = parallel_env.reset()
+                global_step += 1
+            observations, infos = parallel_env.reset()
 
-        # time.sleep(0.05)
+    durations = np.zeros(10)
+
+    print("start")
+
+    for i in range(10):
+        start = time.time()
+
+        play()
+
+        end = time.time() - start
+
+        durations[i] = end
+
+    print("durations : ", durations)

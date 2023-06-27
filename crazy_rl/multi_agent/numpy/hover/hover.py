@@ -132,7 +132,7 @@ if __name__ == "__main__":
         init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
     )
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
     while parallel_env.agents:
         actions = {

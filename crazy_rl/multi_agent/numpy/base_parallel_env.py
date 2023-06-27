@@ -188,11 +188,12 @@ class BaseParallelEnv(ParallelEnv):
             self._agent_location = self._get_drones_state()
 
         observation = self._compute_obs()
+        infos = self._compute_info()
 
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
 
-        return observation
+        return observation, infos
 
     @override
     def step(self, actions):

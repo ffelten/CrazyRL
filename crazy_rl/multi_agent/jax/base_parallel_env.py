@@ -75,8 +75,12 @@ class BaseParallelEnv:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_obs(self, state, key):
+    def _compute_obs(self, state):
         """Computes the current observation of the environment. Must be implemented in a subclass."""
+        raise NotImplementedError
+
+    def _compute_mechanics(self, state, key):
+        """Computes the mechanics of the environment, for example the movements of the target. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def _compute_action(self, state, actions):
@@ -113,7 +117,7 @@ class BaseParallelEnv:
     @partial(jit, static_argnums=(0,))
     def reset(self, key, seed=None, return_info=False, options=None):
         state = self._initialize_state()
-        state = self._compute_obs(state, key)
+        state = self._compute_obs(state)
         return state
 
     @override
@@ -125,8 +129,9 @@ class BaseParallelEnv:
 
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
+        state = self._compute_mechanics(state, key)
         state = self._compute_reward(state)
-        state = self._compute_obs(state, key)
+        state = self._compute_obs(state)
 
         return state
 

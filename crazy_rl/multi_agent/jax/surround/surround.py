@@ -78,7 +78,7 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state, key):
+    def _compute_obs(self, state):
         return jdc.replace(
             state,
             observations=jnp.append(
@@ -90,6 +90,11 @@ class Surround(BaseParallelEnv):
                 axis=1,
             ),
         )
+
+    @override
+    @partial(jit, static_argnums=(0,))
+    def _compute_mechanics(self, state, key):
+        return state
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -155,7 +160,7 @@ class Surround(BaseParallelEnv):
         return State(
             agents_locations=self._init_flying_pos,
             timestep=0,
-            observations=jnp.zeros((self.num_drones, (self.num_drones + 1) * 3)),
+            observations=jnp.array([]),
             rewards=jnp.zeros(self.num_drones),
             terminations=jnp.zeros(self.num_drones),
             truncations=jnp.zeros(self.num_drones),
@@ -164,7 +169,7 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def auto_reset(self, key, **state):
+    def auto_reset(self, **state):
         """Resets if the game has ended, or returns state."""
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
@@ -175,9 +180,9 @@ class Surround(BaseParallelEnv):
             (1 - done) * state["rewards"],
             (1 - done) * state["terminations"],
             (1 - done) * state["truncations"],
-            done * self._target_location + (1 - done) * state["target_location"],
+            state["target_location"],
         )
-        state = self._compute_obs(state, key)
+        state = self._compute_obs(state)
         return state
 
     @partial(jit, static_argnums=(0,))
@@ -202,7 +207,7 @@ class Surround(BaseParallelEnv):
 if __name__ == "__main__":
     from jax.lib import xla_bridge
 
-    jax.config.update("jax_platform_name", "cpu")
+    jax.config.update("jax_platform_name", "gpu")
 
     print(xla_bridge.get_backend().platform)
 
@@ -212,7 +217,7 @@ if __name__ == "__main__":
         target_location=jnp.array([[1.0, 1.0, 2.5]]),
     )
 
-    n = 100  # number of states in parallel
+    n = 1000  # number of states in parallel
     seed = 5  # test value
     key = random.PRNGKey(seed)
 
@@ -225,9 +230,7 @@ if __name__ == "__main__":
 
         states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states_key[0]))
 
-        key, *subkeys = random.split(states_key[1], n + 1)
-
-        states = vmap(parallel_env.auto_reset)(jnp.stack(subkeys), **parallel_env.state_to_dict(states))
+        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
 
         return (states, key)
 
@@ -238,7 +241,7 @@ if __name__ == "__main__":
 
         states = vmap(parallel_env.reset)(jnp.stack(subkeys))
 
-        states, key = jax.lax.fori_loop(0, 5000, body, (states, key))
+        states, key = jax.lax.fori_loop(0, 1000, body, (states, key))
 
         return key, states
 
@@ -256,8 +259,6 @@ if __name__ == "__main__":
         jax.block_until_ready(states)
 
         end = time.time() - start
-
-        # print("t", i, " : ", end)
 
         durations[i] = end
 

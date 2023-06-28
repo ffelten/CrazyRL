@@ -4,11 +4,12 @@ import time
 from functools import partial
 from typing_extensions import override
 
+import jax
 import jax.numpy as jnp
 import jax_dataclasses as jdc
 import numpy as np
 from gymnasium import spaces
-from jax import jit, random
+from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 
@@ -82,9 +83,22 @@ class Catch(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state, key):
-        key, subkey = random.split(key)
+    def _compute_obs(self, state):
+        return jdc.replace(
+            state,
+            observations=jnp.append(
+                # each row contains the location of one agent and the location of the target
+                jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
+                # then we add agents_locations to each row without the agent which is already in the row
+                # and make it only one dimension
+                jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
+                axis=1,
+            ),
+        )
 
+    @override
+    @partial(jit, static_argnums=(0,))
+    def _compute_mechanics(self, state, key):
         # mean of the agent's positions
         mean = jnp.zeros(3)
 
@@ -104,28 +118,12 @@ class Catch(BaseParallelEnv):
             + ((1 - surrounded) * (state.target_location - mean) / (dist + 0.0001) * self.target_speed)
             # if the mean of the agents is too close to the target, move the target in a random direction,
             # slowly because it hesitates
-            + (surrounded * random.uniform(subkey, (3,), minval=-1, maxval=1) * self.target_speed * 0.1),
+            + (surrounded * random.uniform(key, (3,), minval=-1, maxval=1) * self.target_speed * 0.1),
             jnp.array([-self.size, -self.size, 0.2]),
             jnp.array([self.size, self.size, self.size]),
         )
 
-        return (
-            jdc.replace(
-                state,
-                observations=jnp.append(
-                    # each row contains the location of one agent and the location of the target
-                    jnp.column_stack((state.agents_locations, jnp.tile(target_location, (self.num_drones, 1)))),
-                    # then we add agents_locations to each row without the agent which is already in the row
-                    # and make it only one dimension
-                    jnp.array(
-                        [jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]
-                    ),
-                    axis=1,
-                ),
-                target_location=target_location,
-            ),
-            key,
-        )
+        return jdc.replace(state, target_location=target_location)
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -193,52 +191,106 @@ class Catch(BaseParallelEnv):
             agents_locations=self._init_flying_pos,
             timestep=0,
             observations=jnp.array([]),
-            rewards=jnp.array([]),
+            rewards=jnp.zeros(self.num_drones),
             terminations=jnp.zeros(self.num_drones),
             truncations=jnp.zeros(self.num_drones),
             target_location=jnp.array([self._target_location]),
         )
 
+    @override
+    @partial(jit, static_argnums=(0,))
+    def auto_reset(self, **state):
+        """Resets if the game has ended, or returns state."""
+        done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
+
+        state = State(
+            done * self._init_flying_pos + (1 - done) * state["agents_locations"],
+            (1 - done) * state["timestep"],
+            state["observations"],
+            (1 - done) * state["rewards"],
+            (1 - done) * state["terminations"],
+            (1 - done) * state["truncations"],
+            done * self._target_location + (1 - done) * state["target_location"],
+        )
+        state = self._compute_obs(state)
+        return state
+
+    @partial(jit, static_argnums=(0,))
+    def state_to_dict(self, state):
+        """Translates the State into a dict."""
+        return {
+            "agents_locations": state.agents_locations,
+            "timestep": state.timestep,
+            "observations": state.observations,
+            "rewards": state.rewards,
+            "terminations": state.terminations,
+            "truncations": state.truncations,
+            "target_location": state.target_location,
+        }
+
+    @partial(jit, static_argnums=(0,))
+    def step_vmap(self, action, key, **state_val):
+        """Calls step with a State and is called by vmap without State object."""
+        return self.step(State(**state_val), action, key)
+
 
 if __name__ == "__main__":
+    from jax.lib import xla_bridge
+
+    jax.config.update("jax_platform_name", "gpu")
+
+    print(xla_bridge.get_backend().platform)
+
     parallel_env = Catch(
         num_drones=5,
-        init_flying_pos=jnp.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-        init_target_location=jnp.array([1, 1, 2.5]),
+        init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [2.0, 1.0, 1.0], [0.0, 1.0, 1.0], [2.0, 2.0, 1.0], [1.0, 0.0, 1.0]]),
+        init_target_location=jnp.array([1.0, 1.0, 2.5]),
         target_speed=0.1,
     )
 
-    # to verify the proportion of crash and avoid some mistakes
-    nb_crash = 0
-    nb_end = 0
-
-    global_step = 0
-    start_time = time.time()
-
-    seed = 5
-
+    n = 1000  # number of states in parallel
+    seed = 5  # test value
     key = random.PRNGKey(seed)
 
-    key, subkey = random.split(key)
+    @jit
+    def body(i, states_key):
+        """Body of the fori_loop of play."""
+        actions = random.uniform(states_key[1], (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
 
-    state, key = parallel_env.reset(key)
+        key, *subkeys = random.split(states_key[1], n + 1)
 
-    for i in range(500):
-        while not jnp.any(state.truncations) and not jnp.any(state.terminations):
-            actions = jnp.array([parallel_env.action_space().sample() for _ in range(parallel_env.num_drones)])
+        states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states_key[0]))
 
-            state, key = parallel_env.step(state, actions, key)
+        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
 
-            if global_step % 2000 == 0:
-                print("SPS:", int(global_step / (time.time() - start_time)))
+        return (states, key)
 
-            global_step += 1
+    @jit
+    def play(key):
+        """Execution of the environment with random actions."""
+        key, *subkeys = random.split(key, n + 1)
 
-        nb_crash += jnp.any(state.terminations)
-        nb_end += jnp.any(state.truncations)
+        states = vmap(parallel_env.reset)(jnp.stack(subkeys))
 
-        state, key = parallel_env.reset(key)
+        states, key = jax.lax.fori_loop(0, 1000, body, (states, key))
 
-    print("nb_crash", nb_crash)
-    print("nb_end", nb_end)
-    print("total", nb_end + nb_crash)
+        return key, states
+
+    key, states = play(key)  # compilation of the function
+
+    durations = np.zeros(10)
+
+    print("start")
+
+    for i in range(10):
+        start = time.time()
+
+        key, states = play(key)
+
+        jax.block_until_ready(states)
+
+        end = time.time() - start
+
+        durations[i] = end
+
+    print("durations : ", durations)

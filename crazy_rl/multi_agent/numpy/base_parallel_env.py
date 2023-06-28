@@ -204,6 +204,7 @@ class BaseParallelEnv(ParallelEnv):
         if self._mode == "simu":
             self._agent_location = target_action
             self.render()
+
         elif self._mode == "real":
             command = dict()
             # dict target_position URI
@@ -222,10 +223,10 @@ class BaseParallelEnv(ParallelEnv):
             self._agent_location = target_action
 
         terminations = self._compute_terminated()
+        truncations = self._compute_truncation()
         rewards = self._compute_reward()
         observations = self._compute_obs()
         infos = self._compute_info()
-        truncations = self._compute_truncation()
 
         return observations, rewards, terminations, truncations, infos
 

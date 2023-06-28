@@ -118,10 +118,10 @@ class Surround(BaseParallelEnv):
 
                 reward[agent] /= self.num_drones - 1
 
-                reward[agent] *= 0.2
+                reward[agent] *= 0.05
 
                 # a maximum value minus the distance to the target
-                reward[agent] += 0.8 * (
+                reward[agent] += 0.95 * (
                     2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
                 )
 
@@ -189,7 +189,6 @@ class Surround(BaseParallelEnv):
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.end = True
-            self.timestep = 0
         else:
             truncation = {agent: False for agent in self._agents_names}
         return truncation

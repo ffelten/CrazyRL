@@ -164,19 +164,21 @@ class Surround(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def auto_reset(self, **state):
+    def auto_reset(self, key, **state):
         """Resets if the game has ended, or returns state."""
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
-        return State(
+        state = State(
             done * self._init_flying_pos + (1 - done) * state["agents_locations"],
             (1 - done) * state["timestep"],
-            (1 - done) * state["observations"],
+            state["observations"],
             (1 - done) * state["rewards"],
             (1 - done) * state["terminations"],
             (1 - done) * state["truncations"],
             done * self._target_location + (1 - done) * state["target_location"],
         )
+        state = self._compute_obs(state, key)
+        return state
 
     @partial(jit, static_argnums=(0,))
     def state_to_dict(self, state):
@@ -223,7 +225,9 @@ if __name__ == "__main__":
 
         states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states_key[0]))
 
-        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+        key, *subkeys = random.split(states_key[1], n + 1)
+
+        states = vmap(parallel_env.auto_reset)(jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
         return (states, key)
 

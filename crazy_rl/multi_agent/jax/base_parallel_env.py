@@ -112,7 +112,9 @@ class BaseParallelEnv:
     @override
     @partial(jit, static_argnums=(0,))
     def reset(self, key, seed=None, return_info=False, options=None):
-        return self._initialize_state()
+        state = self._initialize_state()
+        state = self._compute_obs(state, key)
+        return state
 
     @override
     @partial(jit, static_argnums=(0,))

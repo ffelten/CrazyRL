@@ -33,7 +33,9 @@ def test_vmap():
 
     assert (states.agents_locations == jnp.array([[[0, 0.2, 1], [0, 1, 1]], [[0.2, 0, 1], [0, 1, 1]]])).all()
 
-    states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+    key, *subkeys = random.split(key, n + 1)
+
+    states = vmap(parallel_env.auto_reset)(jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
     assert (
         states.observations
@@ -53,7 +55,8 @@ def test_vmap():
 
     key, *subkeys = random.split(key, n + 1)
     states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
-    states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+    key, *subkeys = random.split(key, n + 1)
+    states = vmap(parallel_env.auto_reset)(jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
     actions = jnp.array(
         [[[0, 1, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0]]]  # state 1 : [[0, 0.6, 1], [0, 1, 1]]
@@ -61,7 +64,8 @@ def test_vmap():
 
     key, *subkeys = random.split(key, n + 1)
     states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
-    states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+    key, *subkeys = random.split(key, n + 1)
+    states = vmap(parallel_env.auto_reset)(jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
     actions = jnp.array(
         [[[0, 1, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0]]]  # state 1 : [[0, 0.8, 1], [0, 1, 1]]
@@ -74,7 +78,8 @@ def test_vmap():
 
     assert (states.rewards == jnp.array([[-10, -10], [0, 0]])).all()
 
-    states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+    key, *subkeys = random.split(key, n + 1)
+    states = vmap(parallel_env.auto_reset)(jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
     assert (states.timestep == jnp.array([0, 4])).all()
 
@@ -85,8 +90,10 @@ def test_vmap():
     )  # state 2 : [[0.2, 0, 1], [0, 1, 1]]
 
     for i in range(95):
+        key, *subkeys = random.split(key, n + 1)
         states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
-        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+        key, *subkeys = random.split(key, n + 1)
+        states = vmap(parallel_env.auto_reset)(jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 
     states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
 

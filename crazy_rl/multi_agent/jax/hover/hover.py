@@ -51,8 +51,6 @@ class Hover(BaseParallelEnv):
 
         self.size = size
 
-        super().__init__()
-
     @override
     def _observation_space(self, agent):
         return spaces.Box(
@@ -70,11 +68,6 @@ class Hover(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _compute_obs(self, state):
         return jdc.replace(state, observations=vmap(jnp.append)(state.agents_locations, self._target_location))
-
-    @override
-    @partial(jit, static_argnums=(0,))
-    def state(self, state):
-        return jnp.append(state.agents_locations, self._target_location).flatten()
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -122,7 +115,7 @@ class Hover(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def auto_reset(self, **state):
-        """Resets if the game has ended, or returns state."""
+        """Returns the State reinitialized if needed, else the actual State."""
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
         state = State(
@@ -153,6 +146,12 @@ class Hover(BaseParallelEnv):
         """Calls step with a State and is called by vmap without State object."""
         return self.step(State(**state_val), action, key)
 
+    @override
+    @partial(jit, static_argnums=(0,))
+    def state(self, state):
+        """Returns a global observation (concatenation of all the agent locations and target locations)."""
+        return jnp.append(state.agents_locations, self._target_location).flatten()
+
 
 if __name__ == "__main__":
     from jax.lib import xla_bridge
@@ -172,7 +171,12 @@ if __name__ == "__main__":
 
     @jit
     def body(i, states_key):
-        """Body of the fori_loop of play."""
+        """Body of the fori_loop of play.
+
+        Args:
+            i: number of the iteration.
+            states_key: a tuple containing states and key.
+        """
         actions = random.uniform(states_key[1], (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
 
         key, *subkeys = random.split(states_key[1], n + 1)

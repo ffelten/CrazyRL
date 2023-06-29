@@ -220,12 +220,6 @@ if __name__ == "__main__":
                     agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
                 }  # this is where you would insert your policy
                 observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
-                # parallel_env.render()
-
-                # print("obs", observations, "reward", rewards)
-
-                # if global_step % 100 == 0:
-                # print("SPS:", int(global_step / (time.time() - start_time)))
 
                 global_step += 1
             observations, infos = parallel_env.reset()

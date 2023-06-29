@@ -13,12 +13,12 @@ class State:
     """State of the environment containing the modifiable variables."""
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
-    timestep: int  # represents the number of steps already done in the game
+    timestep: int  # represents the number of steps already done in the game.
 
-    observations: jnp.ndarray  # array containing the current observation of each agent
-    rewards: jnp.ndarray  # array containing the current reward of each agent
-    terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed
-    truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
+    observations: jnp.ndarray  # array containing the current observation of each agent.
+    rewards: jnp.ndarray  # array containing the current reward of each agent.
+    terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed.
+    truncations: jnp.ndarray  # array of booleans which are True if the game reaches enough timesteps and ends.
 
 
 class BaseParallelEnv:
@@ -32,23 +32,26 @@ class BaseParallelEnv:
         _action_space: Returns the Space object corresponding to valid actions
         _observation_space: Returns the Space object corresponding to valid observations
         _compute_obs: Computes the current observation of the environment.
+        _compute_mechanics: Computes the mechanics of the environment, for example the movements of the target.
         _compute_action: Computes the action passed to `.step()` into action matching the mode environment.
         _compute_reward: Computes the current reward value(s).
         _compute_terminated: Computes if the game must be stopped because the agents crashed.
         _compute_truncation: Computes if the game must be stopped because it is too long.
         _initialize_state: Initialize the State of the environment.
         auto_reset: Returns the State reinitialized if needed, else the actual State.
+        state_to_dict: Translates the State into a dict.
+        step_vmap: Calls step with a State and is called by vmap without State object.
+        state: Returns a global observation (concatenation of all the agent locations and the target locations).
+
+    There are also the following functions:
+        observation_space: Returns the observation space for one agent.
+        action_space: Returns the action space.
     """
 
     metadata = {
         "is_parallelizable": True,
         "render_fps": 10,
     }
-
-    def __init__(
-        self,
-    ):
-        """Initialization of a generic aviary environment."""
 
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
@@ -62,10 +65,6 @@ class BaseParallelEnv:
         """Computes the current observation of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def state(self, state):
-        """Returns a global observation (concatenation of all the agent locations and the target location). Must be implemented in a subclass."""
-        raise NotImplementedError
-
     def _compute_mechanics(self, state, key):
         """Computes the mechanics of the environment, for example the movements of the target. Must be implemented in a subclass."""
         raise NotImplementedError
@@ -74,8 +73,8 @@ class BaseParallelEnv:
         """Computes the action passed to `.step()` into action matching the mode environment. Must be implemented in a subclass.
 
         Args:
-            state : the state of the environment (contains agent_location used in this function)
-            actions : ndarray. The input action for one drones
+            state : the state of the environment (contains agent_location used in this function).
+            actions : 2D array containing the x, y, z action for each drone.
         """
         raise NotImplementedError
 
@@ -92,16 +91,27 @@ class BaseParallelEnv:
         raise NotImplementedError
 
     def _initialize_state(self):
-        """Creates a new states with initial values. Must be implemented in a subclass."""
+        """Creates a new state with initial values. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def auto_reset(self, state):
-        """Reset if needed (doesn't work)."""
+        """Returns the State reinitialized if needed, else the actual State. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    # PettingZoo API
+    def state_to_dict(self, state):
+        """Translates the State into a dict. Must be implemented in a subclass."""
+        raise NotImplementedError
+
+    def step_vmap(self, action, key, **state_val):
+        """Calls step with a State and is called by vmap without State object. Must be implemented in a subclass."""
+        raise NotImplementedError
+
+    def state(self, state):
+        """Returns a global observation (concatenation of all the agent locations and target locations). Must be implemented in a subclass."""
+        raise NotImplementedError
+
     @partial(jit, static_argnums=(0,))
-    def reset(self, key, seed=None, return_info=False, options=None):
+    def reset(self, key):
         """Resets the environment in initial state."""
         state = self._initialize_state()
         state = self._compute_obs(state)

@@ -25,8 +25,6 @@ class State(State):
     terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed
     truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
 
-    target_location: jnp.ndarray  # 2D array containing x,y,z coordinates of the unique target
-
 
 class Surround(BaseParallelEnv):
     """A Parallel Environment where drone learn how to surround a target point."""
@@ -56,12 +54,7 @@ class Surround(BaseParallelEnv):
 
         self.size = size
 
-        super().__init__(
-            size=size,
-            init_flying_pos=self._init_flying_pos,
-            target_location=self._target_location,
-            num_drones=self.num_drones,
-        )
+        super().__init__()
 
     @override
     def _observation_space(self, agent):
@@ -83,13 +76,18 @@ class Surround(BaseParallelEnv):
             state,
             observations=jnp.append(
                 # each row contains the location of one agent and the location of the target
-                jnp.column_stack((state.agents_locations, jnp.tile(state.target_location, (self.num_drones, 1)))),
+                jnp.column_stack((state.agents_locations, jnp.tile(self._target_location, (self.num_drones, 1)))),
                 # then we add agents_locations to each row without the agent which is already in the row
                 # and make it only one dimension
                 jnp.array([jnp.delete(state.agents_locations, agent, axis=0).flatten() for agent in range(self.num_drones)]),
                 axis=1,
             ),
         )
+
+    @override
+    @partial(jit, static_argnums=(0,))
+    def state(self, state):
+        return jnp.append(state.agents_locations.flatten(), self._target_location)
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -125,7 +123,7 @@ class Surround(BaseParallelEnv):
                 * 0.05
                 / (self.num_drones - 1)
                 # a maximum value minus the distance to the target
-                + 0.95 * (2 * self.size - jnp.linalg.norm(state.agents_locations - state.target_location, axis=1))
+                + 0.95 * (2 * self.size - jnp.linalg.norm(state.agents_locations - self._target_location, axis=1))
             )
             # negative reward if the drones crash
             + jnp.any(state.terminations) * (1 - jnp.any(state.truncations)) * -10 * jnp.ones(self.num_drones),
@@ -136,7 +134,7 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self, state):
         # collision with the ground and the target
         terminated = jnp.logical_or(
-            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - state.target_location, axis=1) < 0.2
+            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - self._target_location, axis=1) < 0.2
         )
 
         for agent in range(self.num_drones):
@@ -164,7 +162,6 @@ class Surround(BaseParallelEnv):
             rewards=jnp.zeros(self.num_drones),
             terminations=jnp.zeros(self.num_drones),
             truncations=jnp.zeros(self.num_drones),
-            target_location=self._target_location,
         )
 
     @override
@@ -174,13 +171,12 @@ class Surround(BaseParallelEnv):
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
         state = State(
-            done * self._init_flying_pos + (1 - done) * state["agents_locations"],
-            (1 - done) * state["timestep"],
-            state["observations"],
-            (1 - done) * state["rewards"],
-            (1 - done) * state["terminations"],
-            (1 - done) * state["truncations"],
-            state["target_location"],
+            agents_locations=done * self._init_flying_pos + (1 - done) * state["agents_locations"],
+            timestep=(1 - done) * state["timestep"],
+            observations=state["observations"],
+            rewards=(1 - done) * state["rewards"],
+            terminations=(1 - done) * state["terminations"],
+            truncations=(1 - done) * state["truncations"],
         )
         state = self._compute_obs(state)
         return state
@@ -195,7 +191,6 @@ class Surround(BaseParallelEnv):
             "rewards": state.rewards,
             "terminations": state.terminations,
             "truncations": state.truncations,
-            "target_location": state.target_location,
         }
 
     @partial(jit, static_argnums=(0,))
@@ -217,7 +212,7 @@ if __name__ == "__main__":
         target_location=jnp.array([[1.0, 1.0, 2.5]]),
     )
 
-    n = 5000  # number of states in parallel
+    n = 1000  # number of states in parallel
     seed = 5  # test value
     key = random.PRNGKey(seed)
 

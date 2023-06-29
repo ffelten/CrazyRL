@@ -1,7 +1,6 @@
 """The Base environment inheriting from pettingZoo Parallel environment class."""
 import functools
 from functools import partial
-from typing import Optional
 
 import jax.numpy as jnp
 import jax_dataclasses as jdc
@@ -15,6 +14,7 @@ class State:
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game
+
     observations: jnp.ndarray  # array containing the current observation of each agent
     rewards: jnp.ndarray  # array containing the current reward of each agent
     terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed
@@ -47,24 +47,8 @@ class BaseParallelEnv:
 
     def __init__(
         self,
-        num_drones: int,
-        init_flying_pos: Optional[jnp.ndarray] = None,
-        target_location: Optional[jnp.ndarray] = None,
-        size: int = 3,
     ):
-        """Initialization of a generic aviary environment.
-
-        Args:
-            num_drones: ids of the drones (ignored in simulation mode)
-            init_flying_pos (array, optional): An array where each value is a (3)-shaped array containing the initial
-                XYZ position of the drones.
-            target_location (array, optional): An array containing a (3)-shaped array for the XYZ position of the target.
-            size (int, optional): Size of the area sides
-        """
-        self.size = size  # The size of the square grid
-        self._init_flying_pos = init_flying_pos
-        self._target_location = target_location
-        self.num_drones = num_drones
+        """Initialization of a generic aviary environment."""
 
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
@@ -76,6 +60,10 @@ class BaseParallelEnv:
 
     def _compute_obs(self, state):
         """Computes the current observation of the environment. Must be implemented in a subclass."""
+        raise NotImplementedError
+
+    def state(self, state):
+        """Returns a global observation (concatenation of all the agent locations and the target location). Must be implemented in a subclass."""
         raise NotImplementedError
 
     def _compute_mechanics(self, state, key):
@@ -133,10 +121,6 @@ class BaseParallelEnv:
         state = self._compute_obs(state)
 
         return state
-
-    def state(self, state):
-        """Returns a global observation (concatenation of all the agent locations and the target location)."""
-        return jnp.append(state.agents_locations.flatten(), state.target_location)
 
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):

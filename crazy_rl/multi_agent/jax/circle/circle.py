@@ -73,11 +73,7 @@ class Circle(BaseParallelEnv):
             self.ref = self.ref.at[:, agent, 1].set(circle_radius * jnp.sin(ts) + (init_flying_pos[agent][1]))
             self.ref = self.ref.at[:, agent, 2].set(init_flying_pos[agent][2])
 
-        super().__init__(
-            size=size,
-            init_flying_pos=self._init_flying_pos,
-            num_drones=self.num_drones,
-        )
+        super().__init__()
 
     @override
     def _observation_space(self, agent):
@@ -96,6 +92,11 @@ class Circle(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _compute_obs(self, state):
         return jdc.replace(state, observations=vmap(jnp.append)(state.agents_locations, state.target_location))
+
+    @override
+    @partial(jit, static_argnums=(0,))
+    def state(self, state):
+        return jnp.append(state.agents_locations, state.target_location).flatten()
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -152,13 +153,13 @@ class Circle(BaseParallelEnv):
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
         state = State(
-            done * self._init_flying_pos + (1 - done) * state["agents_locations"],
-            (1 - done) * state["timestep"],
-            state["observations"],
-            (1 - done) * state["rewards"],
-            (1 - done) * state["terminations"],
-            (1 - done) * state["truncations"],
-            done * self.ref[0] + (1 - done) * state["target_location"],
+            agents_locations=done * self._init_flying_pos + (1 - done) * state["agents_locations"],
+            timestep=(1 - done) * state["timestep"],
+            observations=state["observations"],
+            rewards=(1 - done) * state["rewards"],
+            terminations=(1 - done) * state["terminations"],
+            truncations=(1 - done) * state["truncations"],
+            target_location=done * self.ref[0] + (1 - done) * state["target_location"],
         )
         state = self._compute_obs(state)
         return state

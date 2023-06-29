@@ -95,5 +95,3 @@ def test_vmap():
     assert (states.truncations == jnp.array([[False, False], [True, True]])).all()
 
     # The reward isn't tested because it will probably change
-
-    assert (states.target_location == jnp.array([[1, 0, 1], [1, 0, 1]])).all()

@@ -73,12 +73,7 @@ class Escort(BaseParallelEnv):
 
         self.size = size
 
-        super().__init__(
-            size=size,
-            init_flying_pos=self._init_flying_pos,
-            target_location=self._target_location,
-            num_drones=num_drones,
-        )
+        super().__init__()
 
     @override
     def _observation_space(self, agent):
@@ -107,6 +102,11 @@ class Escort(BaseParallelEnv):
                 axis=1,
             ),
         )
+
+    @override
+    @partial(jit, static_argnums=(0,))
+    def state(self, state):
+        return jnp.append(state.agents_locations.flatten(), state.target_location)
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -195,13 +195,13 @@ class Escort(BaseParallelEnv):
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
         state = State(
-            done * self._init_flying_pos + (1 - done) * state["agents_locations"],
-            (1 - done) * state["timestep"],
-            state["observations"],
-            (1 - done) * state["rewards"],
-            (1 - done) * state["terminations"],
-            (1 - done) * state["truncations"],
-            done * self._target_location + (1 - done) * state["target_location"],
+            agents_locations=done * self._init_flying_pos + (1 - done) * state["agents_locations"],
+            timestep=(1 - done) * state["timestep"],
+            observations=state["observations"],
+            rewards=(1 - done) * state["rewards"],
+            terminations=(1 - done) * state["terminations"],
+            truncations=(1 - done) * state["truncations"],
+            target_location=done * self._target_location + (1 - done) * state["target_location"],
         )
         state = self._compute_obs(state)
         return state

@@ -25,8 +25,6 @@ class State(State):
     terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed
     truncations: jnp.ndarray  # array of booleans which are True if the game reaches 100 timesteps
 
-    target_location: jnp.ndarray  # 2D array containing x,y,z coordinates of the target of each agent
-
 
 class Hover(BaseParallelEnv):
     """A Parallel Environment where drone learn how to hover around a target point."""
@@ -49,14 +47,11 @@ class Hover(BaseParallelEnv):
         self.num_drones = num_drones
 
         self._init_flying_pos = init_flying_pos
+        self._target_location = init_flying_pos
 
         self.size = size
 
-        super().__init__(
-            num_drones=num_drones,
-            size=size,
-            init_flying_pos=self._init_flying_pos,
-        )
+        super().__init__()
 
     @override
     def _observation_space(self, agent):
@@ -74,7 +69,12 @@ class Hover(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_obs(self, state):
-        return jdc.replace(state, observations=vmap(jnp.append)(state.agents_locations, state.target_location))
+        return jdc.replace(state, observations=vmap(jnp.append)(state.agents_locations, self._target_location))
+
+    @override
+    @partial(jit, static_argnums=(0,))
+    def state(self, state):
+        return jnp.append(state.agents_locations, self._target_location).flatten()
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -94,7 +94,7 @@ class Hover(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state):
-        return jdc.replace(state, rewards=-1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1))
+        return jdc.replace(state, rewards=-1 * jnp.linalg.norm(self._target_location - state.agents_locations, axis=1))
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -117,7 +117,6 @@ class Hover(BaseParallelEnv):
             rewards=jnp.zeros(self.num_drones),
             terminations=jnp.zeros(self.num_drones),
             truncations=jnp.zeros(self.num_drones),
-            target_location=jnp.copy(self._init_flying_pos),
         )
 
     @override
@@ -127,13 +126,12 @@ class Hover(BaseParallelEnv):
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
         state = State(
-            done * self._init_flying_pos + (1 - done) * state["agents_locations"],
-            (1 - done) * state["timestep"],
-            state["observations"],
-            (1 - done) * state["rewards"],
-            (1 - done) * state["terminations"],
-            (1 - done) * state["truncations"],
-            state["target_location"],
+            agents_locations=done * self._init_flying_pos + (1 - done) * state["agents_locations"],
+            timestep=(1 - done) * state["timestep"],
+            observations=state["observations"],
+            rewards=(1 - done) * state["rewards"],
+            terminations=(1 - done) * state["terminations"],
+            truncations=(1 - done) * state["truncations"],
         )
         state = self._compute_obs(state)
         return state
@@ -148,7 +146,6 @@ class Hover(BaseParallelEnv):
             "rewards": state.rewards,
             "terminations": state.terminations,
             "truncations": state.truncations,
-            "target_location": state.target_location,
         }
 
     @partial(jit, static_argnums=(0,))

@@ -1,4 +1,8 @@
-"""The Base environment inheriting from pettingZoo Parallel environment class."""
+"""The Base environment.
+
+This class differs from its Numpy version because it cannot extend PettingZoo as jax is
+based on functional programming while PZ relies heavily on OOP and state mutations.
+"""
 import functools
 from functools import partial
 
@@ -10,7 +14,13 @@ from jax import jit
 
 @jdc.pytree_dataclass
 class State:
-    """State of the environment containing the modifiable variables."""
+    """State of the environment containing the modifiable variables.
+
+    Jax is based on functional programming, this means we have to carry mutable variables along the way instead
+    of hiding them as class members.
+    In the same vein, the agents' states cannot be contained in a dictionary as it is not easily portable to GPU.
+    Hence, we convert the dictionary of agents to arrays indexed from 0, based on the agent ids.
+    """
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game.
@@ -31,12 +41,12 @@ class BaseParallelEnv:
     They are defined in this main environment and the following compute methods must be implemented in child env:
         _action_space: Returns the Space object corresponding to valid actions
         _observation_space: Returns the Space object corresponding to valid observations
-        _compute_obs: Computes the current observation of the environment.
-        _compute_mechanics: Computes the mechanics of the environment, for example the movements of the target.
-        _compute_action: Computes the action passed to `.step()` into action matching the mode environment.
-        _compute_reward: Computes the current reward value(s).
-        _compute_terminated: Computes if the game must be stopped because the agents crashed.
-        _compute_truncation: Computes if the game must be stopped because it is too long.
+        _compute_obs: Computes the current observation of the environment from a given state.
+        _transition_state: Transitions the state based on the mechanics of the environment, for example makes the target move.
+        _sanitize_action: Makes the actions passed to step fit the environment, e.g. avoid making brutal moves.
+        _compute_reward: Computes the current reward value(s) from a given state.
+        _compute_terminated: Computes if the game must be stopped because the agents crashed from a given state.
+        _compute_truncation: Computes if the game must be stopped because it is too long from a given state.
         _initialize_state: Initialize the State of the environment.
         auto_reset: Returns the State reinitialized if needed, else the actual State.
         state_to_dict: Translates the State into a dict.
@@ -45,13 +55,8 @@ class BaseParallelEnv:
 
     There are also the following functions:
         observation_space: Returns the observation space for one agent.
-        action_space: Returns the action space.
+        action_space: Returns the action space for one agent.
     """
-
-    metadata = {
-        "is_parallelizable": True,
-        "render_fps": 10,
-    }
 
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
@@ -62,15 +67,15 @@ class BaseParallelEnv:
         raise NotImplementedError
 
     def _compute_obs(self, state):
-        """Computes the current observation of the environment. Must be implemented in a subclass."""
+        """Computes the current observation of the environment from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_mechanics(self, state, key):
-        """Computes the mechanics of the environment, for example the movements of the target. Must be implemented in a subclass."""
+    def _transition_state(self, state, key):
+        """Transitions the state based on the mechanics of the environment, for example makes the target move. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_action(self, state, actions):
-        """Computes the action passed to `.step()` into action matching the mode environment. Must be implemented in a subclass.
+    def _sanitize_action(self, state, actions):
+        """Makes the actions passed to step fit the environment, e.g. avoid making brutal moves. Must be implemented in a subclass.
 
         Args:
             state : the state of the environment (contains agent_location used in this function).
@@ -79,15 +84,15 @@ class BaseParallelEnv:
         raise NotImplementedError
 
     def _compute_reward(self, state):
-        """Computes the current reward value(s). Must be implemented in a subclass."""
+        """Computes the current reward value(s) from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def _compute_terminated(self, state):
-        """Computes if the game must be stopped because the agents crashed. Must be implemented in a subclass."""
+        """Computes if the game must be stopped because the agents crashed from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def _compute_truncation(self, state):
-        """Computes if the game must be stopped because it is too long. Must be implemented in a subclass."""
+        """Computes if the game must be stopped because it is too long form a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def _initialize_state(self):
@@ -120,13 +125,13 @@ class BaseParallelEnv:
     @partial(jit, static_argnums=(0,))
     def step(self, state, actions, key):
         """Computes one step for the environment, in response to the actions of the drones."""
-        state = self._compute_action(state, actions)
+        state = self._sanitize_action(state, actions)
 
         state = jdc.replace(state, timestep=state.timestep + 1)
 
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
-        state = self._compute_mechanics(state, key)
+        state = self._transition_state(state, key)
         state = self._compute_reward(state)
         state = self._compute_obs(state)
 
@@ -139,5 +144,5 @@ class BaseParallelEnv:
 
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        """Returns the action space."""
+        """Returns the action space for one agent."""
         return self._action_space(agent)

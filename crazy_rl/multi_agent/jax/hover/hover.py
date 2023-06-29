@@ -29,8 +29,6 @@ class State(State):
 class Hover(BaseParallelEnv):
     """A Parallel Environment where drone learn how to hover around a target point."""
 
-    metadata = {"is_parallelizable": True, "render_fps": 20}
-
     def __init__(
         self,
         num_drones: int,
@@ -42,7 +40,7 @@ class Hover(BaseParallelEnv):
         Args:
             num_drones: Number of drones
             init_flying_pos: Array of initial positions of the drones when they are flying
-            size: Size of the map
+            size: Size of the map in meters
         """
         self.num_drones = num_drones
 
@@ -71,12 +69,12 @@ class Hover(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_mechanics(self, state, key):
+    def _transition_state(self, state, key):
         return state
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_action(self, state, actions):
+    def _sanitize_action(self, state, actions):
         return jdc.replace(
             state,
             agents_locations=jnp.clip(
@@ -165,9 +163,13 @@ if __name__ == "__main__":
         init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [2.0, 1.0, 1.0], [0.0, 1.0, 1.0], [2.0, 2.0, 1.0], [1.0, 0.0, 1.0]]),
     )
 
-    n = 1000  # number of states in parallel
+    num_envs = 1000  # number of states in parallel
     seed = 5  # test value
     key = random.PRNGKey(seed)
+
+    vmapped_step = vmap(parallel_env.step_vmap)
+    vmapped_auto_reset = vmap(parallel_env.auto_reset)
+    vmapped_reset = vmap(parallel_env.reset)
 
     @jit
     def body(i, states_key):
@@ -177,22 +179,26 @@ if __name__ == "__main__":
             i: number of the iteration.
             states_key: a tuple containing states and key.
         """
-        actions = random.uniform(states_key[1], (n, parallel_env.num_drones, 3), minval=-1, maxval=1)
+        states, key = states_key
 
-        key, *subkeys = random.split(states_key[1], n + 1)
+        actions = random.uniform(key, (num_envs, parallel_env.num_drones, 3), minval=-1, maxval=1)
 
-        states = vmap(parallel_env.step_vmap)(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states_key[0]))
+        key, *subkeys = random.split(key, num_envs + 1)
 
-        states = vmap(parallel_env.auto_reset)(**parallel_env.state_to_dict(states))
+        states = vmapped_step(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
+
+        # where you would learn or add to buffer
+
+        states = vmapped_auto_reset(**parallel_env.state_to_dict(states))
 
         return (states, key)
 
     @jit
     def play(key):
         """Execution of the environment with random actions."""
-        key, *subkeys = random.split(key, n + 1)
+        key, *subkeys = random.split(key, num_envs + 1)
 
-        states = vmap(parallel_env.reset)(jnp.stack(subkeys))
+        states = vmapped_reset(jnp.stack(subkeys))
 
         states, key = jax.lax.fori_loop(0, 1000, body, (states, key))
 

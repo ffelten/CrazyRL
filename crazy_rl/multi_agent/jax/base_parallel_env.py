@@ -2,7 +2,6 @@
 import functools
 from functools import partial
 from typing import Optional
-from typing_extensions import override
 
 import jax.numpy as jnp
 import jax_dataclasses as jdc
@@ -113,16 +112,16 @@ class BaseParallelEnv:
         raise NotImplementedError
 
     # PettingZoo API
-    @override
     @partial(jit, static_argnums=(0,))
     def reset(self, key, seed=None, return_info=False, options=None):
+        """Resets the environment in initial state."""
         state = self._initialize_state()
         state = self._compute_obs(state)
         return state
 
-    @override
     @partial(jit, static_argnums=(0,))
     def step(self, state, actions, key):
+        """Computes one step for the environment, in response to the actions of the drones."""
         state = self._compute_action(state, actions)
 
         state = jdc.replace(state, timestep=state.timestep + 1)
@@ -135,19 +134,16 @@ class BaseParallelEnv:
 
         return state
 
-    @override
     def state(self, state):
-        states = jnp.array(
-            [self._compute_obs(state.agent_location)[agent].astype(jnp.float32) for agent in range(self.num_drones)]
-        )
-        return jnp.concatenate(states, axis=None)
+        """Returns a global observation (concatenation of all the agent locations and the target location)."""
+        return jnp.append(state.agents_locations.flatten(), state.target_location)
 
     @functools.lru_cache(maxsize=None)
-    @override
     def observation_space(self, agent):
+        """Returns the observation space for one agent."""
         return self._observation_space(agent)
 
     @functools.lru_cache(maxsize=None)
-    @override
     def action_space(self):
+        """Returns the action space."""
         return self._action_space()

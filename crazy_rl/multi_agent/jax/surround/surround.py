@@ -217,7 +217,7 @@ if __name__ == "__main__":
         target_location=jnp.array([[1.0, 1.0, 2.5]]),
     )
 
-    n = 1000  # number of states in parallel
+    n = 5000  # number of states in parallel
     seed = 5  # test value
     key = random.PRNGKey(seed)
 
@@ -263,5 +263,3 @@ if __name__ == "__main__":
         durations[i] = end
 
     print("durations : ", durations)
-
-    # with profiler.trace("/tmp/jax-trace", create_perfetto_link=True):

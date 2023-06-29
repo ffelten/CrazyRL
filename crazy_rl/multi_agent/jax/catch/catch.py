@@ -71,7 +71,7 @@ class Catch(BaseParallelEnv):
         )
 
     @override
-    def _action_space(self):
+    def _action_space(self, agent):
         return spaces.Box(low=-1 * np.ones(3, dtype=np.float32), high=np.ones(3, dtype=np.float32), dtype=np.float32)
 
     @override

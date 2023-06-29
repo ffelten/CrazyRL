@@ -57,7 +57,7 @@ class BaseParallelEnv:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _action_space(self) -> spaces.Space:
+    def _action_space(self, agent) -> spaces.Space:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -138,6 +138,6 @@ class BaseParallelEnv:
         return self._observation_space(agent)
 
     @functools.lru_cache(maxsize=None)
-    def action_space(self):
+    def action_space(self, agent):
         """Returns the action space."""
-        return self._action_space()
+        return self._action_space(agent)

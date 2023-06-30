@@ -101,7 +101,8 @@ class Escort(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _transition_state(self, state, key):
+    def _transition_state(self, state, actions, key):
+        state = self._sanitize_action(state, actions)
         finished = state.timestep < self.num_ref_points
         return jdc.replace(
             state, target_location=jnp.array([finished * self.ref[state.timestep] + (1 - finished) * self.ref[-1]])
@@ -185,7 +186,11 @@ class Escort(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def auto_reset(self, **state):
-        """Returns the State reinitialized if needed, else the actual State."""
+        """Returns the State reinitialized if needed, else the actual State.
+
+        The values contained by State are passed in argument and used like a dictionary
+        because auto_reset is meant to be used by vmap and vmap doesn't accept objects.
+        """
         done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
 
         state = State(

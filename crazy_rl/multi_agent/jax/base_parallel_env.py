@@ -41,7 +41,7 @@ class BaseParallelEnv:
         _observation_space: Returns the Space object corresponding to valid observations
         _compute_obs: Computes the current observation of the environment from a given state.
         _transition_state: Transitions the state based on the mechanics of the environment, for example makes the
-                           target move.
+                           target move and sanitize the actions.
         _sanitize_action: Makes the actions passed to step fit the environment, e.g. avoid making brutal moves.
         _compute_reward: Computes the current reward value(s) from a given state.
         _compute_terminated: Computes if the game must be stopped because the agents crashed from a given state.
@@ -71,8 +71,8 @@ class BaseParallelEnv:
         """Computes the current observation of the environment from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _transition_state(self, state: State, key: jnp.ndarray) -> State:
-        """Transitions the state based on the mechanics of the environment, for example makes the target move. Must be implemented in a subclass."""
+    def _transition_state(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
+        """Transitions the state based on the mechanics of the environment, for example makes the target move and sanitize the actions. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def _sanitize_action(self, state: State, actions: jnp.ndarray) -> State:
@@ -101,7 +101,11 @@ class BaseParallelEnv:
         raise NotImplementedError
 
     def auto_reset(self, state: State) -> State:
-        """Returns the State reinitialized if needed, else the actual State. Must be implemented in a subclass."""
+        """Returns the State reinitialized if needed, else the actual State. Must be implemented in a subclass.
+
+        The values contained by State are passed in argument and used like a dictionary
+        because auto_reset is meant to be used by vmap and vmap doesn't accept objects.
+        """
         raise NotImplementedError
 
     def state_to_dict(self, state: State) -> dict:
@@ -125,13 +129,12 @@ class BaseParallelEnv:
     @partial(jit, static_argnums=(0,))
     def step(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
         """Computes one step for the environment, in response to the actions of the drones."""
-        state = self._sanitize_action(state, actions)
-
         state = jdc.replace(state, timestep=state.timestep + 1)
+
+        state = self._transition_state(state, actions, key)
 
         state = self._compute_truncation(state)
         state = self._compute_terminated(state)
-        state = self._transition_state(state, key)
         state = self._compute_reward(state)
         state = self._compute_obs(state)
 

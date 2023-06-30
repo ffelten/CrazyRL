@@ -34,23 +34,24 @@ class State:
 class BaseParallelEnv:
     """The Base environment.
 
-    The main API methods of this class are:
-    - step
-    - reset
+    The main API methods of this class is step.
 
     They are defined in this main environment and the following compute methods must be implemented in child env:
         _action_space: Returns the Space object corresponding to valid actions
         _observation_space: Returns the Space object corresponding to valid observations
         _compute_obs: Computes the current observation of the environment from a given state.
-        _transition_state: Transitions the state based on the mechanics of the environment, for example makes the target move.
+        _transition_state: Transitions the state based on the mechanics of the environment, for example makes the
+                           target move.
         _sanitize_action: Makes the actions passed to step fit the environment, e.g. avoid making brutal moves.
         _compute_reward: Computes the current reward value(s) from a given state.
         _compute_terminated: Computes if the game must be stopped because the agents crashed from a given state.
         _compute_truncation: Computes if the game must be stopped because it is too long from a given state.
         _initialize_state: Initialize the State of the environment.
+        reset: Resets the environment in initial state.
         auto_reset: Returns the State reinitialized if needed, else the actual State.
         state_to_dict: Translates the State into a dict.
-        step_vmap: Calls step with a State and is called by vmap without State object.
+        step_vmap: Used to vmap step, takes the values of the state and calls step with a new State object containing
+                   the state values.
         state: Returns a global observation (concatenation of all the agent locations and the target locations).
 
     There are also the following functions:
@@ -58,23 +59,23 @@ class BaseParallelEnv:
         action_space: Returns the action space for one agent.
     """
 
-    def _observation_space(self, agent) -> spaces.Space:
+    def _observation_space(self, agent: int) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _action_space(self, agent) -> spaces.Space:
+    def _action_space(self, agent: int) -> spaces.Space:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_obs(self, state):
+    def _compute_obs(self, state: State) -> State:
         """Computes the current observation of the environment from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _transition_state(self, state, key):
+    def _transition_state(self, state: State, key: jnp.ndarray) -> State:
         """Transitions the state based on the mechanics of the environment, for example makes the target move. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _sanitize_action(self, state, actions):
+    def _sanitize_action(self, state: State, actions: jnp.ndarray) -> State:
         """Makes the actions passed to step fit the environment, e.g. avoid making brutal moves. Must be implemented in a subclass.
 
         Args:
@@ -83,47 +84,46 @@ class BaseParallelEnv:
         """
         raise NotImplementedError
 
-    def _compute_reward(self, state):
+    def _compute_reward(self, state: State) -> State:
         """Computes the current reward value(s) from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_terminated(self, state):
+    def _compute_terminated(self, state: State) -> State:
         """Computes if the game must be stopped because the agents crashed from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_truncation(self, state):
+    def _compute_truncation(self, state: State) -> State:
         """Computes if the game must be stopped because it is too long form a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _initialize_state(self):
-        """Creates a new state with initial values. Must be implemented in a subclass."""
+    def reset(self, key: jnp.ndarray) -> State:
+        """Resets the environment in initial state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def auto_reset(self, state):
+    def auto_reset(self, state: State) -> State:
         """Returns the State reinitialized if needed, else the actual State. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def state_to_dict(self, state):
+    def state_to_dict(self, state: State) -> dict:
         """Translates the State into a dict. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def step_vmap(self, action, key, **state_val):
-        """Calls step with a State and is called by vmap without State object. Must be implemented in a subclass."""
+    def step_vmap(self, action: jnp.ndarray, key: jnp.ndarray, **state_val) -> State:
+        """Used to vmap step, takes the values of the state and calls step with a new State object containing the state values. Must be implemented in a subclass.
+
+        Args:
+            action: 2D array containing the x, y, z action for each drone.
+            key : JAX PRNG key.
+            **state_val: Different values contained in the State.
+        """
         raise NotImplementedError
 
-    def state(self, state):
+    def state(self, state: State) -> jnp.ndarray:
         """Returns a global observation (concatenation of all the agent locations and target locations). Must be implemented in a subclass."""
         raise NotImplementedError
 
     @partial(jit, static_argnums=(0,))
-    def reset(self, key):
-        """Resets the environment in initial state."""
-        state = self._initialize_state()
-        state = self._compute_obs(state)
-        return state
-
-    @partial(jit, static_argnums=(0,))
-    def step(self, state, actions, key):
+    def step(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
         """Computes one step for the environment, in response to the actions of the drones."""
         state = self._sanitize_action(state, actions)
 
@@ -138,11 +138,11 @@ class BaseParallelEnv:
         return state
 
     @functools.lru_cache(maxsize=None)
-    def observation_space(self, agent):
+    def observation_space(self, agent: int) -> spaces.Space:
         """Returns the observation space for one agent."""
         return self._observation_space(agent)
 
     @functools.lru_cache(maxsize=None)
-    def action_space(self, agent):
+    def action_space(self, agent: int) -> spaces.Space:
         """Returns the action space for one agent."""
         return self._action_space(agent)

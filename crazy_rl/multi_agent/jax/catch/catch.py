@@ -177,8 +177,9 @@ class Catch(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _initialize_state(self):
-        return State(
+    def reset(self, key):
+        """Resets the environment in initial state."""
+        state = State(
             agents_locations=self._init_flying_pos,
             timestep=0,
             observations=jnp.array([]),
@@ -187,6 +188,8 @@ class Catch(BaseParallelEnv):
             truncations=jnp.zeros(self.num_drones),
             target_location=jnp.array([self._target_location]),
         )
+        state = self._compute_obs(state)
+        return state
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -221,7 +224,13 @@ class Catch(BaseParallelEnv):
 
     @partial(jit, static_argnums=(0,))
     def step_vmap(self, action, key, **state_val):
-        """Calls step with a State and is called by vmap without State object."""
+        """Used to vmap step, takes the values of the state and calls step with a new State object containing the state values.
+
+        Args:
+            action: 2D array containing the x, y, z action for each drone.
+            key : JAX PRNG key.
+            **state_val: Different values contained in the State.
+        """
         return self.step(State(**state_val), action, key)
 
     @override

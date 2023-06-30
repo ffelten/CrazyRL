@@ -70,18 +70,7 @@ class Hover(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _transition_state(self, state, actions, key):
-        state = self._sanitize_action(state, actions)
-        return state
-
-    @override
-    @partial(jit, static_argnums=(0,))
-    def _sanitize_action(self, state, actions):
-        return jdc.replace(
-            state,
-            agents_locations=jnp.clip(
-                state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size
-            ),
-        )
+        return jdc.replace(state, agents_locations=self._sanitize_action(state, actions))
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -149,7 +138,15 @@ class Hover(BaseParallelEnv):
 
     @partial(jit, static_argnums=(0,))
     def step_vmap(self, action, key, **state_val):
-        """Used to vmap step, takes the values of the state and calls step with a new State object containing the state values.
+        """Used to vmap step.
+
+        Takes the values of the state and calls step with a new State object containing the state values.
+
+        JAX's vmap cannot operate on array-of-structs, but can operate on struct-of-arrays,
+        so the states actually contain array of arrays after vmap. Our solution to this is
+        to convert the struct into a dictionary of array of arrays and plug it into the vmapped
+        function as kwargs. This way, each value of the kwargs (the state members) will be
+        processed as a regular array.
 
         Args:
             action: 2D array containing the x, y, z action for each drone.

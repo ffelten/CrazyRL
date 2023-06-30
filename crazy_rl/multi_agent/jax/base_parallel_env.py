@@ -42,11 +42,9 @@ class BaseParallelEnv:
         _compute_obs: Computes the current observation of the environment from a given state.
         _transition_state: Transitions the state based on the mechanics of the environment, for example makes the
                            target move and sanitize the actions.
-        _sanitize_action: Makes the actions passed to step fit the environment, e.g. avoid making brutal moves.
         _compute_reward: Computes the current reward value(s) from a given state.
         _compute_terminated: Computes if the game must be stopped because the agents crashed from a given state.
         _compute_truncation: Computes if the game must be stopped because it is too long from a given state.
-        _initialize_state: Initialize the State of the environment.
         reset: Resets the environment in initial state.
         auto_reset: Returns the State reinitialized if needed, else the actual State.
         state_to_dict: Translates the State into a dict.
@@ -55,6 +53,7 @@ class BaseParallelEnv:
         state: Returns a global observation (concatenation of all the agent locations and the target locations).
 
     There are also the following functions:
+        _sanitize_action: Makes the actions passed to step fit the environment, e.g. avoid making brutal moves.
         observation_space: Returns the observation space for one agent.
         action_space: Returns the action space for one agent.
     """
@@ -75,14 +74,16 @@ class BaseParallelEnv:
         """Transitions the state based on the mechanics of the environment, for example makes the target move and sanitize the actions. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _sanitize_action(self, state: State, actions: jnp.ndarray) -> State:
-        """Makes the actions passed to step fit the environment, e.g. avoid making brutal moves. Must be implemented in a subclass.
+    @partial(jit, static_argnums=(0,))
+    def _sanitize_action(self, state: State, actions: jnp.ndarray) -> jnp.ndarray:
+        """Makes the actions passed to step fit the environment, e.g. avoid making brutal moves.
 
         Args:
             state : the state of the environment (contains agent_location used in this function).
             actions : 2D array containing the x, y, z action for each drone.
         """
-        raise NotImplementedError
+        # Actions are clipped to stay in the map and scaled to do max 20cm in one step
+        return jnp.clip(state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
 
     def _compute_reward(self, state: State) -> State:
         """Computes the current reward value(s) from a given state. Must be implemented in a subclass."""
@@ -100,26 +101,37 @@ class BaseParallelEnv:
         """Resets the environment in initial state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def auto_reset(self, state: State) -> State:
+    def auto_reset(self, **state) -> State:
         """Returns the State reinitialized if needed, else the actual State. Must be implemented in a subclass.
 
         The values contained by State are passed in argument and used like a dictionary
         because auto_reset is meant to be used by vmap and vmap doesn't accept objects.
+
+        This function handles states like a dictionary, see also the pydoc of step_vmap.
         """
         raise NotImplementedError
 
-    def state_to_dict(self, state: State) -> dict:
-        """Translates the State into a dict. Must be implemented in a subclass."""
-        raise NotImplementedError
-
     def step_vmap(self, action: jnp.ndarray, key: jnp.ndarray, **state_val) -> State:
-        """Used to vmap step, takes the values of the state and calls step with a new State object containing the state values. Must be implemented in a subclass.
+        """Used to vmap step.
+
+         Takes the values of the state and calls step with a new State object containing
+         the state values. Must be implemented in a subclass.
+
+         JAX's vmap cannot operate on array-of-structs, but can operate on struct-of-arrays,
+         so the states actually contain array of arrays after vmap. Our solution to this is
+         to convert the struct into a dictionary of array of arrays and plug it into the vmapped
+         function as kwargs. This way, each value of the kwargs (the state members) will be
+         processed as a regular array.
 
         Args:
             action: 2D array containing the x, y, z action for each drone.
             key : JAX PRNG key.
             **state_val: Different values contained in the State.
         """
+        raise NotImplementedError
+
+    def state_to_dict(self, state: State) -> dict:
+        """Translates the State into a dict. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def state(self, state: State) -> jnp.ndarray:

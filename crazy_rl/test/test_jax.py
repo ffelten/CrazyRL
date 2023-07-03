@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import jax.random as random
+import numpy as np
 
 from crazy_rl.multi_agent.jax.catch.catch import Catch
 from crazy_rl.multi_agent.jax.circle.circle import Circle
@@ -292,3 +293,59 @@ def test_catch():
     state, key = wait(parallel_env, state, key)
 
     assert jnp.linalg.norm(state.target_location - jnp.array([1, 0, 1])) <= 0.01
+
+
+def test_action_space():
+    """Test the sampling of action_space."""
+    parallel_env = Surround(
+        num_drones=2,
+        init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
+        target_location=jnp.array([[1, 1, 2.5]]),
+    )
+
+    seed = 5
+
+    key = random.PRNGKey(seed)
+
+    key, subkey = random.split(key)
+    state = parallel_env.reset(subkey)
+
+    actions = jnp.array([parallel_env.action_space(agent).sample() for agent in range(parallel_env.num_drones)])
+
+    assert parallel_env.action_space(0).contains(actions[0])
+    assert parallel_env.action_space(0).contains(actions[1])
+
+    state = parallel_env.step(state, actions, key)
+
+    actions = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0]], dtype=np.float32)
+
+    assert parallel_env.action_space(0).contains(actions[0])
+    assert parallel_env.action_space(0).contains(actions[1])
+
+    actions = jnp.array([[1.0, 2.0, 30.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+    assert not (parallel_env.action_space(0).contains(actions))
+
+
+def test_observation():
+    """Test if the observation correspond to the observation space."""
+    parallel_env = Surround(
+        num_drones=2,
+        init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
+        target_location=jnp.array([[1, 1, 2.5]]),
+    )
+
+    seed = 5
+
+    key = random.PRNGKey(seed)
+
+    key, subkey = random.split(key)
+    state = parallel_env.reset(subkey)
+
+    for agent in range(parallel_env.num_drones):
+        assert parallel_env.observation_space(agent).contains(state.observations[agent])
+
+    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 1], [0, 0, 1]]))
+
+    for agent in range(parallel_env.num_drones):
+        assert parallel_env.observation_space(agent).contains(state.observations[agent])

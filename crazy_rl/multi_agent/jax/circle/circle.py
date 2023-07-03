@@ -72,7 +72,7 @@ class Circle(BaseParallelEnv):
             self.ref = self.ref.at[:, agent, 2].set(init_flying_pos[agent][2])
 
     @override
-    def _observation_space(self, agent):
+    def _observation_space(self, agent: int) -> spaces.Space:
         return spaces.Box(
             low=jnp.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=jnp.float32),
             high=jnp.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=jnp.float32),
@@ -81,17 +81,17 @@ class Circle(BaseParallelEnv):
         )
 
     @override
-    def _action_space(self, agent):
+    def action_space(self, agent: int) -> spaces.Space:
         return spaces.Box(low=-1 * np.ones(3, dtype=np.float32), high=np.ones(3, dtype=np.float32), dtype=np.float32)
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_obs(self, state):
+    def _compute_obs(self, state: State) -> State:
         return jdc.replace(state, observations=vmap(jnp.append)(state.agents_locations, state.target_location))
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _transition_state(self, state, actions, key):
+    def _transition_state(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
         return jdc.replace(
             state,
             agents_locations=self._sanitize_action(state, actions),
@@ -100,26 +100,25 @@ class Circle(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_reward(self, state):
+    def _compute_reward(self, state: State) -> State:
         # Reward is based on the Euclidean distance to the target point
 
         return jdc.replace(state, rewards=-1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1))
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_terminated(self, state):
+    def _compute_terminated(self, state: State) -> State:
         # the drones never crash. Terminations initialized to jnp.zeros() and then never changes
         return state
 
     @override
     @partial(jit, static_argnums=(0,))
-    def _compute_truncation(self, state):
+    def _compute_truncation(self, state: State) -> State:
         return jdc.replace(state, truncations=(state.timestep == 100) * jnp.ones(self.num_drones))
 
     @override
     @partial(jit, static_argnums=(0,))
-    def reset(self, key):
-        """Resets the environment in initial state."""
+    def reset(self, key: jnp.ndarray) -> State:
         state = State(
             agents_locations=self._init_flying_pos,
             timestep=0,
@@ -134,13 +133,8 @@ class Circle(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def auto_reset(self, **state):
-        """Returns the State reinitialized if needed, else the actual State.
-
-        The values contained by State are passed in argument and used like a dictionary
-        because auto_reset is meant to be used by vmap and vmap doesn't accept objects.
-        """
-        done = jnp.any(state["truncations"]) + jnp.any(state["terminations"])
+    def auto_reset(self, **state) -> State:
+        done = jnp.min(jnp.array([jnp.any(state["truncations"]) + jnp.any(state["terminations"]), 1]))
 
         state = State(
             agents_locations=done * self._init_flying_pos + (1 - done) * state["agents_locations"],
@@ -154,9 +148,9 @@ class Circle(BaseParallelEnv):
         state = self._compute_obs(state)
         return state
 
+    @override
     @partial(jit, static_argnums=(0,))
-    def state_to_dict(self, state):
-        """Translates the State into a dict."""
+    def state_to_dict(self, state: State) -> dict:
         return {
             "agents_locations": state.agents_locations,
             "timestep": state.timestep,
@@ -167,29 +161,14 @@ class Circle(BaseParallelEnv):
             "target_location": state.target_location,
         }
 
+    @override
     @partial(jit, static_argnums=(0,))
-    def step_vmap(self, action, key, **state_val):
-        """Used to vmap step.
-
-        Takes the values of the state and calls step with a new State object containing the state values.
-
-        JAX's vmap cannot operate on array-of-structs, but can operate on struct-of-arrays,
-        so the states actually contain array of arrays after vmap. Our solution to this is
-        to convert the struct into a dictionary of array of arrays and plug it into the vmapped
-        function as kwargs. This way, each value of the kwargs (the state members) will be
-        processed as a regular array.
-
-        Args:
-            action: 2D array containing the x, y, z action for each drone.
-            key : JAX PRNG key.
-            **state_val: Different values contained in the State.
-        """
+    def step_vmap(self, action: jnp.ndarray, key: jnp.ndarray, **state_val) -> State:
         return self.step(State(**state_val), action, key)
 
     @override
     @partial(jit, static_argnums=(0,))
-    def state(self, state):
-        """Returns a global observation (concatenation of all the agent locations and target locations)."""
+    def state(self, state: State) -> jnp.ndarray:
         return jnp.append(state.agents_locations, state.target_location).flatten()
 
 

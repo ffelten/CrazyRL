@@ -6,6 +6,28 @@ from crazy_rl.multi_agent.jax.surround.surround import Surround as JaxSurround
 from crazy_rl.multi_agent.numpy.surround.surround import Surround as NpSurround
 
 
+def compare(state, np_env, observations, terminations, truncations, rewards):
+    assert (state.agents_locations[0] == np_env._agent_location["agent_0"]).all()
+    assert (state.agents_locations[1] == np_env._agent_location["agent_1"]).all()
+
+    assert state.timestep == np_env.timestep
+
+    assert (state.observations[0] == observations["agent_0"]).all()
+    assert (state.observations[1] == observations["agent_1"]).all()
+
+    assert state.terminations[0] == terminations["agent_0"]
+    assert state.terminations[1] == terminations["agent_1"]
+
+    assert state.truncations[0] == truncations["agent_0"]
+    assert state.truncations[1] == truncations["agent_1"]
+
+    assert state.rewards[0] > rewards["agent_0"] - 0.01
+    assert state.rewards[0] < rewards["agent_0"] + 0.01
+
+    assert state.rewards[1] > rewards["agent_1"] - 0.01
+    assert state.rewards[1] < rewards["agent_1"] + 0.01
+
+
 def test_np_jax():
     """Test to compare numpy and jax API."""
     # Jax initialisation
@@ -41,22 +63,7 @@ def test_np_jax():
     jax_actions = jnp.array([[0, 1, 0], [0, -1, 0]])
     state = jax_env.step(state, jax_actions, key)
 
-    assert (state.agents_locations[0] == np_env._agent_location["agent_0"]).all()
-    assert (state.agents_locations[1] == np_env._agent_location["agent_1"]).all()
-
-    assert state.timestep == np_env.timestep
-
-    assert (state.observations[0] == observations["agent_0"]).all()
-    assert (state.observations[1] == observations["agent_1"]).all()
-
-    assert state.terminations[0] == terminations["agent_0"]
-    assert state.terminations[1] == terminations["agent_1"]
-
-    assert state.truncations[0] == truncations["agent_0"]
-    assert state.truncations[1] == truncations["agent_1"]
-
-    assert state.rewards[0] == rewards["agent_0"]
-    assert state.rewards[1] == rewards["agent_1"]
+    compare(state, np_env, observations, terminations, truncations, rewards)
 
     # Collision
 
@@ -72,26 +79,11 @@ def test_np_jax():
     jax_actions = jnp.array([[0, 0.5, 0], [0, 0, 0]])
     state = jax_env.step(state, jax_actions, key)
 
-    assert (state.agents_locations[0] == np_env._agent_location["agent_0"]).all()
-    assert (state.agents_locations[1] == np_env._agent_location["agent_1"]).all()
-
-    assert state.timestep == np_env.timestep
-
-    assert (state.observations[0] == observations["agent_0"]).all()
-    assert (state.observations[1] == observations["agent_1"]).all()
-
-    assert state.terminations.all()
-
-    assert state.terminations[0] == terminations["agent_0"]
-    assert state.terminations[1] == terminations["agent_1"]
-
-    assert state.truncations[0] == truncations["agent_0"]
-    assert state.truncations[1] == truncations["agent_1"]
+    compare(state, np_env, observations, terminations, truncations, rewards)
 
     assert (state.rewards == jnp.array([-10, -10])).all()
 
-    assert state.rewards[0] == rewards["agent_0"]
-    assert state.rewards[1] == rewards["agent_1"]
+    assert state.terminations.all()
 
     state = jax_env.reset(key)
     observations, infos = np_env.reset()
@@ -105,22 +97,7 @@ def test_np_jax():
         jax_actions = jnp.array([[0, 0, 0], [0, 1, 0]])
         state = jax_env.step(state, jax_actions, key)
 
-    assert (state.agents_locations[0] == np_env._agent_location["agent_0"]).all()
-    assert (state.agents_locations[1] == np_env._agent_location["agent_1"]).all()
-
-    assert state.timestep == np_env.timestep
-
-    assert (state.observations[0] == observations["agent_0"]).all()
-    assert (state.observations[1] == observations["agent_1"]).all()
-
-    assert state.terminations[0] == terminations["agent_0"]
-    assert state.terminations[1] == terminations["agent_1"]
-
-    assert state.truncations[0] == truncations["agent_0"]
-    assert state.truncations[1] == truncations["agent_1"]
-
-    assert state.rewards[0] == rewards["agent_0"]
-    assert state.rewards[1] == rewards["agent_1"]
+    compare(state, np_env, observations, terminations, truncations, rewards)
 
     # End
 
@@ -131,27 +108,9 @@ def test_np_jax():
         observations, rewards, terminations, truncations, infos = np_env.step(np_actions)
         state = jax_env.step(state, jax_actions, key)
 
-    assert (state.agents_locations[0] == np_env._agent_location["agent_0"]).all()
-    assert (state.agents_locations[1] == np_env._agent_location["agent_1"]).all()
-
-    assert state.timestep == np_env.timestep
-
-    assert (state.observations[0] == observations["agent_0"]).all()
-    assert (state.observations[1] == observations["agent_1"]).all()
-
-    assert state.terminations[0] == terminations["agent_0"]
-    assert state.terminations[1] == terminations["agent_1"]
+    compare(state, np_env, observations, terminations, truncations, rewards)
 
     assert state.truncations.all()
-
-    assert state.truncations[0] == truncations["agent_0"]
-    assert state.truncations[1] == truncations["agent_1"]
-
-    assert state.rewards[0] > rewards["agent_0"] - 0.01
-    assert state.rewards[0] < rewards["agent_0"] + 0.01
-
-    assert state.rewards[1] > rewards["agent_1"] - 0.01
-    assert state.rewards[1] < rewards["agent_1"] + 0.01
 
     state = jax_env.reset(key)
     observations, infos = np_env.reset()

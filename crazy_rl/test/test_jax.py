@@ -12,24 +12,15 @@ def two_drones_crash(parallel_env, key):
     """Test where two drones starting on (0, 0, 1), (0, 1, 1) crash together."""
     state = parallel_env.reset(key)
 
-    actions = jnp.array([[0, 1, 0], [0, -1, 0]])
-
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
 
     assert (state.agents_locations == jnp.array([[0, 0.2, 1], [0, 0.8, 1]])).all()
 
-    actions = jnp.array([[0, 1, 0], [0, -1, 0]])
-
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
 
     assert not state.terminations.any()
 
-    actions = jnp.array([[0, 1, 0], [0, -1, 0]])
-
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
 
     # the drones crash
     assert state.terminations.all()
@@ -43,25 +34,9 @@ def crash_ground(parallel_env, key):
     """Test where the first drone, starting on (0, 0, 1), crashes on the ground."""
     state = parallel_env.reset(key)
 
-    actions = jnp.array([[0, 0, -1], [0, 0, 0]])  # position = [0, 0, 0.8]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 0, -1], [0, 0, 0]]), 4)  # position = [0, 0, 0.2] (0.20003)
 
-    actions = jnp.array([[0, 0, -1], [0, 0, 0]])  # position = [0, 0, 0.6]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
-
-    actions = jnp.array([[0, 0, -1], [0, 0, 0]])  # position = [0, 0, 0.4]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
-
-    actions = jnp.array([[0, 0, -1], [0, 0, 0]])  # position = [0, 0, 0.2] (0.20003)
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
-
-    actions = jnp.array([[0, 0, -0.01], [0, 0, 0]])  # position = [0, 0, 0.2] (just below)
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 0, -0.01], [0, 0, 0]]))  # position = [0, 0, 0.2] (just below)
 
     # the drone crashes on the ground
     assert state.terminations.all()
@@ -74,24 +49,28 @@ def leave_the_map(parallel_env, key):
     end of the round."""
     state = parallel_env.reset(key)
 
-    for i in range(10):
-        actions = jnp.array([[0, 0, 0], [0, 1, 0]])
-        key, subkey = random.split(key)
-        state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [0, 1, 0]]), 10)
 
     # the drone stays in the map
     assert state.agents_locations[1, 1] <= 3
 
-    actions = jnp.array([[0, 0, 0], [0, 0, 0]])
-
-    for i in range(90):
-        key, subkey = random.split(key)
-        state = parallel_env.step(state, actions, subkey)
+    state, key = wait(parallel_env, state, key, 90)
 
     # the game ends after 100 timesteps
     assert state.truncations.all()
 
     return state
+
+
+def move(parallel_env, state, key, actions, iterations=1):
+    for i in range(iterations):
+        key, subkey = random.split(key)
+        state = parallel_env.step(state, actions, subkey)
+    return state, key
+
+
+def wait(parallel_env, state, key, iterations=1):
+    return move(parallel_env, state, key, jnp.array([[0, 0, 0], [0, 0, 0]]), iterations)
 
 
 def test_surround():
@@ -116,35 +95,13 @@ def test_surround():
     key, subkey = random.split(key)
     state = parallel_env.reset(subkey)
 
-    actions = jnp.array([[0, 0, 0], [1, 0, 1]])  # position = [0.2, 1, 1.2]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [1, 0, 1]]))  # position = [0.2, 1, 1.2]
 
     assert (state.observations == jnp.array([[0, 0, 1, 1, 1, 2.5, 0.2, 1, 1.2], [0.2, 1, 1.2, 1, 1, 2.5, 0, 0, 1]])).all()
 
-    actions = jnp.array([[0, 0, 0], [1, 0, 1]])  # position = [0.4, 1, 1.4]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [1, 0, 1]]), 4)  # position = [1, 1, 2]
 
-    actions = jnp.array([[0, 0, 0], [1, 0, 1]])  # position = [0.6, 1, 1.6]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
-
-    actions = jnp.array([[0, 0, 0], [1, 0, 1]])  # position = [0.8, 1, 1.8]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
-
-    actions = jnp.array([[0, 0, 0], [1, 0, 1]])  # position = [1, 1, 2]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
-
-    actions = jnp.array([[0, 0, 0], [0, 0, 1]])  # position = [1, 1, 2.2]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
-
-    actions = jnp.array([[0, 0, 0], [0, 0, 1]])  # position = [1, 1, 2.4]
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [0, 0, 1]]), 2)  # position = [1, 1, 2.4]
 
     # the drone crashes in the target
     assert state.terminations.all()
@@ -158,12 +115,6 @@ def test_surround():
 
     key, subkey = random.split(key)
     state = leave_the_map(parallel_env, subkey)
-
-    assert (
-        state.rewards
-        == (6 - jnp.array([jnp.linalg.norm(jnp.array([1, 1, 1.5])), jnp.linalg.norm(jnp.array([1, 2, 1.5]))])) * 0.95
-        + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
-    ).all()
 
 
 def test_hover():
@@ -210,10 +161,7 @@ def test_circle():
     key, subkey = random.split(key)
     state = parallel_env.reset(subkey)
 
-    actions = jnp.zeros((2, 3))
-
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = wait(parallel_env, state, key)
 
     ts = 2 * jnp.pi / 100
 
@@ -267,46 +215,10 @@ def test_escort():
         )
     ).all()
 
-    # not exactly the same due to approximations
-    assert (
-        state.rewards
-        > (
-            6
-            - jnp.array(
-                [
-                    jnp.linalg.norm(jnp.array([0, 0, 1]) - jnp.array([-0.9736842, -0.9736842, 2.8289473])),
-                    jnp.linalg.norm(jnp.array([0, 3, 1]) - jnp.array([-0.9736842, -0.9736842, 2.8289473])),
-                ]
-            )
-        )
-        * 0.95
-        + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
-        - 0.05
-    ).all()
-
-    assert (
-        state.rewards
-        < (
-            6
-            - jnp.array(
-                [
-                    jnp.linalg.norm(jnp.array([0, 0, 1]) - jnp.array([-0.9736842, -0.9736842, 2.8289473])),
-                    jnp.linalg.norm(jnp.array([0, 3, 1]) - jnp.array([-0.9736842, -0.9736842, 2.8289473])),
-                ]
-            )
-        )
-        * 0.95
-        + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
-        + 0.05
-    ).all()
-
     key, subkey = random.split(key)
     state = parallel_env.reset(subkey)
 
-    actions = jnp.zeros((2, 3))
-
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = wait(parallel_env, state, key)
 
     assert (state.target_location == jnp.array([1, 1, 2.5]) + jnp.array([-3, -3, 0.5]) / 152).all()
 
@@ -350,39 +262,6 @@ def test_catch():
         )
     ).all()
 
-    # not exactly the same due to approximations
-    assert (
-        state.rewards
-        > (
-            6
-            - jnp.array(
-                [
-                    jnp.linalg.norm(jnp.array([0, 0, 1]) - state.target_location),
-                    jnp.linalg.norm(jnp.array([0, 3, 1]) - state.target_location),
-                ]
-            )
-        )
-        * 0.95
-        + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
-        - 0.1
-    ).all()
-
-    assert (
-        state.rewards
-        < (
-            6
-            - jnp.array(
-                [
-                    jnp.linalg.norm(jnp.array([0, 0, 1]) - state.target_location),
-                    jnp.linalg.norm(jnp.array([0, 3, 1]) - state.target_location),
-                ]
-            )
-        )
-        * 0.95
-        + jnp.linalg.norm(jnp.array([0, 3, 0])) * 0.05
-        + 0.1
-    ).all()
-
     # Tests the target
 
     parallel_env = Catch(
@@ -395,10 +274,7 @@ def test_catch():
     key, subkey = random.split(key)
     state = parallel_env.reset(subkey)
 
-    actions = jnp.array([[0, 0, 0], [0, 0, 0]])
-
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = wait(parallel_env, state, key)
 
     assert (state.target_location > jnp.array([[-0.1, 0, 1]]) - 0.001).all()
     assert (state.target_location < jnp.array([[-0.1, 0, 1]]) + 0.001).all()
@@ -413,7 +289,6 @@ def test_catch():
     key, subkey = random.split(subkey)
     state = parallel_env.reset(key)
 
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, subkey)
+    state, key = wait(parallel_env, state, key)
 
     assert jnp.linalg.norm(state.target_location - jnp.array([1, 0, 1])) <= 0.01

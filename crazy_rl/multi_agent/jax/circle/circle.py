@@ -72,7 +72,7 @@ class Circle(BaseParallelEnv):
             self.ref = self.ref.at[:, agent, 2].set(init_flying_pos[agent][2])
 
     @override
-    def _observation_space(self, agent: int) -> spaces.Space:
+    def observation_space(self, agent: int) -> spaces.Space:
         return spaces.Box(
             low=jnp.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=jnp.float32),
             high=jnp.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=jnp.float32),

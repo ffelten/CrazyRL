@@ -58,11 +58,13 @@ class BaseParallelEnv:
         action_space: Returns the action space for one agent.
     """
 
-    def _observation_space(self, agent: int) -> spaces.Space:
+    @functools.lru_cache(maxsize=None)
+    def observation_space(self, agent: int) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _action_space(self, agent: int) -> spaces.Space:
+    @functools.lru_cache(maxsize=None)
+    def action_space(self, agent: int) -> spaces.Space:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -151,13 +153,3 @@ class BaseParallelEnv:
         state = self._compute_obs(state)
 
         return state
-
-    @functools.lru_cache(maxsize=None)
-    def observation_space(self, agent: int) -> spaces.Space:
-        """Returns the observation space for one agent."""
-        return self._observation_space(agent)
-
-    @functools.lru_cache(maxsize=None)
-    def action_space(self, agent: int) -> spaces.Space:
-        """Returns the action space for one agent."""
-        return self._action_space(agent)

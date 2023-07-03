@@ -72,7 +72,7 @@ class Escort(BaseParallelEnv):
         self.size = size
 
     @override
-    def _observation_space(self, agent: int) -> spaces.Space:
+    def observation_space(self, agent: int) -> spaces.Space:
         return spaces.Box(
             low=np.tile(np.array([-self.size, -self.size, 0], dtype=np.float32), self.num_drones + 1),
             high=np.tile(np.array([self.size, self.size, self.size], dtype=np.float32), self.num_drones + 1),
@@ -81,7 +81,7 @@ class Escort(BaseParallelEnv):
         )
 
     @override
-    def _action_space(self, agent: int) -> spaces.Space:
+    def action_space(self, agent: int) -> spaces.Space:
         return spaces.Box(low=-1 * np.ones(3, dtype=np.float32), high=np.ones(3, dtype=np.float32), dtype=np.float32)
 
     @override

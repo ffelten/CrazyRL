@@ -37,8 +37,8 @@ class BaseParallelEnv:
     The main API methods of this class is step.
 
     They are defined in this main environment and the following compute methods must be implemented in child env:
-        _action_space: Returns the Space object corresponding to valid actions
-        _observation_space: Returns the Space object corresponding to valid observations
+        action_space: Returns the Space object corresponding to valid actions for one agent.
+        observation_space: Returns the Space object corresponding to valid observations for one agent.
         _compute_obs: Computes the current observation of the environment from a given state.
         _transition_state: Transitions the state based on the mechanics of the environment, for example makes the
                            target move and sanitize the actions.
@@ -54,8 +54,6 @@ class BaseParallelEnv:
 
     There are also the following functions:
         _sanitize_action: Makes the actions passed to step fit the environment, e.g. avoid making brutal moves.
-        observation_space: Returns the observation space for one agent.
-        action_space: Returns the action space for one agent.
     """
 
     @functools.lru_cache(maxsize=None)

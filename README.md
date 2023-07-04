@@ -17,11 +17,11 @@ It has:
 
 🚁 A set of utilities based on the [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/) to control actual Crazyflies;
 
-🤝 Unified under a standard API from [PettingZoo](https://pettingzoo.farama.org/) parallel environments;
+🤝 A Numpy version, unified under a standard API from [PettingZoo](https://pettingzoo.farama.org/) parallel environments;
 
-🚀 A JAX version faster on GPU;
+🚀 A [JAX](https://github.com/google/jax) version that can be ran fully on GPU;
 
-✅ Good quality and documented Python code;
+✅ Good quality, tested and documented Python code;
 
 👷 A set of example environments to learn swarming behaviors (in progress).
 
@@ -91,6 +91,7 @@ I suggest to have a look at [MASAC](https://github.com/ffelten/MASAC) for traini
 ### Numpy version
 
 Basic version which can be used for training, simulation and the real drones.
+It follows the [PettingZoo parallel API](https://pettingzoo.farama.org/).
 
 Execution :
 ```python
@@ -102,25 +103,29 @@ env: ParallelEnv = Circle(
     init_flying_pos=np.array([[0, 0, 1], [2, 2, 1]]),
 )
 
+obs, info = env.reset()
+
 done = False
 while not done:
     # Execute policy for each agent
     actions: Dict[str, np.ndarray] = {}
     for agent_id in env.possible_agents:
-        obs_with_id = torch.Tensor(concat_id(obs[agent_id], agent_id)).to(device)
-        act, _, _ = actor.get_action(obs_with_id.unsqueeze(0)) # YOUR POLICY HERE
-        act = act.detach().cpu().numpy()
-        actions[agent_id] = act.flatten()
+        actions[agent_id] = actor.get_action(obs[agent_id], agent_id)
 
-    obs, _, _, _, _ = env.step(actions)
+    obs, _, terminated, truncated, info = env.step(actions)
+    done = terminated or truncated
 ```
 
-You can have a look at the [test_multiagent](learning/exec_multiagent.py) file. The path to the save model MASAC and the mode to "real" has to be set on the main.
+You can have a look at the `learning/` folder to see how we execute pre-trained policies
+using [MASAC](https://github.com/ffelten/MASAC) in both Torch and Jax.
 
 ### JAX version
 
 This version is specifically optimized for GPU usage and intended for agent training purposes.
 However, simulation and real-world functionalities are not available in this version.
+
+Moreover, it is not compliant with the PettingZoo API as it heavily relies on functional programming.
+We sacrified the API compatibility for huge performance gains.
 
 Execution:
 
@@ -140,23 +145,22 @@ key = random.PRNGKey(seed)
 key, subkey = random.split(key)
 state = parallel_env.reset(subkey)
 
-for i in range(500):
-    while not (jnp.any(state.terminations) or jnp.any(state.truncations)):
+while not (jnp.any(state.terminations) or jnp.any(state.truncations)):
 
-        # where you would choose the drones' actions (2D array)
-
-        key, subkey = random.split(key)
-        state = parallel_env.step(state, actions, key)
-
-        # where you would learn or add to buffer
+    actions = jnp.zeros((parallel_env.num_drones, parallel_env.action_space(0).shape[0]))
+    for agent_id in range(parallel_env.num_drones):
+        actions[agent_id] = actor.get_action(state.obs, agent_id, key) # YOUR POLICY HERE
 
     key, subkey = random.split(key)
-    state = parallel_env.reset(subkey)
+    state = parallel_env.step(state, actions, key)
+
+    # where you would learn or add to buffer
 ```
 
 ### Vmapped JAX version
 
-The JAX version supports vmap, enabling parallelized training, particularly beneficial for GPU utilization.
+The JAX version supports vectorized operations such as vmap, enabling parallelized training, allowing to leverage
+all the cores on the GPU.
 While it offers faster performance on GPUs, it may exhibit slower execution on CPUs.
 
 Execution:
@@ -182,9 +186,12 @@ vmapped_reset = vmap(parallel_env.reset)
 key, *subkeys = random.split(key, num_envs + 1)
 states = vmapped_reset(jnp.stack(subkeys))
 
-for i in range(1000):
+for i in range(1000):   # perform 1 million steps (1000 steps on 1000 parallel envs)
 
-    # where you would choose the drones' actions (3D array)
+    actions = jnp.zeros((num_envs, parallel_env.num_drones, parallel_env.action_space(0).shape[0]))
+    for env_id, obs in enumerate(states.observations):
+        for agent_id in range(parallel_env.num_drones):
+            actions[env_id, agent_id] = actor.get_action(obs, agent_id, key) # YOUR POLICY HERE
 
     key, *subkeys = random.split(key, num_envs + 1)
     states = vmapped_step(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
@@ -293,14 +300,15 @@ You can explore the [test files](crazy_rl/test) to gain examples of usage and ma
 Numpy and JAX versions.
 
 ## Contributors
-Pierre-Yves Houitte wrote the original version of this library. It has been cleaned up and simplified by Florian Felten (@ffelten).
+Pierre-Yves Houitte wrote the original version of this library. It has been cleaned up and
+simplified by Florian Felten (@ffelten) and adapted to JAX by Coline Ledez (@ColineLedez).
 
 ## Citation
 If you use this code for your research, please cite this using:
 
 ```bibtex
 @misc{crazyrl,
-    author = {Florian Felten and Pierre-Yves Houitte and El-Ghazali Talbi and Grégoire Danoy},
+    author = {Florian Felten and Pierre-Yves Houitte and El-Ghazali Talbi and Grégoire Danoy and Coline Ledez},
     title = {CrazyRL: A Multi-Agent Reinforcement Learning library for flying Crazyflie drones},
     year = {2023},
     publisher = {GitHub},

@@ -28,6 +28,13 @@ It has:
 
 The real-life example shown in the video is the result of executing the policies in real-life after learning in the lightweight simulator. The learning was performed by with [MASAC](https://github.com/ffelten/MASAC). Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/).
 
+These two graphs show the evolution of execution time with the number of steps and states in parallel on Numpy and JAX version,
+on CPU and GPU:
+
+<img src="graph n steps=1000.png" alt="Execution time(n)" align="center" width="50%"/>
+
+<img src="graph total steps.png" alt="Execution time(steps)" align="center" width="50%"/>
+
 ## Environments
 
 The red balls represent the position of the drones.

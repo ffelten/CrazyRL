@@ -300,15 +300,17 @@ You can explore the [test files](crazy_rl/test) to gain examples of usage and ma
 Numpy and JAX versions.
 
 ## Contributors
-Pierre-Yves Houitte wrote the original version of this library. It has been cleaned up and
-simplified by Florian Felten (@ffelten) and adapted to JAX by Coline Ledez (@ColineLedez).
+* Florian Felten made the design, architecture, vision, reviews and cleanup.
+* Pierre-Yves Houitte wrote an original proof-of-concept of the library.
+* Coline Ledez adapted the environments to Jax, added tests.
+* El-Ghazali Talbi and Grégoire Danoy supervised the work.
 
 ## Citation
 If you use this code for your research, please cite this using:
 
 ```bibtex
 @misc{crazyrl,
-    author = {Florian Felten and Pierre-Yves Houitte and El-Ghazali Talbi and Grégoire Danoy and Coline Ledez},
+    author = {Florian Felten and Coline Ledez and Pierre-Yves Houitte and El-Ghazali Talbi and Grégoire Danoy},
     title = {CrazyRL: A Multi-Agent Reinforcement Learning library for flying Crazyflie drones},
     year = {2023},
     publisher = {GitHub},

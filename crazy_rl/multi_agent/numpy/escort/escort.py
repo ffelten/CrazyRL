@@ -1,33 +1,39 @@
-"""Surround environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point."""
+"""Escort environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point moving to one point to another."""
+
 import time
 from typing_extensions import override
 
 import numpy as np
+import numpy.typing as npt
 from gymnasium import spaces
 
-from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
 
 
-class Surround(BaseParallelEnv):
-    """A Parallel Environment where drone learn how to surround a target point."""
+class Escort(BaseParallelEnv):
+    """A Parallel Environment where drone learn how to surround a moving target, going straight to one point to another."""
 
     metadata = {"render_modes": ["human", "real"], "is_parallelizable": True, "render_fps": 20}
 
     def __init__(
         self,
-        drone_ids: np.ndarray,
-        init_flying_pos: np.ndarray,
-        target_location: np.ndarray,
+        drone_ids: npt.NDArray[int],
+        init_flying_pos: npt.NDArray[int],
+        init_target_location: npt.NDArray[int],
+        final_target_location: npt.NDArray[int],
+        num_intermediate_points: int = 10,
         render_mode=None,
         size: int = 4,
         swarm=None,
     ):
-        """Surround environment for Crazyflies 2.
+        """Escort environment for Crazyflies 2.
 
         Args:
             drone_ids: Array of drone ids
             init_flying_pos: Array of initial positions of the drones when they are flying
-            target_location: Array of the position of the target point
+            init_target_location: Array of the initial position of the moving target
+            final_target_location: Array of the final position of the moving target
+            num_intermediate_points: Number of intermediate points in the target trajectory
             render_mode: Render mode: "human", "real" or None
             size: Size of the map
             swarm: Swarm object, used for real tests. Ignored otherwise.
@@ -36,14 +42,27 @@ class Surround(BaseParallelEnv):
 
         self._agent_location = dict()
 
-        self._target_location = {"unique": target_location}  # unique target location for all agents
+        self._target_location = {"unique": init_target_location}  # unique target location for all agents
 
         self._init_flying_pos = dict()
         self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
         self.timestep = 0
 
+        # There are two more ref points than intermediate points, one for the initial and final target locations
+        self.num_ref_points = num_intermediate_points + 2
+        # Ref is a 2d arrays for the target
+        # it contains the reference points (xyz) for the target at each timestep
+        self.ref: np.ndarray = np.array([init_target_location])
+
         for i, agent in enumerate(self._agents_names):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
+
+        for t in range(1, self.num_ref_points):
+            self.ref = np.append(
+                self.ref,
+                [init_target_location + (final_target_location - init_target_location) * t / self.num_ref_points],
+                axis=0,
+            )
 
         self._agent_location = self._init_flying_pos.copy()
 
@@ -75,6 +94,15 @@ class Surround(BaseParallelEnv):
     @override
     def _compute_obs(self):
         obs = dict()
+
+        t = self.timestep
+
+        if t < self.num_ref_points:
+            self._target_location["unique"] = self.ref[t]
+
+        else:
+            self._target_location["unique"] = self.ref[-1]  # stay in final location
+
         for agent in self._agents_names:
             obs[agent] = self._agent_location[agent].copy()
             obs[agent] = np.append(obs[agent], self._target_location["unique"])
@@ -110,13 +138,10 @@ class Surround(BaseParallelEnv):
                     reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
+            reward[agent] *= 0
 
-            reward[agent] *= 0.25
-
-            # a maximum value minus the distance to the target
-            reward[agent] += 0.75 * (
-                2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
-            )
+            # distance to the target
+            reward[agent] -= 1 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
 
             # collision between two drones
             for other_agent in self._agents_names:
@@ -142,6 +167,7 @@ class Surround(BaseParallelEnv):
         for agent in self.agents:
             terminated[agent] = False
 
+        for agent in self.agents:
             # collision between two drones
             for other_agent in self.agents:
                 if other_agent != agent:
@@ -166,7 +192,8 @@ class Surround(BaseParallelEnv):
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 200:
+        # the game stops 50 steps after the target has stopped
+        if self.timestep == self.num_ref_points + 50:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.timestep = 0
@@ -181,29 +208,22 @@ class Surround(BaseParallelEnv):
 
 
 if __name__ == "__main__":
-    parallel_env = Surround(
-        drone_ids=np.array([0, 1, 2, 3, 4]),
+    parallel_env = Escort(
+        drone_ids=np.array([0, 1, 2, 3]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-        target_location=np.array([1, 1, 2.5]),
+        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1], [0, 1, 1], [2, 2, 1]]),
+        init_target_location=np.array([1, 1, 2.5]),
+        final_target_location=np.array([-2, -2, 3]),
+        num_intermediate_points=150,
     )
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
-    # global_step = 0
-    # start_time = time.time()
     while parallel_env.agents:
         actions = {
             agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
-
         print("obs", observations, "reward", rewards)
-
-        # if global_step % 100 == 0:
-        #    print("SPS:", int(global_step / (time.time() - start_time)))
-
-        # global_step += 1
-
-        time.sleep(0.05)
+        time.sleep(0.02)

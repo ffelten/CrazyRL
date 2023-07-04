@@ -6,7 +6,7 @@ from typing_extensions import override
 import numpy as np
 from gymnasium import spaces
 
-from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
 
 
 class Catch(BaseParallelEnv):
@@ -172,6 +172,7 @@ class Catch(BaseParallelEnv):
         for agent in self.agents:
             terminated[agent] = False
 
+        for agent in self.agents:
             # collision between two drones
             for other_agent in self.agents:
                 if other_agent != agent:
@@ -219,7 +220,7 @@ if __name__ == "__main__":
         target_speed=0.1,
     )
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
     while parallel_env.agents:
         actions = {

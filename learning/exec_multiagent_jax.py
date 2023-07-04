@@ -18,7 +18,7 @@ from etils import epath
 from flax.training.train_state import TrainState
 from pettingzoo import ParallelEnv
 
-from crazy_rl.multi_agent.surround import Surround
+from crazy_rl.multi_agent.numpy.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 
@@ -217,7 +217,9 @@ def replay_simu(args):
     )
     actor_state = load_actor_state(args.model_dir, actor_state)
 
-    play_episode(actor_module, actor_state, env, obs, single_action_space, key, True)
+    for i in range(10):
+        obs = env.reset(seed=args.seed)
+        play_episode(actor_module, actor_state, env, obs, single_action_space, key, True)
     env.close()
 
 

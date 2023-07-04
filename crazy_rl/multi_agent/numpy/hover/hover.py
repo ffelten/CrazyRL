@@ -4,10 +4,11 @@ from typing import Dict
 from typing_extensions import override
 
 import numpy as np
+import numpy.typing as npt
 from gymnasium import spaces
 from pettingzoo.test.parallel_test import parallel_api_test
 
-from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
 
 
 class Hover(BaseParallelEnv):
@@ -17,8 +18,8 @@ class Hover(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray,
-        init_flying_pos: np.ndarray,
+        drone_ids: npt.NDArray[int],
+        init_flying_pos: npt.NDArray[int],
         render_mode=None,
         size: int = 4,
     ):
@@ -131,7 +132,7 @@ if __name__ == "__main__":
         init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
     )
 
-    observations = parallel_env.reset()
+    observations, infos = parallel_env.reset()
 
     while parallel_env.agents:
         actions = {

@@ -4,9 +4,11 @@ from typing import List
 from typing_extensions import override
 
 import numpy as np
+import numpy.typing as npt
 from gymnasium import spaces
+from pettingzoo.test.parallel_test import parallel_api_test
 
-from crazy_rl.multi_agent.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
 
 
 class Circle(BaseParallelEnv):
@@ -16,8 +18,8 @@ class Circle(BaseParallelEnv):
 
     def __init__(
         self,
-        drone_ids: np.ndarray,
-        init_flying_pos: np.ndarray,
+        drone_ids: npt.NDArray[int],
+        init_flying_pos: npt.NDArray[int],
         render_mode=None,
         num_intermediate_points: int = 10,
         size: int = 4,
@@ -41,7 +43,7 @@ class Circle(BaseParallelEnv):
         self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
         self.timestep = 0
 
-        circle_radius = 0.6  # [m]
+        circle_radius = 0.5  # [m]
         self.num_intermediate_points = num_intermediate_points
         # Ref is a list of 2d arrays for each agent
         # each 2d array contains the reference points (xyz) for the agent at each timestep
@@ -53,8 +55,8 @@ class Circle(BaseParallelEnv):
             ts = 2 * np.pi * np.arange(num_intermediate_points) / num_intermediate_points
 
             self.ref.append(np.zeros((num_intermediate_points, 3)))
-            self.ref[i][:, 2] = init_flying_pos[i][2]  # z-position
-            self.ref[i][:, 1] = circle_radius * np.sin(ts) + (init_flying_pos[i][1])  # y-position
+            self.ref[i][:, 2] = circle_radius * np.sin(ts) + (init_flying_pos[i][2])  # z-position
+            self.ref[i][:, 1] = init_flying_pos[i][1]  # y-position
             self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_flying_pos[i][0] - circle_radius)  # x-position
 
         self._agent_location = self._init_flying_pos.copy()
@@ -121,7 +123,7 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 45:
+        if self.timestep == 10000:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.timestep = 0
@@ -131,17 +133,32 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_info(self):
-        return dict()
+        info = dict()
+        for agent in self._agents_names:
+            info[agent] = {"distance": np.linalg.norm(self._agent_location[agent] - self._target_location[agent], ord=1)}
+        return info
 
 
 if __name__ == "__main__":
-    parallel_env = Circle(
-        drone_ids=np.array([0, 1, 2, 3]),
-        render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [0, 1, 0.5], [0, -1, 0.5], [1, 0, 0.5]]),
+    parallel_api_test(
+        Circle(
+            drone_ids=np.array([0, 1]),
+            render_mode=None,
+            init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
+        ),
+        num_cycles=10,
     )
 
-    observations = parallel_env.reset()
+    parallel_env = Circle(
+        drone_ids=np.array([0, 1]),
+        render_mode=None,
+        init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
+    )
+
+    global_step = 0
+    start_time = time.time()
+
+    observations, infos = parallel_env.reset()
 
     while parallel_env.agents:
         actions = {
@@ -149,5 +166,8 @@ if __name__ == "__main__":
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
-        print("obs", observations, "reward", rewards)
-        time.sleep(0.1)
+
+        if global_step % 100 == 0:
+            print("SPS:", int(global_step / (time.time() - start_time)))
+
+        global_step += 1

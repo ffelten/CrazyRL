@@ -15,7 +15,7 @@ from cflib.crazyflie.swarm import CachedCfFactory, Swarm
 from pettingzoo import ParallelEnv
 from pettingzoo.utils.env import AgentID
 
-from crazy_rl.multi_agent.circle import Circle
+from crazy_rl.multi_agent.numpy.circle.circle import Circle
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 

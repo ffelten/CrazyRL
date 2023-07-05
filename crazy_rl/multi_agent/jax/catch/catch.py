@@ -8,10 +8,10 @@ import jax
 import jax.numpy as jnp
 import jax_dataclasses as jdc
 import numpy as np
-from gymnasium import spaces
 from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
+from crazy_rl.utils.jax_spaces import Box, Space
 
 
 @jdc.pytree_dataclass
@@ -60,17 +60,16 @@ class Catch(BaseParallelEnv):
         self.size = size
 
     @override
-    def observation_space(self, agent: int) -> spaces.Space:
-        return spaces.Box(
-            low=np.tile(np.array([-self.size, -self.size, 0], dtype=np.float32), self.num_drones + 1),
-            high=np.tile(np.array([self.size, self.size, self.size], dtype=np.float32), self.num_drones + 1),
+    def observation_space(self, agent: int) -> Space:
+        return Box(
+            low=-self.size,
+            high=self.size,
             shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
-            dtype=np.float32,
         )
 
     @override
-    def action_space(self, agent: int) -> spaces.Space:
-        return spaces.Box(low=-1 * np.ones(3, dtype=np.float32), high=np.ones(3, dtype=np.float32), dtype=np.float32)
+    def action_space(self, agent: int) -> Space:
+        return Box(low=-1.0, high=1.0, shape=(3,))  # 3d speed vector of the drone
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -256,7 +255,17 @@ if __name__ == "__main__":
         """
         states, key = states_key
 
-        actions = random.uniform(key, (num_envs, parallel_env.num_drones, 3), minval=-1, maxval=1)
+        key, *subkeys = random.split(key, parallel_env.num_drones + 1)
+        actions = (
+            jnp.array(
+                [parallel_env.action_space(agent_id).sample(subkeys[agent_id]) for agent_id in range(parallel_env.num_drones)]
+            )
+            .flatten()
+            .repeat(num_envs)
+            .reshape((num_envs, parallel_env.num_drones, -1))
+        )
+
+        print(actions)
 
         key, *subkeys = random.split(key, num_envs + 1)
 

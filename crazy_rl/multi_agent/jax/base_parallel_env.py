@@ -8,8 +8,9 @@ from functools import partial
 
 import jax.numpy as jnp
 import jax_dataclasses as jdc
-from gymnasium import spaces
 from jax import jit
+
+from crazy_rl.utils.jax_spaces import Space
 
 
 @jdc.pytree_dataclass
@@ -57,12 +58,12 @@ class BaseParallelEnv:
     """
 
     @functools.lru_cache(maxsize=None)
-    def observation_space(self, agent: int) -> spaces.Space:
+    def observation_space(self, agent: int) -> Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
     @functools.lru_cache(maxsize=None)
-    def action_space(self, agent: int) -> spaces.Space:
+    def action_space(self, agent: int) -> Space:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -137,6 +138,17 @@ class BaseParallelEnv:
     def state(self, state: State) -> jnp.ndarray:
         """Returns a global observation (concatenation of all the agent locations and target locations). Must be implemented in a subclass."""
         raise NotImplementedError
+
+    def state_vmap(self, **state_vals) -> jnp.ndarray:
+        """Used for extracting global state from a batch of states.
+
+        Args:
+            **state_vals: Kwargs containing the values of the states.
+
+        Returns:
+            A global observation (concatenation of all the agent locations and target locations).
+        """
+        return self.state(State(**state_vals))
 
     @partial(jit, static_argnums=(0,))
     def step(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:

@@ -310,19 +310,19 @@ def test_action_space():
     key, subkey = random.split(key)
     state = parallel_env.reset(subkey)
 
-    actions = jnp.array([parallel_env.action_space(agent).sample() for agent in range(parallel_env.num_drones)])
+    actions = jnp.array([parallel_env.action_space(agent).sample(subkey) for agent in range(parallel_env.num_drones)])
 
     assert parallel_env.action_space(0).contains(actions[0])
     assert parallel_env.action_space(0).contains(actions[1])
 
     state = parallel_env.step(state, actions, key)
 
-    actions = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0]], dtype=np.float32)
+    actions = jnp.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0]], dtype=jnp.float32)
 
     assert parallel_env.action_space(0).contains(actions[0])
     assert parallel_env.action_space(0).contains(actions[1])
 
-    actions = jnp.array([[1.0, 2.0, 30.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+    actions = np.array([[1.0, 2.0, 30.0], [4.0, 5.0, 6.0]], dtype=jnp.float32)
 
     assert not (parallel_env.action_space(0).contains(actions))
 

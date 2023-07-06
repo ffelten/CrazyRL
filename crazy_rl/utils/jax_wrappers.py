@@ -7,13 +7,13 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
+from crazy_rl.multi_agent.jax.base_parallel_env import State
 
 
 class Wrapper:
     """Base class for wrappers."""
 
-    def __init__(self, env: BaseParallelEnv):
+    def __init__(self, env):
         self._env = env
 
     # provide proxy access to regular attributes of wrapped object
@@ -24,7 +24,7 @@ class Wrapper:
 class VecEnv(Wrapper):
     """Vectorized environment wrapper."""
 
-    def __init__(self, env: BaseParallelEnv):
+    def __init__(self, env):
         super().__init__(env)
         self.reset = jax.vmap(self._env.reset, in_axes=(0,))
         self.step = jax.vmap(self._env.step)
@@ -44,7 +44,7 @@ class LogEnvState:
 class LogWrapper(Wrapper):
     """Log the episode returns and lengths."""
 
-    def __init__(self, env: BaseParallelEnv):
+    def __init__(self, env):
         super().__init__(env)
 
     @partial(jax.jit, static_argnums=(0,))
@@ -110,8 +110,38 @@ class AddIDToObs(Wrapper):
         return self._env.state(state)
 
 
-# TODO class AutoReset(Wrapper):
-# see: https://github.com/google/brax/blob/main/brax/envs/wrappers/training.py#L96C1-L123C65
+class AutoReset(Wrapper):
+    """Automatically reset the environment when done.
+
+    Based on Brax's wrapper; https://github.com/google/brax/blob/main/brax/envs/wrappers/training.py#L96C1-L123C65"""
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, State]:
+        return self._env.reset(key)
+
+    def step(
+        self, state: State, action: jnp.ndarray, key: chex.PRNGKey
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, State]:
+        obs, rewards, term, trunc, info, state = self._env.step(state, action, key)
+        done = jnp.logical_or(jnp.any(term), jnp.any(trunc))
+
+        def where_done(ifval, elseval):
+            nonlocal done
+            if done.shape:
+                done = jnp.reshape(done, [ifval.shape[0]] + [1] * (len(elseval.shape) - 1))  # type: ignore
+            return jnp.where(done, ifval, elseval)
+
+        new_obs, new_info, new_state = self._env.reset(key)
+        obs = where_done(new_obs, obs)
+        state = jax.tree_util.tree_map(where_done, new_state, state)
+        # TODO does not work with VecEnv... info["final_obs"] = where_done(new_obs, obs)
+        return obs, rewards, term, trunc, info, state
+
+    def state(self, state: State) -> chex.Array:
+        return self._env.state(state)
+
 
 # TODO class NormalizeObservation(Wrapper):
 # see: https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py#L193

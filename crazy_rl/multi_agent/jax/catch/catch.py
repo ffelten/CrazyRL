@@ -11,7 +11,7 @@ from jax import jit, random
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 from crazy_rl.utils.jax_spaces import Box, Space
-from crazy_rl.utils.jax_wrappers import AddIDToObs, LogWrapper, VecEnv
+from crazy_rl.utils.jax_wrappers import AddIDToObs, AutoReset, LogWrapper, VecEnv
 
 
 @jdc.pytree_dataclass
@@ -230,11 +230,12 @@ if __name__ == "__main__":
         env, num_agents
     )  # concats the agent id as one hot encoded vector to the obs (easier for learning algorithms)
     env = LogWrapper(env)  # Add stuff in the info dictionary for logging in the learning algo
+    env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
     env = VecEnv(env)  # vmaps the env public methods
 
     obs, info, state = env.reset(jnp.stack(subkeys))
 
-    for i in range(100):
+    for i in range(10):
         key, *subkeys = random.split(key, num_agents + 1)
         actions = (
             jnp.array([env.action_space(agent_id).sample(jnp.stack(subkeys[agent_id])) for agent_id in range(env.num_drones)])
@@ -246,7 +247,11 @@ if __name__ == "__main__":
         key, *subkeys = random.split(key, num_envs + 1)
         obs, rewards, term, trunc, info, state = env.step(state, actions, jnp.stack(subkeys))
 
-        print(info)
+        # print("obs", obs)
+        # print("rewards", rewards)
+        print("term", term)
+        print("trunc", trunc)
+        print("info", info)
 
     # @jit
     # def body(i, states_key):

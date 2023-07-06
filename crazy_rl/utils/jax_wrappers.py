@@ -27,14 +27,7 @@ class VecEnv(Wrapper):
     def __init__(self, env: BaseParallelEnv):
         super().__init__(env)
         self.reset = jax.vmap(self._env.reset, in_axes=(0,))
-        self.step = jax.vmap(
-            self._env.step,
-            in_axes=(
-                0,
-                0,
-                0,
-            ),
-        )
+        self.step = jax.vmap(self._env.step)
         self.state = jax.vmap(self._env.state, in_axes=(0,))
 
 

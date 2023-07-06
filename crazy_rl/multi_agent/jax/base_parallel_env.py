@@ -5,6 +5,7 @@ based on functional programming while PZ relies heavily on OOP and state mutatio
 """
 import functools
 from functools import partial
+from typing import Tuple
 
 import jax.numpy as jnp
 import jax_dataclasses as jdc
@@ -25,11 +26,6 @@ class State:
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game.
-
-    observations: jnp.ndarray  # array containing the current observation of each agent.
-    rewards: jnp.ndarray  # array containing the current reward of each agent.
-    terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed.
-    truncations: jnp.ndarray  # array of booleans which are True if the game reaches enough timesteps and ends.
 
 
 class BaseParallelEnv:
@@ -67,7 +63,7 @@ class BaseParallelEnv:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_obs(self, state: State) -> State:
+    def _compute_obs(self, state: State) -> jnp.ndarray:
         """Computes the current observation of the environment from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -86,19 +82,19 @@ class BaseParallelEnv:
         # Actions are clipped to stay in the map and scaled to do max 20cm in one step
         return jnp.clip(state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
 
-    def _compute_reward(self, state: State) -> State:
+    def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
         """Computes the current reward value(s) from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_terminated(self, state: State) -> State:
+    def _compute_terminated(self, state: State) -> jnp.ndarray:
         """Computes if the game must be stopped because the agents crashed from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_truncation(self, state: State) -> State:
+    def _compute_truncation(self, state: State) -> jnp.ndarray:
         """Computes if the game must be stopped because it is too long form a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def reset(self, key: jnp.ndarray) -> State:
+    def reset(self, key: jnp.ndarray) -> Tuple[jnp.ndarray, dict, State]:
         """Resets the environment in initial state. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -151,15 +147,17 @@ class BaseParallelEnv:
         return self.state(State(**state_vals))
 
     @partial(jit, static_argnums=(0,))
-    def step(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
+    def step(
+        self, state: State, actions: jnp.ndarray, key: jnp.ndarray
+    ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, dict, State]:
         """Computes one step for the environment, in response to the actions of the drones."""
         state = jdc.replace(state, timestep=state.timestep + 1)
 
         state = self._transition_state(state, actions, key)
 
-        state = self._compute_truncation(state)
-        state = self._compute_terminated(state)
-        state = self._compute_reward(state)
-        state = self._compute_obs(state)
+        truncateds = self._compute_truncation(state)
+        terminateds = self._compute_terminated(state)
+        rewards = self._compute_reward(state, truncations=truncateds, terminations=terminateds)
+        obs = self._compute_obs(state)
 
-        return state
+        return obs, rewards, terminateds, truncateds, {}, state

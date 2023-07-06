@@ -143,6 +143,73 @@ class AutoReset(Wrapper):
         return self._env.state(state)
 
 
+@struct.dataclass
+class NormalizeVecRewEnvState:
+    mean: jnp.ndarray
+    var: jnp.ndarray
+    count: float
+    return_val: float
+    env_state: State
+
+
+class NormalizeVecReward(Wrapper):
+    """Normalize the reward over a vectorized environment.
+
+    Taken and adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
+    """
+
+    def __init__(self, env, gamma):
+        super().__init__(env)
+        self.gamma = gamma
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, NormalizeVecRewEnvState]:
+        obs, info, state = self._env.reset(key)
+        batch_count = obs.shape[0]
+        state = NormalizeVecRewEnvState(
+            mean=0.0,
+            var=1.0,
+            count=1e-4,
+            return_val=jnp.zeros((batch_count,)),
+            env_state=state,
+        )
+        return obs, info, state
+
+    def step(
+        self, state: chex.Array, action: chex.Array, key: chex.Array
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, NormalizeVecRewEnvState]:
+        obs, reward, term, truncated, info, env_state = self._env.step(state.env_state, action, key)
+        done = jnp.logical_or(jnp.any(term, axis=1), jnp.any(truncated, axis=1))
+        return_val = state.return_val * self.gamma * (1 - done) + reward.sum(
+            axis=1
+        )  # rewards are summed over agents (team reward)
+
+        batch_mean = jnp.mean(return_val, axis=0)
+        batch_var = jnp.var(return_val, axis=0)
+        batch_count = obs.shape[0]
+
+        delta = batch_mean - state.mean
+        tot_count = state.count + batch_count
+
+        new_mean = state.mean + delta * batch_count / tot_count
+        m_a = state.var * state.count
+        m_b = batch_var * batch_count
+        M2 = m_a + m_b + jnp.square(delta) * state.count * batch_count / tot_count
+        new_var = M2 / tot_count
+        new_count = tot_count
+
+        state = NormalizeVecRewEnvState(
+            mean=new_mean,
+            var=new_var,
+            count=new_count,
+            return_val=return_val,
+            env_state=env_state,
+        )
+        return obs, reward / jnp.sqrt(state.var + 1e-8), term, truncated, info, state
+
+    def state(self, state: NormalizeVecRewEnvState) -> chex.Array:
+        return self._env.state(state.env_state)
+
+
 # TODO class NormalizeObservation(Wrapper):
 # see: https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py#L193
 

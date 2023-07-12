@@ -39,6 +39,7 @@ class LogEnvState:
     returned_episode_returns: float
     returned_episode_lengths: int
     timestep: int
+    total_timestep: int
 
 
 class LogWrapper(Wrapper):
@@ -48,9 +49,9 @@ class LogWrapper(Wrapper):
         super().__init__(env)
 
     @partial(jax.jit, static_argnums=(0,))
-    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, LogEnvState]:
+    def reset(self, key: chex.PRNGKey, total_timestep: int = 0) -> Tuple[chex.Array, dict, LogEnvState]:
         obs, info, env_state = self._env.reset(key)
-        state = LogEnvState(env_state, 0, 0, 0, 0, 0)
+        state = LogEnvState(env_state, 0, 0, 0, 0, 0, total_timestep)
         return obs, info, state
 
     @partial(jax.jit, static_argnums=(0,))
@@ -71,10 +72,12 @@ class LogWrapper(Wrapper):
             returned_episode_returns=state.returned_episode_returns * (1 - done) + new_episode_return * done,
             returned_episode_lengths=state.returned_episode_lengths * (1 - done) + new_episode_length * done,
             timestep=state.timestep + 1,
+            total_timestep=state.total_timestep + 1,
         )
         info["returned_episode_returns"] = state.returned_episode_returns
         info["returned_episode_lengths"] = state.returned_episode_lengths
         info["timestep"] = state.timestep
+        info["total_timestep"] = state.total_timestep
         info["returned_episode"] = done
         return obs, rewards, terminateds, truncateds, info, state
 
@@ -133,7 +136,7 @@ class AutoReset(Wrapper):
                 done = jnp.reshape(done, [ifval.shape[0]] + [1] * (len(elseval.shape) - 1))  # type: ignore
             return jnp.where(done, ifval, elseval)
 
-        new_obs, new_info, new_state = self._env.reset(key)
+        new_obs, new_info, new_state = self._env.reset(key, state.total_timestep)
         obs = where_done(new_obs, obs)
         state = jax.tree_util.tree_map(where_done, new_state, state)
         # TODO does not work with VecEnv... info["final_obs"] = where_done(new_obs, obs)

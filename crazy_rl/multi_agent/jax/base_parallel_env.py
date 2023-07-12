@@ -150,7 +150,13 @@ class BaseParallelEnv:
     def step(
         self, state: State, actions: jnp.ndarray, key: jnp.ndarray
     ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, dict, State]:
-        """Computes one step for the environment, in response to the actions of the drones."""
+        """Computes one step for the environment, in response to the actions of the drones.
+
+        Args:
+            state: The current state of the environment.
+            actions: 2D array containing the x, y, z action for each drone.
+            key: JAX PRNG key.
+        """
         state = jdc.replace(state, timestep=state.timestep + 1)
 
         state = self._transition_state(state, actions, key)

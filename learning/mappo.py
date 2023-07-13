@@ -38,11 +38,11 @@ def parse_args():
 
     # Algorithm specific arguments
     parser.add_argument("--num-envs", type=int, default=2048, help="the number of parallel environments")
-    parser.add_argument("--num-steps", type=int, default=10, help="the number of steps per epoch")
-    parser.add_argument("--total-timesteps", type=int, default=10e7,
+    parser.add_argument("--num-steps", type=int, default=10, help="the number of steps per epoch (higher batch size should be better)")
+    parser.add_argument("--total-timesteps", type=int, default=1e7,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=4, help="the number epochs to update the policy")
-    parser.add_argument("--num-minibatches", type=int, default=32, help="the number of minibatches")
+    parser.add_argument("--num-minibatches", type=int, default=32, help="the number of minibatches (keep small in MARL)")
     parser.add_argument("--gamma", type=float, default=0.99,
                         help="the discount factor gamma")
     parser.add_argument("--lr", type=float, default=3e-4,
@@ -218,7 +218,7 @@ def make_train(args):
                 #       sample an action
                 actions, log_probs = zip(*_ma_sample_and_log_prob_from_pi(pi, action_keys))
                 joint_actions = jnp.array(actions).reshape((args.num_envs, num_drones, -1))
-                log_probs = jnp.array(log_probs).sum(axis=0)  # TODO check if sum is correct
+                log_probs = jnp.array(log_probs).reshape((args.num_envs, num_drones))  # TODO maybe should sum this?
                 # CRITIC STEP
                 global_obss = env.state(env_states)
                 values = vmapped_get_value(critic_state.params, global_obss)
@@ -278,8 +278,18 @@ def make_train(args):
                         value = vmapped_get_value(critic_params, traj_batch.global_obs)
                         # MA Log Prob
                         log_probs = [pi[i].log_prob(traj_batch.joint_actions[:, i]) for i in range(num_drones)]
-                        log_probs = jnp.array(log_probs).sum(axis=0)  # TODO check if sum is correct
-                        log_prob = log_probs.sum(axis=-1)
+                        log_probs = jnp.array(log_probs).sum(axis=-1)
+                        # .sum(axis=0)  # TODO check if should not aggregate logprobs across agents
+
+                        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+
+                        def _actor_loss(log_prob, i):
+                            ratio = jnp.exp(log_prob - traj_batch.log_prob[:, i])
+                            loss_actor1 = ratio * gae
+                            loss_actor2 = jnp.clip(ratio, 1.0 - args.clip_eps, 1.0 + args.clip_eps) * gae
+                            loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
+                            loss_actor = loss_actor.mean()
+                            return loss_actor
 
                         # CALCULATE VALUE LOSS
                         value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(-args.clip_eps, args.clip_eps)
@@ -287,14 +297,9 @@ def make_train(args):
                         value_losses_clipped = jnp.square(value_pred_clipped - targets)
                         value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
-                        # CALCULATE ACTOR LOSS
-                        ratio = jnp.exp(log_prob - traj_batch.log_prob)
-                        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                        loss_actor1 = ratio * gae
-                        loss_actor2 = jnp.clip(ratio, 1.0 - args.clip_eps, 1.0 + args.clip_eps) * gae
-                        loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                        loss_actor = loss_actor.mean()
-                        entropy = pi[0].entropy().mean()  # TODO check how to aggregate entropies
+                        # CALCULATE ACTOR LOSS FOR ALL AGENTS
+                        loss_actor = jax.vmap(_actor_loss, in_axes=(0, 0))(log_probs, jnp.arange(num_drones)).sum()
+                        entropy = jnp.array([p.entropy().mean() for p in pi]).mean()  # TODO check how to aggregate entropies
 
                         total_loss = loss_actor + args.vf_coef * value_loss - args.ent_coef * entropy
                         return total_loss, (value_loss, loss_actor, entropy)

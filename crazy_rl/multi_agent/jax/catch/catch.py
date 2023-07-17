@@ -15,6 +15,7 @@ from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
     LogWrapper,
+    NormalizeVecObservation,
     NormalizeVecReward,
     VecEnv,
 )
@@ -172,41 +173,6 @@ class Catch(BaseParallelEnv):
 
     @override
     @partial(jit, static_argnums=(0,))
-    def auto_reset(self, **state) -> State:
-        done = jnp.min(jnp.array([jnp.any(state["truncations"]) + jnp.any(state["terminations"]), 1]))
-
-        state = State(
-            agents_locations=done * self._init_flying_pos + (1 - done) * state["agents_locations"],
-            timestep=(1 - done) * state["timestep"],
-            observations=state["observations"],
-            rewards=(1 - done) * state["rewards"],
-            terminations=(1 - done) * state["terminations"],
-            truncations=(1 - done) * state["truncations"],
-            target_location=done * self._target_location + (1 - done) * state["target_location"],
-        )
-        state = self._compute_obs(state)
-        return state
-
-    @override
-    @partial(jit, static_argnums=(0,))
-    def state_to_dict(self, state: State) -> dict:
-        return {
-            "agents_locations": state.agents_locations,
-            "timestep": state.timestep,
-            "observations": state.observations,
-            "rewards": state.rewards,
-            "terminations": state.terminations,
-            "truncations": state.truncations,
-            "target_location": state.target_location,
-        }
-
-    @override
-    @partial(jit, static_argnums=(0,))
-    def step_vmap(self, action: jnp.ndarray, key: jnp.ndarray, **state_val) -> State:
-        return self.step(State(**state_val), action, key)
-
-    @override
-    @partial(jit, static_argnums=(0,))
     def state(self, state: State) -> jnp.ndarray:
         return jnp.append(state.agents_locations.flatten(), state.target_location)
 
@@ -239,10 +205,11 @@ if __name__ == "__main__":
     env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
     env = VecEnv(env)  # vmaps the env public methods
     env = NormalizeVecReward(env, gamma=0.99)  # normalize the reward in [-1, 1]
+    env = NormalizeVecObservation(env)
 
     obs, info, state = env.reset(jnp.stack(subkeys))
 
-    for i in range(201):
+    for i in range(301):
         key, *subkeys = random.split(key, num_agents + 1)
         actions = (
             jnp.array([env.action_space(agent_id).sample(jnp.stack(subkeys[agent_id])) for agent_id in range(env.num_drones)])

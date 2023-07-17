@@ -61,6 +61,7 @@ class LogWrapper(Wrapper):
         key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, LogEnvState]:
         obs, rewards, terminateds, truncateds, info, env_state = self._env.step(state.env_state, action, key)
+
         done = jnp.logical_or(jnp.any(terminateds), jnp.any(truncateds))
         new_episode_return = state.episode_returns + rewards.sum()  # rewards are summed over agents "team reward"
         new_episode_length = state.episode_lengths + 1
@@ -208,6 +209,33 @@ class NormalizeVecReward(Wrapper):
 
     def state(self, state: NormalizeVecRewEnvState) -> chex.Array:
         return self._env.state(state.env_state)
+
+
+class NormalizeVecObservation(Wrapper):
+    """Normalize the observation over a vectorized environment.
+
+    Taken and adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def reset(self, key):
+        obs, info, state = self._env.reset(key)
+
+        obs = obs / self._env.observation_space(0).high
+
+        return obs, info, state
+
+    def step(self, state, action, key):
+        obs, reward, term, truncated, info, env_state = self._env.step(state, action, key)
+
+        obs = obs / self._env.observation_space(0).high
+
+        return obs, reward, term, truncated, info, state
+
+    def state(self, state: NormalizeVecRewEnvState) -> chex.Array:
+        return self._env.state(state)
 
 
 # TODO class NormalizeObservation(Wrapper):

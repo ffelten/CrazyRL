@@ -236,10 +236,3 @@ class NormalizeObservation(Wrapper):
 
     def state(self, state: State) -> chex.Array:
         return self._env.state(state)
-
-
-# TODO class NormalizeObservation(Wrapper):
-# see: https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py#L193
-
-# TODO class NormalizeReward(Wrapper):
-# see: https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py#L270

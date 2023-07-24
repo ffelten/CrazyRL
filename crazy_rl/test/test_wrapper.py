@@ -6,7 +6,7 @@ from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
     LogWrapper,
-    NormalizeVecObservation,
+    NormalizeObservation,
     NormalizeVecReward,
     VecEnv,
 )
@@ -27,6 +27,7 @@ def test_normalize():
     key, *subkeys = random.split(key, num_envs + 1)
 
     # Wrappers
+    env = NormalizeObservation(env)
     env = AddIDToObs(
         env, num_agents
     )  # concats the agent id as one hot encoded vector to the obs (easier for learning algorithms)
@@ -34,7 +35,6 @@ def test_normalize():
     env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
     env = VecEnv(env)  # vmaps the env public methods
     env = NormalizeVecReward(env, gamma=0.99)  # normalize the reward in [-1, 1]
-    env = NormalizeVecObservation(env)
 
     obs, info, state = env.reset(jnp.stack(subkeys))
 

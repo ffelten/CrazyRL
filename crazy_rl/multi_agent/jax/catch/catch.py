@@ -15,7 +15,7 @@ from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
     LogWrapper,
-    NormalizeVecObservation,
+    NormalizeObservation,
     NormalizeVecReward,
     VecEnv,
 )
@@ -198,6 +198,7 @@ if __name__ == "__main__":
     key, *subkeys = random.split(key, num_envs + 1)
 
     # Wrappers
+    env = NormalizeObservation(env)
     env = AddIDToObs(
         env, num_agents
     )  # concats the agent id as one hot encoded vector to the obs (easier for learning algorithms)
@@ -205,7 +206,6 @@ if __name__ == "__main__":
     env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
     env = VecEnv(env)  # vmaps the env public methods
     env = NormalizeVecReward(env, gamma=0.99)  # normalize the reward in [-1, 1]
-    env = NormalizeVecObservation(env)
 
     obs, info, state = env.reset(jnp.stack(subkeys))
 
@@ -226,65 +226,3 @@ if __name__ == "__main__":
         # print("term", term)
         print("trunc", trunc)
         # print("info", info)
-
-    # @jit
-    # def body(i, states_key):
-    #     """Body of the fori_loop of play.
-    #
-    #     Args:
-    #         i: number of the iteration.
-    #         states_key: a tuple containing states and key.
-    #     """
-    #     states, key = states_key
-    #
-    #     key, *subkeys = random.split(key, env.num_drones + 1)
-    #     actions = (
-    #         jnp.array(
-    #             [env.action_space(agent_id).sample(subkeys[agent_id]) for agent_id in range(env.num_drones)]
-    #         )
-    #         .flatten()
-    #         .repeat(num_envs)
-    #         .reshape((num_envs, env.num_drones, -1))
-    #     )
-    #
-    #     print(actions)
-    #
-    #     key, *subkeys = random.split(key, num_envs + 1)
-    #
-    #     states = vmapped_step(actions, jnp.stack(subkeys), **env.state_to_dict(states))
-    #
-    #     # where you would learn or add to buffer
-    #
-    #     states = vmapped_auto_reset(**env.state_to_dict(states))
-    #
-    #     return (states, key)
-    #
-    # @jit
-    # def play(key):
-    #     """Execution of the environment with random actions."""
-    #     key, *subkeys = random.split(key, num_envs + 1)
-    #
-    #     states = vmapped_reset(jnp.stack(subkeys))
-    #
-    #     states, key = jax.lax.fori_loop(0, 1000, body, (states, key))
-    #
-    #     return key, states
-    #
-    # key, states = play(key)  # compilation of the function
-    #
-    # durations = np.zeros(10)
-    #
-    # print("start")
-    #
-    # for i in range(10):
-    #     start = time.time()
-    #
-    #     key, states = play(key)
-    #
-    #     jax.block_until_ready(states)
-    #
-    #     end = time.time() - start
-    #
-    #     durations[i] = end
-    #
-    # print("durations : ", durations)

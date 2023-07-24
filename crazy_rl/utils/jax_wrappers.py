@@ -211,8 +211,8 @@ class NormalizeVecReward(Wrapper):
         return self._env.state(state.env_state)
 
 
-class NormalizeVecObservation(Wrapper):
-    """Normalize the observation over a vectorized environment.
+class NormalizeObservation(Wrapper):
+    """Normalize the observation.
 
     Taken and adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
     """
@@ -234,7 +234,7 @@ class NormalizeVecObservation(Wrapper):
 
         return obs, reward, term, truncated, info, state
 
-    def state(self, state: NormalizeVecRewEnvState) -> chex.Array:
+    def state(self, state: State) -> chex.Array:
         return self._env.state(state)
 
 

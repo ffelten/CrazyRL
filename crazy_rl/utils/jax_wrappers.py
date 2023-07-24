@@ -230,7 +230,10 @@ class NormalizeObservation(Wrapper):
     def step(self, state, action, key):
         obs, reward, term, truncated, info, env_state = self._env.step(state, action, key)
 
-        obs = obs / self._env.observation_space(0).high
+        high = self._env.observation_space(0).high
+        low = self._env.observation_space(0).low
+
+        obs = -1 + (obs - low) * 2 / (high - low)  # min-max normalization
 
         return obs, reward, term, truncated, info, state
 

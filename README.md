@@ -19,7 +19,7 @@ It has:
 
 🤝 A Numpy version, unified under a standard API from [PettingZoo](https://pettingzoo.farama.org/) parallel environments;
 
-🚀 A [JAX](https://github.com/google/jax) version that can be ran fully on GPU;
+🚀 A [JAX](https://github.com/google/jax) version that can be run fully on GPU;
 
 ✅ Good quality, tested and documented Python code;
 
@@ -125,7 +125,13 @@ This version is specifically optimized for GPU usage and intended for agent trai
 However, simulation and real-world functionalities are not available in this version.
 
 Moreover, it is not compliant with the PettingZoo API as it heavily relies on functional programming.
-We sacrified the API compatibility for huge performance gains.
+We sacrificed the API compatibility for huge performance gains.
+
+Some functionalities are automatically done by wrappers, such as vmap, enabling parallelized training, allowing to leverage
+all the cores on the GPU.
+While it offers faster performance on GPUs, it may exhibit slower execution on CPUs.
+
+You can find other wrappers you may need defined in [jax_wrappers](crazy_rl/utils/jax_wrappers.py).
 
 Execution:
 
@@ -139,54 +145,18 @@ parallel_env = Circle(
         num_intermediate_points=100,
     )
 
+num_envs = 3  # number of states in parallel
 seed = 5  # test value
 key = random.PRNGKey(seed)
-
-key, subkey = random.split(key)
-state = parallel_env.reset(subkey)
-
-while not (jnp.any(state.terminations) or jnp.any(state.truncations)):
-
-    actions = jnp.zeros((parallel_env.num_drones, parallel_env.action_space(0).shape[0]))
-    for agent_id in range(parallel_env.num_drones):
-        actions[agent_id] = actor.get_action(state.obs, agent_id, key) # YOUR POLICY HERE
-
-    key, subkey = random.split(key)
-    state = parallel_env.step(state, actions, key)
-
-    # where you would learn or add to buffer
-```
-
-### Vmapped JAX version
-
-The JAX version supports vectorized operations such as vmap, enabling parallelized training, allowing to leverage
-all the cores on the GPU.
-While it offers faster performance on GPUs, it may exhibit slower execution on CPUs.
-
-Execution:
-
-```python
-from jax import random, vmap
-from crazy_rl.multi_agent.jax.circle.circle import Circle
-
-parallel_env = Circle(
-        num_drones=5,
-        init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [2.0, 1.0, 1.0], [0.0, 1.0, 1.0], [2.0, 2.0, 1.0], [1.0, 0.0, 1.0]]),
-        num_intermediate_points=100,
-    )
-
-num_envs = 1000  # number of states in parallel
-seed = 5  # test value
-key = random.PRNGKey(seed)
-
-vmapped_step = vmap(parallel_env.step_vmap)
-vmapped_auto_reset = vmap(parallel_env.auto_reset)
-vmapped_reset = vmap(parallel_env.reset)
-
 key, *subkeys = random.split(key, num_envs + 1)
-states = vmapped_reset(jnp.stack(subkeys))
 
-for i in range(1000):   # perform 1 million steps (1000 steps on 1000 parallel envs)
+# Wrappers
+env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
+env = VecEnv(env)  # vmaps the env public methods
+
+obs, info, state = env.reset(jnp.stack(subkeys))
+
+for i in range(301):
 
     actions = jnp.zeros((num_envs, parallel_env.num_drones, parallel_env.action_space(0).shape[0]))
     for env_id, obs in enumerate(states.observations):
@@ -194,15 +164,10 @@ for i in range(1000):   # perform 1 million steps (1000 steps on 1000 parallel e
             actions[env_id, agent_id] = actor.get_action(obs, agent_id, key) # YOUR POLICY HERE
 
     key, *subkeys = random.split(key, num_envs + 1)
-    states = vmapped_step(actions, jnp.stack(subkeys), **parallel_env.state_to_dict(states))
+    obs, rewards, term, trunc, info, state = env.step(state, actions, jnp.stack(subkeys))
 
     # where you would learn or add to buffer
-
-    states = vmapped_auto_reset(**parallel_env.state_to_dict(states))
 ```
-
-You can have a look to the main of [circle](crazy_rl/multi_agent/jax/circle/circle.py) for a jitted version with
-the optimized 'fori_loop' or JAX.
 
 ## Install & run
 
@@ -294,7 +259,8 @@ option, can be `"real"`, `"human"` or `None`.
 
 `BaseParallelEnv` is the base class for the environment in both versions. It contains the basic methods to
 interact with the environment. From there, child classes allow to specify specific tasks such as Circle or Hover.
-`utils/` contains the basic functions to interact with the drones and OpenGL stuff for rendering.
+`utils/` contains the basic functions to interact with the drones, OpenGL stuff for rendering and wrappers which
+add automatic behaviours to JAX version.
 
 You can explore the [test files](crazy_rl/test) to gain examples of usage and make comparisons between the
 Numpy and JAX versions.

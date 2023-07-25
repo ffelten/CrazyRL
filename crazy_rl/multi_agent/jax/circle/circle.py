@@ -10,14 +10,7 @@ from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 from crazy_rl.utils.jax_spaces import Box, Space
-from crazy_rl.utils.jax_wrappers import (
-    AddIDToObs,
-    AutoReset,
-    LogWrapper,
-    NormalizeObservation,
-    NormalizeVecReward,
-    VecEnv,
-)
+from crazy_rl.utils.jax_wrappers import AutoReset, VecEnv
 
 
 @jdc.pytree_dataclass
@@ -146,14 +139,8 @@ if __name__ == "__main__":
     key, *subkeys = random.split(key, num_envs + 1)
 
     # Wrappers
-    env = NormalizeObservation(env)
-    env = AddIDToObs(
-        env, num_agents
-    )  # concats the agent id as one hot encoded vector to the obs (easier for learning algorithms)
-    env = LogWrapper(env)  # Add stuff in the info dictionary for logging in the learning algo
     env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
     env = VecEnv(env)  # vmaps the env public methods
-    env = NormalizeVecReward(env, gamma=0.99)  # normalize the reward in [-1, 1]
 
     obs, info, state = env.reset(jnp.stack(subkeys))
 

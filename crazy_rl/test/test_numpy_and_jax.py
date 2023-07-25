@@ -6,26 +6,26 @@ from crazy_rl.multi_agent.jax.surround.surround import Surround as JaxSurround
 from crazy_rl.multi_agent.numpy.surround.surround import Surround as NpSurround
 
 
-def compare(state, np_env, observations, terminations, truncations, rewards):
+def compare(state, jax_obs, jax_term, jax_trunc, jax_rewards, np_env, np_obs, np_term, np_trunc, np_rewards):
     assert (state.agents_locations[0] == np_env._agent_location["agent_0"]).all()
     assert (state.agents_locations[1] == np_env._agent_location["agent_1"]).all()
 
     assert state.timestep == np_env.timestep
 
-    assert (state.observations[0] == observations["agent_0"]).all()
-    assert (state.observations[1] == observations["agent_1"]).all()
+    assert (jax_obs[0] == np_obs["agent_0"]).all()
+    assert (jax_obs[1] == np_obs["agent_1"]).all()
 
-    assert state.terminations[0] == terminations["agent_0"]
-    assert state.terminations[1] == terminations["agent_1"]
+    assert jax_term[0] == np_term["agent_0"]
+    assert jax_term[1] == np_term["agent_1"]
 
-    assert state.truncations[0] == truncations["agent_0"]
-    assert state.truncations[1] == truncations["agent_1"]
+    assert jax_trunc[0] == np_trunc["agent_0"]
+    assert jax_trunc[1] == np_trunc["agent_1"]
 
-    assert state.rewards[0] > rewards["agent_0"] - 0.01
-    assert state.rewards[0] < rewards["agent_0"] + 0.01
+    assert jax_rewards[0] > np_rewards["agent_0"] - 0.01
+    assert jax_rewards[0] < np_rewards["agent_0"] + 0.01
 
-    assert state.rewards[1] > rewards["agent_1"] - 0.01
-    assert state.rewards[1] < rewards["agent_1"] + 0.01
+    assert jax_rewards[1] > np_rewards["agent_1"] - 0.01
+    assert jax_rewards[1] < np_rewards["agent_1"] + 0.01
 
 
 def test_np_jax():
@@ -42,7 +42,7 @@ def test_np_jax():
     seed = 5
     key = random.PRNGKey(seed)
     key, subkey = random.split(key)
-    state = jax_env.reset(subkey)
+    jax_obs, info, state = jax_env.reset(subkey)
 
     # Numpy initialisation
 
@@ -54,42 +54,42 @@ def test_np_jax():
         size=2,
     )
 
-    observations, infos = np_env.reset(seed=seed)
+    np_obs, infos = np_env.reset(seed=seed)
 
     # Fist action
 
     np_actions = {"agent_0": np.array([0, 1, 0]), "agent_1": np.array([0, -1, 0])}  # [0, 0.2, 1] [0, 0.8, 1]
-    observations, rewards, terminations, truncations, infos = np_env.step(np_actions)
+    np_obs, np_rewards, np_term, np_trunc, infos = np_env.step(np_actions)
 
     jax_actions = jnp.array([[0, 1, 0], [0, -1, 0]])
     key, subkey = random.split(key)
-    state = jax_env.step(state, jax_actions, subkey)
+    jax_obs, jax_rewards, jax_term, jax_trunc, info, state = jax_env.step(state, jax_actions, subkey)
 
-    compare(state, np_env, observations, terminations, truncations, rewards)
+    compare(state, jax_obs, jax_term, jax_trunc, jax_rewards, np_env, np_obs, np_term, np_trunc, np_rewards)
 
     # Collision
 
-    observations, rewards, terminations, truncations, infos = np_env.step(np_actions)  # [0, 0.4, 1] [0, 0.6, 1]
+    np_obs, np_rewards, np_term, np_trunc, infos = np_env.step(np_actions)  # [0, 0.4, 1] [0, 0.6, 1]
 
     key, subkey = random.split(key)
-    state = jax_env.step(state, jax_actions, subkey)
+    jax_obs, jax_rewards, jax_term, jax_trunc, info, state = jax_env.step(state, jax_actions, subkey)
 
     np_actions = {"agent_0": np.array([0, 0.5, 0]), "agent_1": np.array([0, 0, 0])}  # [0, 0.5, 1] [0, 0.6, 1]
-    observations, rewards, terminations, truncations, infos = np_env.step(np_actions)
+    np_obs, np_rewards, np_term, np_trunc, infos = np_env.step(np_actions)
 
     jax_actions = jnp.array([[0, 0.5, 0], [0, 0, 0]])
     key, subkey = random.split(key)
-    state = jax_env.step(state, jax_actions, subkey)
+    jax_obs, jax_rewards, jax_term, jax_trunc, info, state = jax_env.step(state, jax_actions, subkey)
 
-    compare(state, np_env, observations, terminations, truncations, rewards)
+    compare(state, jax_obs, jax_term, jax_trunc, jax_rewards, np_env, np_obs, np_term, np_trunc, np_rewards)
 
-    assert (state.rewards == jnp.array([-10, -10])).all()
+    assert (jax_rewards == jnp.array([-10, -10])).all()
 
-    assert state.terminations.all()
+    assert jax_term.all()
 
     key, subkey = random.split(key)
-    state = jax_env.reset(subkey)
-    observations, infos = np_env.reset()
+    jax_obs, info, state = jax_env.reset(subkey)
+    np_obs, infos = np_env.reset()
 
     # Border
 
@@ -98,12 +98,12 @@ def test_np_jax():
     jax_actions = jnp.array([[0, 0, 0], [0, 1, 0]])
 
     for i in range(5):
-        observations, rewards, terminations, truncations, infos = np_env.step(np_actions)
+        np_obs, np_rewards, np_term, np_trunc, infos = np_env.step(np_actions)
 
         key, subkey = random.split(key)
-        state = jax_env.step(state, jax_actions, subkey)
+        jax_obs, jax_rewards, jax_term, jax_trunc, info, state = jax_env.step(state, jax_actions, subkey)
 
-    compare(state, np_env, observations, terminations, truncations, rewards)
+    compare(state, jax_obs, jax_term, jax_trunc, jax_rewards, np_env, np_obs, np_term, np_trunc, np_rewards)
 
     # End
 
@@ -111,17 +111,17 @@ def test_np_jax():
     jax_actions = jnp.array([[0, 0, 0], [0, 0, 0]])
 
     for i in range(95):
-        observations, rewards, terminations, truncations, infos = np_env.step(np_actions)
+        np_obs, np_rewards, np_term, np_trunc, infos = np_env.step(np_actions)
         key, subkey = random.split(key)
-        state = jax_env.step(state, jax_actions, subkey)
+        jax_obs, jax_rewards, jax_term, jax_trunc, info, state = jax_env.step(state, jax_actions, subkey)
 
-    compare(state, np_env, observations, terminations, truncations, rewards)
+    compare(state, jax_obs, jax_term, jax_trunc, jax_rewards, np_env, np_obs, np_term, np_trunc, np_rewards)
 
-    assert state.truncations.all()
+    assert jax_trunc.all()
 
     key, subkey = random.split(key)
-    state = jax_env.reset(subkey)
-    observations, infos = np_env.reset()
+    jax_obs, info, state = jax_env.reset(subkey)
+    np_obs, infos = np_env.reset()
 
-    assert (state.observations[0] == observations["agent_0"]).all()
-    assert (state.observations[1] == observations["agent_1"]).all()
+    assert (jax_obs[0] == np_obs["agent_0"]).all()
+    assert (jax_obs[1] == np_obs["agent_1"]).all()

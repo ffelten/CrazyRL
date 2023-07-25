@@ -98,53 +98,9 @@ class BaseParallelEnv:
         """Resets the environment in initial state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def auto_reset(self, **state) -> State:
-        """Returns the State reinitialized if needed, else the actual State. Must be implemented in a subclass.
-
-        The values contained by State are passed in argument and used like a dictionary
-        because auto_reset is meant to be used by vmap and vmap doesn't accept objects.
-
-        This function handles states like a dictionary, see also the pydoc of step_vmap.
-        """
-        raise NotImplementedError
-
-    def step_vmap(self, action: jnp.ndarray, key: jnp.ndarray, **state_val) -> State:
-        """Used to vmap step.
-
-         Takes the values of the state and calls step with a new State object containing
-         the state values. Must be implemented in a subclass.
-
-         JAX's vmap cannot operate on array-of-structs, but can operate on struct-of-arrays,
-         so the states actually contain array of arrays after vmap. Our solution to this is
-         to convert the struct into a dictionary of array of arrays and plug it into the vmapped
-         function as kwargs. This way, each value of the kwargs (the state members) will be
-         processed as a regular array.
-
-        Args:
-            action: 2D array containing the x, y, z action for each drone.
-            key : JAX PRNG key.
-            **state_val: Different values contained in the State.
-        """
-        raise NotImplementedError
-
-    def state_to_dict(self, state: State) -> dict:
-        """Translates the State into a dict. Must be implemented in a subclass."""
-        raise NotImplementedError
-
     def state(self, state: State) -> jnp.ndarray:
         """Returns a global observation (concatenation of all the agent locations and target locations). Must be implemented in a subclass."""
         raise NotImplementedError
-
-    def state_vmap(self, **state_vals) -> jnp.ndarray:
-        """Used for extracting global state from a batch of states.
-
-        Args:
-            **state_vals: Kwargs containing the values of the states.
-
-        Returns:
-            A global observation (concatenation of all the agent locations and target locations).
-        """
-        return self.state(State(**state_vals))
 
     @partial(jit, static_argnums=(0,))
     def step(

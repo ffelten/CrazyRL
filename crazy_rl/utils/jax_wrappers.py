@@ -213,6 +213,36 @@ class NormalizeVecReward(Wrapper):
         return self._env.state(state.env_state)
 
 
+class NormalizeObservation(Wrapper):
+    """Normalize the observation.
+
+    Taken and adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def reset(self, key):
+        obs, info, state = self._env.reset(key)
+
+        obs = obs / self._env.observation_space(0).high
+
+        return obs, info, state
+
+    def step(self, state, action, key):
+        obs, reward, term, truncated, info, env_state = self._env.step(state, action, key)
+
+        high = self._env.observation_space(0).high
+        low = self._env.observation_space(0).low
+
+        obs = -1 + (obs - low) * 2 / (high - low)  # min-max normalization
+
+        return obs, reward, term, truncated, info, state
+
+    def state(self, state: State) -> chex.Array:
+        return self._env.state(state)
+
+
 class ClipActions(Wrapper):
     """Clip actions to the action space."""
 
@@ -231,6 +261,3 @@ class ClipActions(Wrapper):
 
     def state(self, state: State) -> chex.Array:
         return self._env.state(state)
-
-
-# TODO class ClipReward(Wrapper)

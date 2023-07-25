@@ -48,23 +48,17 @@ class Circle(BaseParallelEnv):
             size: Size of the map in meters
         """
         self.num_drones = num_drones
-
         self.size = size
-
         self._init_flying_pos = init_flying_pos
 
         # Specific to circle
-
         circle_radius = 0.5  # [m]
-
         self.num_intermediate_points = num_intermediate_points
 
         # Ref is a list of 2d arrays for each agent
         # each 2d array contains the reference points (xyz) for the agent at each timestep
         self.ref = jnp.zeros((num_intermediate_points, self.num_drones, 3))
-
         ts = 2 * jnp.pi * jnp.arange(num_intermediate_points) / num_intermediate_points
-
         for agent in range(self.num_drones):
             self.ref = self.ref.at[:, agent, 0].set(
                 circle_radius * (1 - jnp.cos(ts)) + (init_flying_pos[agent][0] - circle_radius)
@@ -102,7 +96,6 @@ class Circle(BaseParallelEnv):
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
         # Reward is based on the Euclidean distance to the target point
-
         return -1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1)
 
     @override

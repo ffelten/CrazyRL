@@ -182,9 +182,7 @@ class NormalizeVecReward(Wrapper):
     ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, NormalizeVecRewEnvState]:
         obs, reward, term, truncated, info, env_state = self._env.step(state.env_state, action, key)
         done = jnp.logical_or(jnp.any(term, axis=1), jnp.any(truncated, axis=1))
-        return_val = state.return_val * self.gamma * (1 - done) + reward.sum(
-            axis=1
-        )  # rewards are summed over agents (team reward)
+        return_val = state.return_val * self.gamma * (1 - done) + reward.sum(axis=1)  # team reward
 
         batch_mean = jnp.mean(return_val, axis=0)
         batch_var = jnp.var(return_val, axis=0)
@@ -224,19 +222,14 @@ class NormalizeObservation(Wrapper):
 
     def reset(self, key):
         obs, info, state = self._env.reset(key)
-
         obs = obs / self._env.observation_space(0).high
-
         return obs, info, state
 
     def step(self, state, action, key):
-        obs, reward, term, truncated, info, env_state = self._env.step(state, action, key)
-
+        obs, reward, term, truncated, info, state = self._env.step(state, action, key)
         high = self._env.observation_space(0).high
         low = self._env.observation_space(0).low
-
         obs = -1 + (obs - low) * 2 / (high - low)  # min-max normalization
-
         return obs, reward, term, truncated, info, state
 
     def state(self, state: State) -> chex.Array:
@@ -256,7 +249,6 @@ class ClipActions(Wrapper):
         self, state: State, action: jnp.ndarray, key: chex.PRNGKey
     ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, State]:
         action = jnp.clip(action, self._env.action_space(0).low, self._env.action_space(0).high)
-        jax.debug.breakpoint()
         return self._env.step(state, action, key)
 
     def state(self, state: State) -> chex.Array:

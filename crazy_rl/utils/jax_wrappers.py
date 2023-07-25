@@ -213,8 +213,24 @@ class NormalizeVecReward(Wrapper):
         return self._env.state(state.env_state)
 
 
-# TODO class NormalizeObservation(Wrapper):
-# see: https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py#L193
+class ClipActions(Wrapper):
+    """Clip actions to the action space."""
 
-# TODO class NormalizeReward(Wrapper):
-# see: https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py#L270
+    def __init__(self, env):
+        super().__init__(env)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, State]:
+        return self._env.reset(key)
+
+    def step(
+        self, state: State, action: jnp.ndarray, key: chex.PRNGKey
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, State]:
+        action = jnp.clip(action, self._env.action_space(0).low, self._env.action_space(0).high)
+        jax.debug.breakpoint()
+        return self._env.step(state, action, key)
+
+    def state(self, state: State) -> chex.Array:
+        return self._env.state(state)
+
+
+# TODO class ClipReward(Wrapper)

@@ -17,10 +17,12 @@ from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from jax import vmap
 
-from crazy_rl.multi_agent.jax.catch.catch import Catch, State
+from crazy_rl.multi_agent.jax.base_parallel_env import State
+from crazy_rl.multi_agent.jax.circle import Circle
 from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
+    ClipActions,
     LogWrapper,
     NormalizeVecReward,
     VecEnv,
@@ -37,12 +39,12 @@ def parse_args():
     parser.add_argument("--debug", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True, help="run in debug mode")
 
     # Algorithm specific arguments
-    parser.add_argument("--num-envs", type=int, default=2048, help="the number of parallel environments")
+    parser.add_argument("--num-envs", type=int, default=256, help="the number of parallel environments")
     parser.add_argument("--num-steps", type=int, default=10, help="the number of steps per epoch (higher batch size should be better)")
     parser.add_argument("--total-timesteps", type=int, default=1e7,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=4, help="the number epochs to update the policy")
-    parser.add_argument("--num-minibatches", type=int, default=32, help="the number of minibatches (keep small in MARL)")
+    parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")
     parser.add_argument("--gamma", type=float, default=0.99,
                         help="the discount factor gamma")
     parser.add_argument("--lr", type=float, default=3e-4,
@@ -51,7 +53,7 @@ def parse_args():
                         help="the lambda for the generalized advantage estimation")
     parser.add_argument("--clip-eps", type=float, default=0.2,
                         help="the epsilon for clipping in the policy objective")
-    parser.add_argument("--ent-coef", type=float, default=0.0,
+    parser.add_argument("--ent-coef", type=float, default=0.01,
                         help="the coefficient for the entropy bonus")
     parser.add_argument("--vf-coef", type=float, default=0.5,
                         help="the coefficient for the value function loss")
@@ -59,10 +61,8 @@ def parse_args():
                         help="the maximum norm for the gradient clipping")
     parser.add_argument("--activation", type=str, default="tanh",
                         help="the activation function for the neural networks")
-    parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
+    parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
                         help="whether to anneal the learning rate linearly")
-    parser.add_argument("--normalize-env", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
-                        help="whether to normalize the observations and rewards")
 
     args = parser.parse_args()
     # fmt: on
@@ -110,12 +110,12 @@ class Critic(nn.Module):
 
 class Transition(NamedTuple):
     terminated: jnp.ndarray
-    joint_actions: jnp.ndarray
+    joint_actions: jnp.ndarray  # shape is (batch, num_agents, action_dim)
     value: jnp.ndarray
     reward: jnp.ndarray
     log_prob: jnp.ndarray
-    obs: jnp.ndarray
-    global_obs: jnp.ndarray
+    obs: jnp.ndarray  # shape is (batch, num_agents, obs_dim)
+    global_obs: jnp.ndarray  # shape is (batch, global_obs_dim)
     info: jnp.ndarray
 
 
@@ -124,20 +124,25 @@ def make_train(args):
     minibatch_size = args.num_envs * args.num_steps // args.num_minibatches
     num_drones = 3
 
-    env = Catch(
-        num_drones=num_drones,
+    # env = Catch(
+    #     num_drones=num_drones,
+    #     init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+    #     init_target_location=jnp.array([1.0, 1.0, 2.5]),
+    #     target_speed=0.1,
+    # )
+    env = Circle(
+        num_drones=3,
         init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-        init_target_location=jnp.array([1.0, 1.0, 2.5]),
-        target_speed=0.1,
+        num_intermediate_points=10,
     )
 
+    env = ClipActions(env)
+    # env = NormalizeObservation(env)
     env = AddIDToObs(env, num_drones)
     env = LogWrapper(env)
     env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
     env = VecEnv(env)  # vmaps the env public methods
-    if args.normalize_env:
-        # env = NormalizeObservation(env)
-        env = NormalizeVecReward(env, args.gamma)
+    env = NormalizeVecReward(env, args.gamma)
 
     # Initial reset to have correct dimensions in the observations
     obs, info, state = env.reset(key=jax.random.PRNGKey(0))
@@ -156,19 +161,34 @@ def make_train(args):
         actor_params = actor.init(actor_key, dummy_local_obs_and_id)
         critic_params = critic.init(critic_key, dummy_global_obs)
         if args.anneal_lr:
-            tx = optax.chain(
+            tx_act = optax.chain(
+                optax.clip_by_global_norm(args.max_grad_norm),
+                optax.adam(learning_rate=linear_schedule, eps=1e-5),
+            )
+            tx_critic = optax.chain(
                 optax.clip_by_global_norm(args.max_grad_norm),
                 optax.adam(learning_rate=linear_schedule, eps=1e-5),
             )
         else:
-            tx = optax.chain(
+            tx_act = optax.chain(
                 optax.clip_by_global_norm(args.max_grad_norm),
                 optax.adam(args.lr, eps=1e-5),
             )
+            tx_critic = optax.chain(
+                optax.clip_by_global_norm(args.max_grad_norm),
+                optax.adam(args.lr, eps=1e-5),
+            )
+
         actor_train_state = TrainState.create(
             apply_fn=actor.apply,
             params=actor_params,
-            tx=tx,
+            tx=tx_act,
+        )
+
+        critic_train_state = TrainState.create(
+            apply_fn=critic.apply,
+            params=critic_params,
+            tx=tx_critic,
         )
 
         def _ma_get_pi(params, obs: jnp.ndarray):
@@ -183,13 +203,7 @@ def make_train(args):
                 key (chex.PRNGKey): PRNGKey to use for sampling: size should be (num_agents, 2)
             """
             assert key.shape == (num_drones, 2)
-            return [pi[i].sample_and_log_prob(seed=key[i]) for i in range(num_drones)]
-
-        critic_train_state = TrainState.create(
-            apply_fn=critic.apply,
-            params=critic_params,
-            tx=tx,
-        )
+            return [pi[i].sample(seed=key[i]) for i in range(num_drones)]
 
         # Batch get value for parallel envs
         vmapped_get_value = vmap(critic.apply, in_axes=(None, 0))
@@ -203,7 +217,6 @@ def make_train(args):
         def _update_step(runner_state: Tuple[TrainState, TrainState, chex.Array, State, chex.PRNGKey], unused):
             # COLLECT TRAJECTORIES
             def _env_step(runner_state, unused):
-                env_states: State
                 actor_state, critic_state, obs, env_states, key = runner_state
                 last_obs = obs
 
@@ -216,9 +229,13 @@ def make_train(args):
                 # for each env:
                 #   for each agent:
                 #       sample an action
-                actions, log_probs = zip(*_ma_sample_and_log_prob_from_pi(pi, action_keys))
-                joint_actions = jnp.array(actions).reshape((args.num_envs, num_drones, -1))
-                log_probs = jnp.array(log_probs).reshape((args.num_envs, num_drones))  # TODO maybe should sum this?
+                actions = jnp.array(_ma_sample_and_log_prob_from_pi(pi, action_keys))
+                log_probs = jnp.array([pi[i].log_prob(actions[i]) for i in range(num_drones)])
+                log_probs = log_probs.transpose()  # (num_envs, num_drones) for storage
+                joint_actions = actions.transpose(
+                    (1, 0, 2)
+                )  # (num_envs, num_drones, action_dim) for storage and vectorized env.step
+
                 # CRITIC STEP
                 global_obss = env.state(env_states)
                 values = vmapped_get_value(critic_state.params, global_obss)
@@ -231,8 +248,8 @@ def make_train(args):
                 )
                 reward = rewards.sum(axis=-1)  # team reward
                 terminated = jnp.any(terminateds, axis=-1)  # team terminated
-                # TODO check if terminated signal is correct
                 transition = Transition(terminated, joint_actions, values, reward, log_probs, last_obs, global_obss, info)
+
                 runner_state = (actor_state, critic_state, obs, env_states, key)
                 return runner_state, transition
 
@@ -241,6 +258,7 @@ def make_train(args):
             # CALCULATE ADVANTAGE
             actor_train_state, critic_train_state, obs, env_states, key = runner_state
             global_obss = env.state(env_states)
+            # TODO global_obss should be checked for truncations
             last_val = critic.apply(critic_train_state.params, global_obss)
 
             def _calculate_gae(traj_batch, last_val):
@@ -273,23 +291,26 @@ def make_train(args):
                     traj_batch, advantages, targets = batch_info
 
                     def _loss_fn(actor_params, critic_params, traj_batch, gae, targets):
-                        # RERUN NETWORK
-                        pi = _ma_get_pi(actor_params, traj_batch.obs)
-                        value = vmapped_get_value(critic_params, traj_batch.global_obs)
-                        # MA Log Prob
-                        log_probs = [pi[i].log_prob(traj_batch.joint_actions[:, i]) for i in range(num_drones)]
-                        log_probs = jnp.array(log_probs).sum(axis=-1)
-                        # .sum(axis=0)  # TODO check if should not aggregate logprobs across agents
+                        # Batch values are in shape (batch_size, num_drones, ...)
 
+                        # RERUN NETWORK
+                        pi = _ma_get_pi(actor_params, traj_batch.obs)  # shape (num_drones, batch_size)
+                        value = vmapped_get_value(critic_params, traj_batch.global_obs)
+                        # MA Log Prob: shape (num_drones, batch_size)
+                        log_probs = jnp.array([pi[i].log_prob(traj_batch.joint_actions[:, i, :]) for i in range(num_drones)])
+
+                        # Normalizes advantage (trick)
                         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
 
-                        def _actor_loss(log_prob, i):
-                            ratio = jnp.exp(log_prob - traj_batch.log_prob[:, i])
+                        def _actor_loss_for_agent_i(i):
+                            logratio = log_probs[i, :] - traj_batch.log_prob[:, i]
+                            ratio = jnp.exp(logratio)
+                            approx_kl = ((ratio - 1) - logratio).mean()
                             loss_actor1 = ratio * gae
                             loss_actor2 = jnp.clip(ratio, 1.0 - args.clip_eps, 1.0 + args.clip_eps) * gae
                             loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                             loss_actor = loss_actor.mean()
-                            return loss_actor
+                            return loss_actor, approx_kl
 
                         # CALCULATE VALUE LOSS
                         value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(-args.clip_eps, args.clip_eps)
@@ -297,12 +318,15 @@ def make_train(args):
                         value_losses_clipped = jnp.square(value_pred_clipped - targets)
                         value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
-                        # CALCULATE ACTOR LOSS FOR ALL AGENTS
-                        loss_actor = jax.vmap(_actor_loss, in_axes=(0, 0))(log_probs, jnp.arange(num_drones)).sum()
-                        entropy = jnp.array([p.entropy().mean() for p in pi]).mean()  # TODO check how to aggregate entropies
+                        # CALCULATE ACTOR LOSS FOR ALL AGENTS, AGGREGATE LOSS
+                        loss_actors, approx_kls = jax.vmap(_actor_loss_for_agent_i, in_axes=0)(jnp.arange(num_drones))
+                        approx_kls = approx_kls.mean()
+                        entropies = jnp.array([p.entropy().mean() for p in pi])
+                        entropy = entropies.mean()  # TODO check how to aggregate entropies
+                        loss_actor = loss_actors.sum()  # TODO same here
 
                         total_loss = loss_actor + args.vf_coef * value_loss - args.ent_coef * entropy
-                        return total_loss, (value_loss, loss_actor, entropy)
+                        return total_loss, (value_loss, loss_actor, entropy, approx_kls)
 
                     grad_fn = jax.value_and_grad(_loss_fn, argnums=(0, 1), has_aux=True)
                     total_loss, grads = grad_fn(
@@ -335,18 +359,37 @@ def make_train(args):
             update_state = (actor_train_state, critic_train_state, traj_batch, advantages, targets, key)
             update_state, loss_info = jax.lax.scan(_update_epoch, update_state, None, args.update_epochs)
             metric = traj_batch.info
+
+            losses = (
+                loss_info[0],
+                loss_info[1][0],
+                loss_info[1][1],
+                loss_info[1][2],
+                loss_info[1][3],
+            )
+            # metric["total_loss"] = losses[0]
+            # metric["value_loss"] = losses[1]
+            # metric["actor_loss"] = losses[2]
+            # metric["entropy"] = losses[3]
+            # metric["approx_kl"] = losses[4]
             key = update_state[-1]
             if args.debug:
 
-                def callback(info):
-                    return_values = info["returned_episode_returns"][info["returned_episode"]]
-                    timesteps = info["timestep"][info["returned_episode"]] * args.num_envs
-                    total_timesteps = info["total_timestep"].sum()
-                    for t in range(len(timesteps)):
-                        print(f"global step={timesteps[t]}, episodic return={return_values[t]}")
-                    print(f"total timesteps: {total_timesteps}")
+                def callback(info, loss):
+                    print(f"total loss: {loss[0].mean()}")
+                    print(f"value loss: {loss[1].mean()}")
+                    print(f"actor loss: {loss[2].mean()}")
+                    print(f"entropy: {loss[3].mean()}")
+                    print(f"approx kl: {loss[4].mean()}")
+                    # return_values = info["returned_episode_returns"][info["returned_episode"]]
+                    # length = info["returned_episode_lengths"][info["returned_episode"]]
+                    # timesteps = info["timestep"][info["returned_episode"]] * args.num_envs
+                    total_timesteps = info["total_timestep"][-1].sum()
+                    # for t in range(len(timesteps)):
+                    #     print(f"global step={timesteps[t]}, episodic return={return_values[t]}, length={length[t]}")
+                    print(f"==== total timesteps: {total_timesteps}")
 
-                jax.debug.callback(callback, metric)
+                jax.debug.callback(callback, metric, losses)
 
             runner_state = (actor_train_state, critic_train_state, obs, env_states, key)
             return runner_state, metric
@@ -361,7 +404,7 @@ def make_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    rng = jax.random.PRNGKey(30)
+    rng = jax.random.PRNGKey(args.seed)
     train_jit = jax.jit(make_train(args))
     start_time = time.time()
     out = jax.block_until_ready(train_jit(rng))
@@ -370,7 +413,16 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
 
-    plt.plot(out["metrics"]["returned_episode_returns"].mean(-1).reshape(-1))
+    returns = out["metrics"]["returned_episode_returns"]
+    returns = returns.mean(-1).reshape(-1)
+    returns = returns[returns != 0.0]
+
+    plt.plot(returns, label="episode return")
+    # plt.plot(out["metrics"]["actor_loss"].mean(-1).reshape(-1), label="actor loss")
+    # plt.plot(out["metrics"]["value_loss"].mean(-1).reshape(-1), label="value loss")
+    # plt.plot(out["metrics"]["entropy"].mean(-1).reshape(-1), label="entropy")
+    # plt.plot(out["metrics"]["approx_kl"].mean(-1).reshape(-1), label="approx kl")
     plt.xlabel("Update Step")
-    plt.ylabel("Return")
+    plt.ylabel("")
+    plt.legend()
     plt.show()

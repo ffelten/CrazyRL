@@ -43,10 +43,6 @@ class BaseParallelEnv:
         _compute_terminated: Computes if the game must be stopped because the agents crashed from a given state.
         _compute_truncation: Computes if the game must be stopped because it is too long from a given state.
         reset: Resets the environment in initial state.
-        auto_reset: Returns the State reinitialized if needed, else the actual State.
-        state_to_dict: Translates the State into a dict.
-        step_vmap: Used to vmap step, takes the values of the state and calls step with a new State object containing
-                   the state values.
         state: Returns a global observation (concatenation of all the agent locations and the target locations).
 
     There are also the following functions:

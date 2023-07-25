@@ -212,28 +212,30 @@ class NormalizeVecReward(Wrapper):
 
 
 class NormalizeObservation(Wrapper):
-    """Normalize the observation.
+    """Rescale the observation between low and high."""
 
-    Taken and adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
-    """
-
-    def __init__(self, env):
+    def __init__(self, env, low=-1, high=1):
         super().__init__(env)
+        self.low = low
+        self.high = high
 
     def reset(self, key):
         obs, info, state = self._env.reset(key)
 
-        obs = obs / self._env.observation_space(0).high
+        max = self._env.observation_space(0).high
+        min = self._env.observation_space(0).low
+
+        obs = self.low + (obs - min) * (self.high - self.low) / (max - min)  # min-max normalization
 
         return obs, info, state
 
     def step(self, state, action, key):
         obs, reward, term, truncated, info, env_state = self._env.step(state, action, key)
 
-        high = self._env.observation_space(0).high
-        low = self._env.observation_space(0).low
+        max = self._env.observation_space(0).high
+        min = self._env.observation_space(0).low
 
-        obs = -1 + (obs - low) * 2 / (high - low)  # min-max normalization
+        obs = self.low + (obs - min) * (self.high - self.low) / (max - min)  # min-max normalization
 
         return obs, reward, term, truncated, info, state
 

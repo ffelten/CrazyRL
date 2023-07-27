@@ -5,6 +5,7 @@ based on functional programming while PZ relies heavily on OOP and state mutatio
 """
 import functools
 from functools import partial
+from typing import Tuple
 
 import jax.numpy as jnp
 import jax_dataclasses as jdc
@@ -26,11 +27,6 @@ class State:
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game.
 
-    observations: jnp.ndarray  # array containing the current observation of each agent.
-    rewards: jnp.ndarray  # array containing the current reward of each agent.
-    terminations: jnp.ndarray  # array of booleans which are True if the agents have crashed.
-    truncations: jnp.ndarray  # array of booleans which are True if the game reaches enough timesteps and ends.
-
 
 class BaseParallelEnv:
     """The Base environment.
@@ -47,10 +43,6 @@ class BaseParallelEnv:
         _compute_terminated: Computes if the game must be stopped because the agents crashed from a given state.
         _compute_truncation: Computes if the game must be stopped because it is too long from a given state.
         reset: Resets the environment in initial state.
-        auto_reset: Returns the State reinitialized if needed, else the actual State.
-        state_to_dict: Translates the State into a dict.
-        step_vmap: Used to vmap step, takes the values of the state and calls step with a new State object containing
-                   the state values.
         state: Returns a global observation (concatenation of all the agent locations and the target locations).
 
     There are also the following functions:
@@ -67,7 +59,7 @@ class BaseParallelEnv:
         """Returns the action space of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_obs(self, state: State) -> State:
+    def _compute_obs(self, state: State) -> jnp.ndarray:
         """Computes the current observation of the environment from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
@@ -86,80 +78,38 @@ class BaseParallelEnv:
         # Actions are clipped to stay in the map and scaled to do max 20cm in one step
         return jnp.clip(state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
 
-    def _compute_reward(self, state: State) -> State:
+    def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
         """Computes the current reward value(s) from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_terminated(self, state: State) -> State:
+    def _compute_terminated(self, state: State) -> jnp.ndarray:
         """Computes if the game must be stopped because the agents crashed from a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_truncation(self, state: State) -> State:
+    def _compute_truncation(self, state: State) -> jnp.ndarray:
         """Computes if the game must be stopped because it is too long form a given state. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def reset(self, key: jnp.ndarray) -> State:
+    def reset(self, key: jnp.ndarray) -> Tuple[jnp.ndarray, dict, State]:
         """Resets the environment in initial state. Must be implemented in a subclass."""
-        raise NotImplementedError
-
-    def auto_reset(self, **state) -> State:
-        """Returns the State reinitialized if needed, else the actual State. Must be implemented in a subclass.
-
-        The values contained by State are passed in argument and used like a dictionary
-        because auto_reset is meant to be used by vmap and vmap doesn't accept objects.
-
-        This function handles states like a dictionary, see also the pydoc of step_vmap.
-        """
-        raise NotImplementedError
-
-    def step_vmap(self, action: jnp.ndarray, key: jnp.ndarray, **state_val) -> State:
-        """Used to vmap step.
-
-         Takes the values of the state and calls step with a new State object containing
-         the state values. Must be implemented in a subclass.
-
-         JAX's vmap cannot operate on array-of-structs, but can operate on struct-of-arrays,
-         so the states actually contain array of arrays after vmap. Our solution to this is
-         to convert the struct into a dictionary of array of arrays and plug it into the vmapped
-         function as kwargs. This way, each value of the kwargs (the state members) will be
-         processed as a regular array.
-
-        Args:
-            action: 2D array containing the x, y, z action for each drone.
-            key : JAX PRNG key.
-            **state_val: Different values contained in the State.
-        """
-        raise NotImplementedError
-
-    def state_to_dict(self, state: State) -> dict:
-        """Translates the State into a dict. Must be implemented in a subclass."""
         raise NotImplementedError
 
     def state(self, state: State) -> jnp.ndarray:
         """Returns a global observation (concatenation of all the agent locations and target locations). Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def state_vmap(self, **state_vals) -> jnp.ndarray:
-        """Used for extracting global state from a batch of states.
-
-        Args:
-            **state_vals: Kwargs containing the values of the states.
-
-        Returns:
-            A global observation (concatenation of all the agent locations and target locations).
-        """
-        return self.state(State(**state_vals))
-
     @partial(jit, static_argnums=(0,))
-    def step(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
+    def step(
+        self, state: State, actions: jnp.ndarray, key: jnp.ndarray
+    ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, dict, State]:
         """Computes one step for the environment, in response to the actions of the drones."""
         state = jdc.replace(state, timestep=state.timestep + 1)
 
         state = self._transition_state(state, actions, key)
 
-        state = self._compute_truncation(state)
-        state = self._compute_terminated(state)
-        state = self._compute_reward(state)
-        state = self._compute_obs(state)
+        truncateds = self._compute_truncation(state)
+        terminateds = self._compute_terminated(state)
+        rewards = self._compute_reward(state, truncations=truncateds, terminations=terminateds)
+        obs = self._compute_obs(state)
 
-        return state
+        return obs, rewards, terminateds, truncateds, {}, state

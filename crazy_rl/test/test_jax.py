@@ -11,63 +11,69 @@ from crazy_rl.multi_agent.jax.surround.surround import Surround
 
 def two_drones_crash(parallel_env, key):
     """Test where two drones starting on (0, 0, 1), (0, 1, 1) crash together."""
-    state = parallel_env.reset(key)
+    obs, info, state = parallel_env.reset(key)
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
+    obs, rewards, terminated, truncated, info, state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
 
     assert (state.agents_locations == jnp.array([[0, 0.2, 1], [0, 0.8, 1]])).all()
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
+    obs, rewards, terminated, truncated, info, state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
 
-    assert not state.terminations.any()
+    assert not terminated.any()
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
+    obs, rewards, terminated, truncated, info, state, key = move(parallel_env, state, key, jnp.array([[0, 1, 0], [0, -1, 0]]))
 
     # the drones crash
-    assert state.terminations.all()
+    assert terminated.all()
 
-    assert (state.rewards == jnp.array([-10, -10])).all()
+    assert (rewards == jnp.array([-10, -10])).all()
 
-    return state
+    return obs, rewards, terminated, truncated, state
 
 
 def crash_ground(parallel_env, key):
     """Test where the first drone, starting on (0, 0, 1), crashes on the ground."""
-    state = parallel_env.reset(key)
+    obs, info, state = parallel_env.reset(key)
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 0, -1], [0, 0, 0]]), 4)  # position = [0, 0, 0.2] (0.20003)
+    obs, rewards, terminated, truncated, info, state, key = move(
+        parallel_env, state, key, jnp.array([[0, 0, -1], [0, 0, 0]]), 4
+    )  # position = [0, 0, 0.2] (0.20003)
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 0, -0.01], [0, 0, 0]]))  # position = [0, 0, 0.2] (just below)
+    obs, rewards, terminated, truncated, info, state, key = move(
+        parallel_env, state, key, jnp.array([[0, 0, -0.01], [0, 0, 0]])
+    )  # position = [0, 0, 0.2] (just below)
 
     # the drone crashes on the ground
-    assert state.terminations.all()
+    assert terminated.all()
 
-    return state
+    return obs, rewards, terminated, truncated, state
 
 
 def leave_the_map(parallel_env, key):
     """Test where the second drone, starting on (0, 1, 1) tries to leave the map, and they stay alive until the
     end of the round."""
-    state = parallel_env.reset(key)
+    obs, info, state = parallel_env.reset(key)
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [0, 1, 0]]), 10)
+    obs, rewards, terminated, truncated, info, state, key = move(
+        parallel_env, state, key, jnp.array([[0, 0, 0], [0, 1, 0]]), 10
+    )
 
     # the drone stays in the map
     assert state.agents_locations[1, 1] <= 3
 
-    state, key = wait(parallel_env, state, key, 90)
+    obs, rewards, terminated, truncated, info, state, key = wait(parallel_env, state, key, 90)
 
     # the game ends after 100 timesteps
-    assert state.truncations.all()
+    assert truncated.all()
 
-    return state
+    return obs, rewards, terminated, truncated, state
 
 
 def move(parallel_env, state, key, actions, iterations=1):
     for i in range(iterations):
         key, subkey = random.split(key)
-        state = parallel_env.step(state, actions, subkey)
-    return state, key
+        obs, rewards, terminated, truncated, info, state = parallel_env.step(state, actions, subkey)
+    return obs, rewards, terminated, truncated, info, state, key
 
 
 def wait(parallel_env, state, key, iterations=1):
@@ -89,33 +95,39 @@ def test_surround():
     # 1st round : the two drones crash
 
     key, subkey = random.split(key)
-    state = two_drones_crash(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = two_drones_crash(parallel_env, subkey)
 
     # 2nd round : one drone crashes with the target
 
     key, subkey = random.split(key)
-    state = parallel_env.reset(subkey)
+    obs, info, state = parallel_env.reset(subkey)
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [1, 0, 1]]))  # position = [0.2, 1, 1.2]
+    obs, rewards, terminated, truncated, info, state, key = move(
+        parallel_env, state, key, jnp.array([[0, 0, 0], [1, 0, 1]])
+    )  # position = [0.2, 1, 1.2]
 
-    assert (state.observations == jnp.array([[0, 0, 1, 1, 1, 2.5, 0.2, 1, 1.2], [0.2, 1, 1.2, 1, 1, 2.5, 0, 0, 1]])).all()
+    assert (obs == jnp.array([[0, 0, 1, 1, 1, 2.5, 0.2, 1, 1.2], [0.2, 1, 1.2, 1, 1, 2.5, 0, 0, 1]])).all()
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [1, 0, 1]]), 4)  # position = [1, 1, 2]
+    obs, rewards, terminated, truncated, info, state, key = move(
+        parallel_env, state, key, jnp.array([[0, 0, 0], [1, 0, 1]]), 4
+    )  # position = [1, 1, 2]
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 0], [0, 0, 1]]), 2)  # position = [1, 1, 2.4]
+    obs, rewards, terminated, truncated, info, state, key = move(
+        parallel_env, state, key, jnp.array([[0, 0, 0], [0, 0, 1]]), 2
+    )  # position = [1, 1, 2.4]
 
     # the drone crashes in the target
-    assert state.terminations.all()
+    assert terminated.all()
 
     # 3rd round : one drone crashes with the ground
 
     key, subkey = random.split(key)
-    state = crash_ground(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = crash_ground(parallel_env, subkey)
 
     # 4th round : the drones never crash and one tries to leave the map
 
     key, subkey = random.split(key)
-    state = leave_the_map(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
 
 
 def test_hover():
@@ -130,12 +142,12 @@ def test_hover():
     key = random.PRNGKey(seed)
 
     key, subkey = random.split(key)
-    state = leave_the_map(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
 
     # observation : agent's location and target's location
-    assert (state.observations == jnp.array([[0, 0, 1, 0, 0, 1], [0, 3, 1, 0, 1, 1]])).all()
+    assert (obs == jnp.array([[0, 0, 1, 0, 0, 1], [0, 3, 1, 0, 1, 1]])).all()
 
-    assert (state.rewards == jnp.array([0, -2])).all()
+    assert (rewards == jnp.array([0, -2])).all()
 
 
 def test_circle():
@@ -151,18 +163,18 @@ def test_circle():
     key = random.PRNGKey(seed)
 
     key, subkey = random.split(key)
-    state = leave_the_map(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
 
     # observation : agent's location and target's location
-    assert (state.observations == jnp.array([[0, 0, 1, -0.5, 0, 1], [0, 3, 1, -0.5, 1, 1]])).all()
+    assert (obs == jnp.array([[0, 0, 1, -0.5, 0, 1], [0, 3, 1, -0.5, 1, 1]])).all()
 
-    assert (state.rewards > jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) - 0.01).all()
-    assert (state.rewards < jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) + 0.01).all()
+    assert (rewards > jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) - 0.01).all()
+    assert (rewards < jnp.array([-0.5, -jnp.linalg.norm(jnp.array([0.5, 2, 0]))]) + 0.01).all()
 
     key, subkey = random.split(key)
-    state = parallel_env.reset(subkey)
+    obs, info, state = parallel_env.reset(subkey)
 
-    state, key = wait(parallel_env, state, key)
+    obs, rewards, terminated, truncated, info, state, key = wait(parallel_env, state, key)
 
     ts = 2 * jnp.pi / 100
 
@@ -193,21 +205,21 @@ def test_escort():
 
     # 1st round : the two drones crash
     key, subkey = random.split(key)
-    state = two_drones_crash(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = two_drones_crash(parallel_env, subkey)
 
     # 2nd round : one drone crashes with the ground
 
     key, subkey = random.split(key)
-    state = crash_ground(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = crash_ground(parallel_env, subkey)
 
     # 3rd round : the drones never crash and one tries to leave the map
 
     key, subkey = random.split(key)
-    state = leave_the_map(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
 
     # observation : agent's location, target's location and other agent's location
     assert (
-        state.observations
+        obs
         == jnp.array(
             [
                 [0, 0, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 3, 1],
@@ -217,9 +229,9 @@ def test_escort():
     ).all()
 
     key, subkey = random.split(key)
-    state = parallel_env.reset(subkey)
+    obs, info, state = parallel_env.reset(subkey)
 
-    state, key = wait(parallel_env, state, key)
+    obs, rewards, terminated, truncated, info, state, key = wait(parallel_env, state, key)
 
     assert (state.target_location == jnp.array([1, 1, 2.5]) + jnp.array([-3, -3, 0.5]) / 152).all()
 
@@ -240,21 +252,21 @@ def test_catch():
     # 1st round : the two drones crash
 
     key, subkey = random.split(key)
-    state = two_drones_crash(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = two_drones_crash(parallel_env, subkey)
 
     # 2nd round : one drone crashes with the ground
 
     key, subkey = random.split(key)
-    state = crash_ground(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = crash_ground(parallel_env, subkey)
 
     # 3rd round : the drones never crash and one tries to leave the map
 
     key, subkey = random.split(key)
-    state = leave_the_map(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
 
     # observation : agent's location, target's location and other agent's location
     assert (
-        state.observations
+        obs
         == jnp.array(
             [
                 [0, 0, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 3, 1],
@@ -273,9 +285,9 @@ def test_catch():
     )
 
     key, subkey = random.split(key)
-    state = parallel_env.reset(subkey)
+    obs, info, state = parallel_env.reset(subkey)
 
-    state, key = wait(parallel_env, state, key)
+    obs, rewards, terminated, truncated, info, state, key = wait(parallel_env, state, key)
 
     assert (state.target_location > jnp.array([[-0.1, 0, 1]]) - 0.001).all()
     assert (state.target_location < jnp.array([[-0.1, 0, 1]]) + 0.001).all()
@@ -288,9 +300,9 @@ def test_catch():
     )
 
     key, subkey = random.split(subkey)
-    state = parallel_env.reset(key)
+    obs, info, state = parallel_env.reset(key)
 
-    state, key = wait(parallel_env, state, key)
+    obs, rewards, terminated, truncated, info, state, key = wait(parallel_env, state, key)
 
     assert jnp.linalg.norm(state.target_location - jnp.array([1, 0, 1])) <= 0.01
 
@@ -308,14 +320,14 @@ def test_action_space():
     key = random.PRNGKey(seed)
 
     key, subkey = random.split(key)
-    state = parallel_env.reset(subkey)
+    obs, info, state = parallel_env.reset(subkey)
 
     actions = jnp.array([parallel_env.action_space(agent).sample(subkey) for agent in range(parallel_env.num_drones)])
 
     assert parallel_env.action_space(0).contains(actions[0])
     assert parallel_env.action_space(0).contains(actions[1])
 
-    state = parallel_env.step(state, actions, key)
+    obs, rewards, terminated, truncated, info, state = parallel_env.step(state, actions, key)
 
     actions = jnp.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0]], dtype=jnp.float32)
 
@@ -340,12 +352,12 @@ def test_observation():
     key = random.PRNGKey(seed)
 
     key, subkey = random.split(key)
-    state = parallel_env.reset(subkey)
+    obs, info, state = parallel_env.reset(subkey)
 
     for agent in range(parallel_env.num_drones):
-        assert parallel_env.observation_space(agent).contains(state.observations[agent])
+        assert parallel_env.observation_space(agent).contains(obs[agent])
 
-    state, key = move(parallel_env, state, key, jnp.array([[0, 0, 1], [0, 0, 1]]))
+    obs, rewards, terminated, truncated, info, state, key = move(parallel_env, state, key, jnp.array([[0, 0, 1], [0, 0, 1]]))
 
     for agent in range(parallel_env.num_drones):
-        assert parallel_env.observation_space(agent).contains(state.observations[agent])
+        assert parallel_env.observation_space(agent).contains(obs[agent])

@@ -216,25 +216,27 @@ class NormalizeObservation(Wrapper):
 
     def __init__(self, env, low=-1, high=1):
         super().__init__(env)
+        self.max_obs = self._env.observation_space(0).high
+        self.min_obs = self._env.observation_space(0).low
         self.low = low
         self.high = high
 
     def reset(self, key):
         obs, info, state = self._env.reset(key)
-        max = self._env.observation_space(0).high
-        min = self._env.observation_space(0).low
-        obs = self.low + (obs - min) * (self.high - self.low) / (max - min)  # min-max normalization
+        obs = self.low + (obs - self.min_obs) * (self.high - self.low) / (self.max_obs - self.min_obs)  # min-max normalization
         return obs, info, state
 
     def step(self, state, action, key):
-        obs, reward, term, truncated, info, env_state = self._env.step(state, action, key)
-        max = self._env.observation_space(0).high
-        min = self._env.observation_space(0).low
-        obs = self.low + (obs - min) * (self.high - self.low) / (max - min)  # min-max normalization
+        obs, reward, term, truncated, info, state = self._env.step(state, action, key)
+        obs = self.low + (obs - self.min_obs) * (self.high - self.low) / (self.max_obs - self.min_obs)  # min-max normalization
         return obs, reward, term, truncated, info, state
 
     def state(self, state: State) -> chex.Array:
-        return self._env.state(state)
+        global_obs = self._env.state(state)
+        global_obs = self.low + (global_obs - self.min_obs) * (self.high - self.low) / (
+            self.max_obs - self.min_obs
+        )  # min-max normalization
+        return global_obs
 
 
 class ClipActions(Wrapper):

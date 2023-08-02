@@ -40,9 +40,9 @@ def parse_args():
     parser.add_argument("--debug", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True, help="run in debug mode")
 
     # Algorithm specific arguments
-    parser.add_argument("--num-envs", type=int, default=256, help="the number of parallel environments")
+    parser.add_argument("--num-envs", type=int, default=512, help="the number of parallel environments")
     parser.add_argument("--num-steps", type=int, default=100, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=5e6,
+    parser.add_argument("--total-timesteps", type=int, default=1e7,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")

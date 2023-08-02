@@ -191,15 +191,16 @@ Therefore, you need to manually install JAX GPU and disregard the poetry require
 
 ```shell
 poetry install
+poetry shell
 pip install --upgrade pip
 
 # Using CUDA 12
-pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 # Or using CUDA 11
-pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda11_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
-poetry run python crazy_rl/multi_agent/jax/circle/circle.py
+python crazy_rl/learning/mappo.py
 ```
 
 Please refer to the [JAX installation GitHub page](https://github.com/google/jax#installation) for the

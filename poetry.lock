@@ -1008,7 +1008,7 @@ pytest = ["pytest"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9, <3.12"
-content-hash = "472f8a1a6c539ae666886a1de507ee0ca2c07dfd2cd7bd8f4734d169b112f600"
+content-hash = "96df0d99f98ca8b9a3da811e2b032a765ec5bfc24f917d06af6daa22e07165a1"
 
 [metadata.files]
 absl-py = [

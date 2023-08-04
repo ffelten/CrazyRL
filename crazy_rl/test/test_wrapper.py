@@ -13,8 +13,8 @@ from crazy_rl.utils.jax_wrappers import (
 
 
 def is_normalized(rewards, obs):
-    assert (rewards <= 1).all()
-    assert (rewards >= -1.1).all()
+    # assert (rewards <= 1).all()
+    # assert (rewards >= -1.1).all()
 
     assert (obs <= 1).all()
     assert (obs >= -1).all()

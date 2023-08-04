@@ -136,7 +136,10 @@ class AutoReset(Wrapper):
                 done = jnp.reshape(done, [ifval.shape[0]] + [1] * (len(elseval.shape) - 1))  # type: ignore
             return jnp.where(done, ifval, elseval)
 
-        new_obs, new_info, new_state = self._env.reset(key, state.total_timestep)
+        if isinstance(self._env, LogWrapper):
+            new_obs, new_info, new_state = self._env.reset(key, state.total_timestep)
+        else:
+            new_obs, new_info, new_state = self._env.reset(key)
         obs = where_done(new_obs, obs)
         state = jax.tree_util.tree_map(where_done, new_state, state)
         # TODO does not work with VecEnv... info["final_obs"] = where_done(new_obs, obs)

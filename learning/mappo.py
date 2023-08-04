@@ -42,7 +42,7 @@ def parse_args():
     # Algorithm specific arguments
     parser.add_argument("--num-envs", type=int, default=512, help="the number of parallel environments")
     parser.add_argument("--num-steps", type=int, default=100, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=1e7,
+    parser.add_argument("--total-timesteps", type=int, default=5e6,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")

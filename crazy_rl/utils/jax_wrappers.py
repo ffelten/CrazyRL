@@ -39,6 +39,7 @@ class LogEnvState:
     returned_episode_returns: float
     returned_episode_lengths: int
     timestep: int
+    total_timestep: int
 
 
 class LogWrapper(Wrapper):
@@ -48,9 +49,9 @@ class LogWrapper(Wrapper):
         super().__init__(env)
 
     @partial(jax.jit, static_argnums=(0,))
-    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, LogEnvState]:
+    def reset(self, key: chex.PRNGKey, total_timestep: int = 0) -> Tuple[chex.Array, dict, LogEnvState]:
         obs, info, env_state = self._env.reset(key)
-        state = LogEnvState(env_state, 0, 0, 0, 0, 0)
+        state = LogEnvState(env_state, 0, 0, 0, 0, 0, total_timestep)
         return obs, info, state
 
     @partial(jax.jit, static_argnums=(0,))
@@ -61,7 +62,6 @@ class LogWrapper(Wrapper):
         key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, LogEnvState]:
         obs, rewards, terminateds, truncateds, info, env_state = self._env.step(state.env_state, action, key)
-
         done = jnp.logical_or(jnp.any(terminateds), jnp.any(truncateds))
         new_episode_return = state.episode_returns + rewards.sum()  # rewards are summed over agents "team reward"
         new_episode_length = state.episode_lengths + 1
@@ -72,10 +72,12 @@ class LogWrapper(Wrapper):
             returned_episode_returns=state.returned_episode_returns * (1 - done) + new_episode_return * done,
             returned_episode_lengths=state.returned_episode_lengths * (1 - done) + new_episode_length * done,
             timestep=state.timestep + 1,
+            total_timestep=state.total_timestep + 1,
         )
         info["returned_episode_returns"] = state.returned_episode_returns
         info["returned_episode_lengths"] = state.returned_episode_lengths
         info["timestep"] = state.timestep
+        info["total_timestep"] = state.total_timestep
         info["returned_episode"] = done
         return obs, rewards, terminateds, truncateds, info, state
 
@@ -134,7 +136,10 @@ class AutoReset(Wrapper):
                 done = jnp.reshape(done, [ifval.shape[0]] + [1] * (len(elseval.shape) - 1))  # type: ignore
             return jnp.where(done, ifval, elseval)
 
-        new_obs, new_info, new_state = self._env.reset(key)
+        if isinstance(self._env, LogWrapper):
+            new_obs, new_info, new_state = self._env.reset(key, state.total_timestep)
+        else:
+            new_obs, new_info, new_state = self._env.reset(key)
         obs = where_done(new_obs, obs)
         state = jax.tree_util.tree_map(where_done, new_state, state)
         # TODO does not work with VecEnv... info["final_obs"] = where_done(new_obs, obs)
@@ -180,9 +185,7 @@ class NormalizeVecReward(Wrapper):
     ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, NormalizeVecRewEnvState]:
         obs, reward, term, truncated, info, env_state = self._env.step(state.env_state, action, key)
         done = jnp.logical_or(jnp.any(term, axis=1), jnp.any(truncated, axis=1))
-        return_val = state.return_val * self.gamma * (1 - done) + reward.sum(
-            axis=1
-        )  # rewards are summed over agents (team reward)
+        return_val = state.return_val * self.gamma * (1 - done) + reward.sum(axis=1)  # team reward
 
         batch_mean = jnp.mean(return_val, axis=0)
         batch_var = jnp.var(return_val, axis=0)
@@ -216,28 +219,43 @@ class NormalizeObservation(Wrapper):
 
     def __init__(self, env, low=-1, high=1):
         super().__init__(env)
+        self.max_obs = self._env.observation_space(0).high
+        self.min_obs = self._env.observation_space(0).low
         self.low = low
         self.high = high
 
     def reset(self, key):
         obs, info, state = self._env.reset(key)
-
-        max = self._env.observation_space(0).high
-        min = self._env.observation_space(0).low
-
-        obs = self.low + (obs - min) * (self.high - self.low) / (max - min)  # min-max normalization
-
+        obs = self.low + (obs - self.min_obs) * (self.high - self.low) / (self.max_obs - self.min_obs)  # min-max normalization
         return obs, info, state
 
     def step(self, state, action, key):
-        obs, reward, term, truncated, info, env_state = self._env.step(state, action, key)
-
-        max = self._env.observation_space(0).high
-        min = self._env.observation_space(0).low
-
-        obs = self.low + (obs - min) * (self.high - self.low) / (max - min)  # min-max normalization
-
+        obs, reward, term, truncated, info, state = self._env.step(state, action, key)
+        obs = self.low + (obs - self.min_obs) * (self.high - self.low) / (self.max_obs - self.min_obs)  # min-max normalization
         return obs, reward, term, truncated, info, state
+
+    def state(self, state: State) -> chex.Array:
+        global_obs = self._env.state(state)
+        global_obs = self.low + (global_obs - self.min_obs) * (self.high - self.low) / (
+            self.max_obs - self.min_obs
+        )  # min-max normalization
+        return global_obs
+
+
+class ClipActions(Wrapper):
+    """Clip actions to the action space."""
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, State]:
+        return self._env.reset(key)
+
+    def step(
+        self, state: State, action: jnp.ndarray, key: chex.PRNGKey
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, State]:
+        action = jnp.clip(action, self._env.action_space(0).low, self._env.action_space(0).high)
+        return self._env.step(state, action, key)
 
     def state(self, state: State) -> chex.Array:
         return self._env.state(state)

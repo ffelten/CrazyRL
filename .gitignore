@@ -132,3 +132,5 @@ dmypy.json
 .pyre/
 
 .idea/
+trained_model/
+**.DS_Store

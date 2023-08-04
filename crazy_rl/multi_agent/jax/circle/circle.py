@@ -10,7 +10,7 @@ from jax import jit, random, vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
 from crazy_rl.utils.jax_spaces import Box, Space
-from crazy_rl.utils.jax_wrappers import AutoReset, VecEnv
+from crazy_rl.utils.jax_wrappers import AutoReset, LogWrapper, VecEnv
 
 
 @jdc.pytree_dataclass
@@ -41,29 +41,23 @@ class Circle(BaseParallelEnv):
             size: Size of the map in meters
         """
         self.num_drones = num_drones
-
         self.size = size
-
         self._init_flying_pos = init_flying_pos
 
         # Specific to circle
-
         circle_radius = 0.5  # [m]
-
         self.num_intermediate_points = num_intermediate_points
 
         # Ref is a list of 2d arrays for each agent
         # each 2d array contains the reference points (xyz) for the agent at each timestep
-        self.ref = jnp.zeros((num_intermediate_points, self.num_drones, 3))
-
+        self.ref = jnp.zeros((self.num_drones, num_intermediate_points, 3))
         ts = 2 * jnp.pi * jnp.arange(num_intermediate_points) / num_intermediate_points
-
         for agent in range(self.num_drones):
-            self.ref = self.ref.at[:, agent, 0].set(
+            self.ref = self.ref.at[agent, :, 0].set(
                 circle_radius * (1 - jnp.cos(ts)) + (init_flying_pos[agent][0] - circle_radius)
             )
-            self.ref = self.ref.at[:, agent, 1].set(circle_radius * jnp.sin(ts) + (init_flying_pos[agent][1]))
-            self.ref = self.ref.at[:, agent, 2].set(init_flying_pos[agent][2])
+            self.ref = self.ref.at[agent, :, 1].set(circle_radius * jnp.sin(ts) + (init_flying_pos[agent][1]))
+            self.ref = self.ref.at[agent, :, 2].set(init_flying_pos[agent][2])
 
     @override
     def observation_space(self, agent: int) -> Space:
@@ -88,15 +82,14 @@ class Circle(BaseParallelEnv):
         return jdc.replace(
             state,
             agents_locations=self._sanitize_action(state, actions),
-            target_location=self.ref[state.timestep % self.num_intermediate_points],
+            target_location=self.ref[:, state.timestep % self.num_intermediate_points, :],
         )  # redo the circle if the end is reached
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
         # Reward is based on the Euclidean distance to the target point
-
-        return -1 * jnp.linalg.norm(state.target_location - state.agents_locations, axis=1)
+        return 2 * self.size - jnp.linalg.norm(state.target_location - state.agents_locations, axis=1)
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -115,7 +108,7 @@ class Circle(BaseParallelEnv):
         state = State(
             agents_locations=self._init_flying_pos,
             timestep=0,
-            target_location=jnp.copy(self.ref[0]),
+            target_location=jnp.copy(self.ref[:, 0, :]),
         )
         obs = self._compute_obs(state)
         return obs, {}, state
@@ -133,11 +126,11 @@ if __name__ == "__main__":
 
     print(xla_bridge.get_backend().platform)
 
-    num_agents = 5
+    num_agents = 3
     env = Circle(
         num_drones=num_agents,
-        init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [2.0, 1.0, 1.0], [0.0, 1.0, 1.0], [2.0, 2.0, 1.0], [1.0, 0.0, 1.0]]),
-        num_intermediate_points=100,
+        init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        num_intermediate_points=10,
     )
 
     num_envs = 3  # number of states in parallel
@@ -146,12 +139,14 @@ if __name__ == "__main__":
     key, *subkeys = random.split(key, num_envs + 1)
 
     # Wrappers
+    env = LogWrapper(env)  # Logs the env info
     env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
     env = VecEnv(env)  # vmaps the env public methods
 
     obs, info, state = env.reset(jnp.stack(subkeys))
+    r = jnp.zeros(num_envs)
 
-    for i in range(301):
+    for i in range(100):
         key, *subkeys = random.split(key, num_agents + 1)
         actions = (
             jnp.array([env.action_space(agent_id).sample(jnp.stack(subkeys[agent_id])) for agent_id in range(env.num_drones)])
@@ -162,9 +157,11 @@ if __name__ == "__main__":
         global_state = env.state(state)
         key, *subkeys = random.split(key, num_envs + 1)
         obs, rewards, term, trunc, info, state = env.step(state, actions, jnp.stack(subkeys))
+        r += rewards.sum(axis=1)
 
         # print("obs", obs)
         print("rewards", rewards)
         # print("term", term)
-        print("trunc", trunc)
+        # print("trunc", trunc)
         # print("info", info)
+    print(r)

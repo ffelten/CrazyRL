@@ -755,7 +755,7 @@ plugins = ["importlib-metadata"]
 
 [[package]]
 name = "pyopengl"
-version = "3.1.7"
+version = "3.1.6"
 description = "Standard OpenGL bindings for Python"
 category = "main"
 optional = false
@@ -1008,7 +1008,7 @@ pytest = ["pytest"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9, <3.12"
-content-hash = "96df0d99f98ca8b9a3da811e2b032a765ec5bfc24f917d06af6daa22e07165a1"
+content-hash = "a8926c994923585ba4ce49e1ee6da844c30a5ce263b944e983c215e4a4e97a90"
 
 [metadata.files]
 absl-py = [
@@ -1735,8 +1735,9 @@ pygments = [
     {file = "Pygments-2.15.1.tar.gz", hash = "sha256:8ace4d3c1dd481894b2005f560ead0f9f19ee64fe983366be1a21e171d12775c"},
 ]
 pyopengl = [
-    {file = "PyOpenGL-3.1.7-py3-none-any.whl", hash = "sha256:a6ab19cf290df6101aaf7470843a9c46207789855746399d0af92521a0a92b7a"},
-    {file = "PyOpenGL-3.1.7.tar.gz", hash = "sha256:eef31a3888e6984fd4d8e6c9961b184c9813ca82604d37fe3da80eb000a76c86"},
+    {file = "PyOpenGL-3.1.6-py2-none-any.whl", hash = "sha256:57c597d989178e1413002df6b923619f6d29807501dece1c60cc6f12c0c8e8a7"},
+    {file = "PyOpenGL-3.1.6-py3-none-any.whl", hash = "sha256:a7139bc3e15d656feae1f7e3ef68c799941ed43fadc78177a23db7e946c20738"},
+    {file = "PyOpenGL-3.1.6.tar.gz", hash = "sha256:8ea6c8773927eda7405bffc6f5bb93be81569a7b05c8cac50cd94e969dce5e27"},
 ]
 pyparsing = [
     {file = "pyparsing-3.0.9-py3-none-any.whl", hash = "sha256:5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc"},

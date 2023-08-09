@@ -49,7 +49,7 @@ def crash_ground(parallel_env, key):
     return obs, rewards, terminated, truncated, state
 
 
-def leave_the_map(parallel_env, key):
+def leave_the_map(parallel_env, key, total_moves=100):
     """Test where the second drone, starting on (0, 1, 1) tries to leave the map, and they stay alive until the
     end of the round."""
     obs, info, state = parallel_env.reset(key)
@@ -61,7 +61,7 @@ def leave_the_map(parallel_env, key):
     # the drone stays in the map
     assert state.agents_locations[1, 1] <= 3
 
-    obs, rewards, terminated, truncated, info, state, key = wait(parallel_env, state, key, 90)
+    obs, rewards, terminated, truncated, info, state, key = wait(parallel_env, state, key, total_moves - 10)
 
     # the game ends after 100 timesteps
     assert truncated.all()
@@ -163,7 +163,7 @@ def test_circle():
     key = random.PRNGKey(seed)
 
     key, subkey = random.split(key)
-    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
+    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey, total_moves=200)
 
     # observation : agent's location and target's location
     assert (obs == jnp.array([[0, 0, 1, -0.5, 0, 1], [0, 3, 1, -0.5, 1, 1]])).all()

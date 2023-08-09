@@ -12,7 +12,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+import orbax.checkpoint
 from distrax import MultivariateNormalDiag
+from etils import epath
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from jax import vmap
@@ -133,9 +135,7 @@ def make_train(args):
     # )
     env = Circle(
         num_drones=num_drones,
-        # init_flying_pos=jnp.array([[0.0, 0.0, 1.0]]),
         init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-        num_intermediate_points=40,
     )
 
     env = ClipActions(env)
@@ -426,6 +426,13 @@ if __name__ == "__main__":
     out = jax.block_until_ready(train_jit(rng))
     print(f"total time: {time.time() - start_time}")
     print(f"SPS: {args.total_timesteps / (time.time() - start_time)}")
+
+    actor_state = out["runner_state"][0]
+    directory = epath.Path("trained_model")
+    actor_dir = directory / "actor"
+    print("Saving actor to ", actor_dir)
+    ckptr = orbax.checkpoint.PyTreeCheckpointer()
+    ckptr.save(actor_dir, actor_state, force=True)
 
     import matplotlib.pyplot as plt
 

@@ -18,6 +18,7 @@ from etils import epath
 from flax.training.train_state import TrainState
 from pettingzoo import ParallelEnv
 
+from crazy_rl.multi_agent.numpy.circle import Circle
 from crazy_rl.multi_agent.numpy.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
@@ -194,14 +195,15 @@ def replay_simu(args):
     np.random.seed(args.seed)
     key = jax.random.PRNGKey(args.seed)
 
-    env: ParallelEnv = Surround(
-        drone_ids=np.array([0, 1, 2, 3, 4]),
+    env: ParallelEnv = Circle(
+        drone_ids=np.array([0, 1, 2]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-        target_location=np.array([1, 1, 2.5]),
+        init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        # init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        # target_location=np.array([1, 1, 2.5]),
     )
 
-    obs = env.reset(seed=args.seed)
+    _ = env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])
     key, actor_key = jax.random.split(key, 2)
     init_local_state = jnp.asarray(env.observation_space(env.unwrapped.agents[0]).sample())
@@ -218,7 +220,7 @@ def replay_simu(args):
     actor_state = load_actor_state(args.model_dir, actor_state)
 
     for i in range(10):
-        obs = env.reset(seed=args.seed)
+        obs, _ = env.reset(seed=args.seed)
         play_episode(actor_module, actor_state, env, obs, single_action_space, key, True)
     env.close()
 
@@ -259,7 +261,7 @@ def replay_real(args):
             swarm=swarm,
         )
 
-        obs = env.reset(seed=args.seed)
+        obs, _ = env.reset(seed=args.seed)
         single_action_space = env.action_space(env.unwrapped.agents[0])
         key, actor_key = jax.random.split(key, 2)
         init_local_state = jnp.asarray(env.observation_space(env.unwrapped.agents[0]).sample())

@@ -173,12 +173,12 @@ def replay_simu(args):
     print("Using ", device)
 
     env: ParallelEnv = Circle(
-        drone_ids=np.array([0, 1, 2, 3]),
+        drone_ids=np.array([0, 1, 2]),
         render_mode="human",
-        init_flying_pos=np.array([[0, 0, 1], [0, 1, 0.5], [0, -1, 0.5], [1, 0, 0.5]]),
+        init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
     )
 
-    obs = env.reset(seed=args.seed)
+    obs, _ = env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])
     assert isinstance(single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -239,7 +239,7 @@ def replay_real(args):
             swarm=swarm,
         )
 
-        obs = env.reset(seed=args.seed)
+        obs, _ = env.reset(seed=args.seed)
         # Use pretrained model
         print("Loading pre-trained model ", args.model_filename)
         actor = Actor(env).to(device)

@@ -22,7 +22,7 @@ class Circle(BaseParallelEnv):
         init_flying_pos: npt.NDArray[int],
         render_mode=None,
         num_intermediate_points: int = 10,
-        size: int = 4,
+        size: int = 3,
         swarm=None,
     ):
         """Circle environment for Crazyflies 2.
@@ -51,12 +51,11 @@ class Circle(BaseParallelEnv):
 
         for i, agent in enumerate(self._agents_names):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
-
             ts = 2 * np.pi * np.arange(num_intermediate_points) / num_intermediate_points
 
             self.ref.append(np.zeros((num_intermediate_points, 3)))
-            self.ref[i][:, 2] = circle_radius * np.sin(ts) + (init_flying_pos[i][2])  # z-position
-            self.ref[i][:, 1] = init_flying_pos[i][1]  # y-position
+            self.ref[i][:, 2] = init_flying_pos[i][2]  # z-position
+            self.ref[i][:, 1] = circle_radius * np.sin(ts) + (init_flying_pos[i][1])  # y-position
             self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_flying_pos[i][0] - circle_radius)  # x-position
 
         self._agent_location = self._init_flying_pos.copy()
@@ -114,7 +113,7 @@ class Circle(BaseParallelEnv):
         # Reward is based on the euclidean distance to the target point
         reward = dict()
         for agent in self._agents_names:
-            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
+            reward[agent] = 2 * self.size - np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
         return reward
 
     @override
@@ -123,7 +122,7 @@ class Circle(BaseParallelEnv):
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 10000:
+        if self.timestep == 200:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
             self.timestep = 0

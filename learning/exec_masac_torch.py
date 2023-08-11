@@ -142,11 +142,12 @@ def play_episode(actor, env, init_obs, device, simu):
 
         # TRY NOT TO MODIFY: execute the game and log data.
         start = time.time()
-        next_obs, _, terminateds, truncateds, infos = env.step(actions)
+        next_obs, r, terminateds, truncateds, infos = env.step(actions)
+        print("Reward: ", r)
         print("Time for env step: ", time.time() - start)
 
         if simu:
-            time.sleep(0.05)
+            time.sleep(0.1)
 
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())

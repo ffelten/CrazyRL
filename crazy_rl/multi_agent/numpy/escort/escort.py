@@ -114,7 +114,7 @@ class Escort(BaseParallelEnv):
         return obs
 
     @override
-    def _compute_action(self, actions):
+    def _transition_state(self, actions):
         target_point_action = dict()
         state = self._get_drones_state()
 

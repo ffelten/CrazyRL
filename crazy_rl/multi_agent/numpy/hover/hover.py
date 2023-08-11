@@ -79,7 +79,7 @@ class Hover(BaseParallelEnv):
         return obs
 
     @override
-    def _compute_action(self, actions: Dict[str, np.ndarray]):
+    def _transition_state(self, actions: Dict[str, np.ndarray]):
         target_point_action = dict()
         state = self._get_drones_state()
         for agent in self._agents_names:

@@ -22,6 +22,7 @@ from flax.training.train_state import TrainState
 from pettingzoo import ParallelEnv
 
 from crazy_rl.multi_agent.numpy.circle import Circle
+from crazy_rl.multi_agent.numpy.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 
@@ -42,7 +43,8 @@ class Actor(nn.Module):
         actor_mean = activation(actor_mean)
         actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(actor_mean)
         actor_logtstd = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
-        pi: MultivariateNormalDiag = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_logtstd))
+        std = jnp.exp(actor_logtstd)
+        pi: MultivariateNormalDiag = distrax.MultivariateNormalDiag(actor_mean, std)
         return pi
 
 
@@ -66,7 +68,7 @@ def _ma_get_action(actor: Actor, actor_state: TrainState, env: ParallelEnv, obs:
         # get action from NN
         # print("Observation: ", agent_obs)
         pi = actor.apply(actor_state.params, agent_obs)
-        action = pi.sample(seed=keys[i])
+        action = pi.mode()  # deterministic mode just takes the mean
         # clip action
         action = jnp.clip(action, -1.0, 1.0)
         actions[key] = np.array(action)
@@ -135,7 +137,7 @@ def load_actor_state(model_path: str, actor_state: TrainState):
     directory = epath.Path(model_path)
     print("Loading actor from ", directory)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
-    ckptr.restore(model_path, item=actor_state)
+    actor_state = ckptr.restore(model_path, item=actor_state)
     print(type(actor_state))
 
     return actor_state
@@ -153,10 +155,17 @@ def replay_simu(args):
     np.random.seed(args.seed)
     key = jax.random.PRNGKey(args.seed)
 
-    env = Circle(
+    # env = Circle(
+    #     drone_ids=np.array([0, 1, 2]),
+    #     render_mode="human",
+    #     init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+    # )
+
+    env = Surround(
         drone_ids=np.array([0, 1, 2]),
         render_mode="human",
         init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        target_location=np.array([1.0, 1.0, 2.0]),
     )
 
     # env: ParallelEnv = Circle(
@@ -185,9 +194,8 @@ def replay_simu(args):
     )
     actor_state = load_actor_state(args.model_dir, actor_state)
 
-    for i in range(10):
-        obs, _ = env.reset(seed=args.seed)
-        play_episode(actor_module, actor_state, env, obs, key, True)
+    obs, _ = env.reset(seed=args.seed)
+    play_episode(actor_module, actor_state, env, obs, key, True)
     env.close()
 
 

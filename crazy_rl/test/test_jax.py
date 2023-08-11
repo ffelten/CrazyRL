@@ -222,8 +222,28 @@ def test_escort():
         obs
         == jnp.array(
             [
-                [0, 0, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 3, 1],
-                [0, 3, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 0, 1],
+                [
+                    0,
+                    0,
+                    1,
+                    state.target_location[0, 0],
+                    state.target_location[0, 1],
+                    state.target_location[0, 2],
+                    0,
+                    3,
+                    1,
+                ],
+                [
+                    0,
+                    3,
+                    1,
+                    state.target_location[0, 0],
+                    state.target_location[0, 1],
+                    state.target_location[0, 2],
+                    0,
+                    0,
+                    1,
+                ],
             ]
         )
     ).all()
@@ -269,8 +289,28 @@ def test_catch():
         obs
         == jnp.array(
             [
-                [0, 0, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 3, 1],
-                [0, 3, 1, state.target_location[0, 0], state.target_location[0, 1], state.target_location[0, 2], 0, 0, 1],
+                [
+                    0,
+                    0,
+                    1,
+                    state.target_location[0, 0],
+                    state.target_location[0, 1],
+                    state.target_location[0, 2],
+                    0,
+                    3,
+                    1,
+                ],
+                [
+                    0,
+                    3,
+                    1,
+                    state.target_location[0, 0],
+                    state.target_location[0, 1],
+                    state.target_location[0, 2],
+                    0,
+                    0,
+                    1,
+                ],
             ]
         )
     ).all()

@@ -3,7 +3,7 @@ import argparse
 import os
 import time
 from distutils.util import strtobool
-from typing import List, NamedTuple, Sequence, Tuple
+from typing import List, NamedTuple, Optional, Sequence, Tuple
 
 import chex
 import distrax
@@ -20,7 +20,7 @@ from flax.training.train_state import TrainState
 from jax import vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import State
-from crazy_rl.multi_agent.jax.circle import Circle
+from crazy_rl.multi_agent.jax.surround import Surround
 from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
@@ -42,23 +42,23 @@ def parse_args():
     parser.add_argument("--debug", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True, help="run in debug mode")
 
     # Algorithm specific arguments
-    parser.add_argument("--num-envs", type=int, default=512, help="the number of parallel environments")
-    parser.add_argument("--num-steps", type=int, default=100, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=5e6,
+    parser.add_argument("--num-envs", type=int, default=128, help="the number of parallel environments")
+    parser.add_argument("--num-steps", type=int, default=10, help="the number of steps per epoch (higher batch size should be better)")
+    parser.add_argument("--total-timesteps", type=int, default=3e6,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")
     parser.add_argument("--gamma", type=float, default=0.99,
                         help="the discount factor gamma")
-    parser.add_argument("--lr", type=float, default=3e-4,
+    parser.add_argument("--lr", type=float, default=1e-3,
                         help="the learning rate of the policy network optimizer")
-    parser.add_argument("--gae-lambda", type=float, default=0.95,
+    parser.add_argument("--gae-lambda", type=float, default=0.99,
                         help="the lambda for the generalized advantage estimation")
     parser.add_argument("--clip-eps", type=float, default=0.2,
                         help="the epsilon for clipping in the policy objective")
-    parser.add_argument("--ent-coef", type=float, default=0.01,
+    parser.add_argument("--ent-coef", type=float, default=0.0,
                         help="the coefficient for the entropy bonus")
-    parser.add_argument("--vf-coef", type=float, default=0.5,
+    parser.add_argument("--vf-coef", type=float, default=0.8,
                         help="the coefficient for the value function loss")
     parser.add_argument("--max-grad-norm", type=float, default=0.5,
                         help="the maximum norm for the gradient clipping")
@@ -127,16 +127,15 @@ def make_train(args):
     minibatch_size = args.num_envs * args.num_steps // args.num_minibatches
     num_drones = 3
 
-    # env = Catch(
-    #     num_drones=num_drones,
-    #     init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-    #     init_target_location=jnp.array([1.0, 1.0, 2.5]),
-    #     target_speed=0.1,
-    # )
-    env = Circle(
+    env = Surround(
         num_drones=num_drones,
         init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        target_location=jnp.array([1.0, 1.0, 2.0]),
     )
+    # env = Circle(
+    #     num_drones=num_drones,
+    #     init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+    # )
 
     env = ClipActions(env)
     env = NormalizeObservation(env)
@@ -149,11 +148,13 @@ def make_train(args):
     # Initial reset to have correct dimensions in the observations
     obs, info, state = env.reset(key=jax.random.PRNGKey(args.seed))
 
-    def linear_schedule(count):
-        frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / num_updates
-        return args.lr * frac
+    def train(key: chex.PRNGKey, lr: Optional[float] = None):
+        lr = args.lr if lr is None else lr
 
-    def train(key: chex.PRNGKey):
+        def linear_schedule(count):
+            frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / num_updates
+            return lr * frac
+
         # INIT NETWORKS
         actor = Actor(env.action_space(0).shape[0], activation=args.activation)
         critic = Critic(activation=args.activation)
@@ -418,29 +419,77 @@ def make_train(args):
     return train
 
 
-if __name__ == "__main__":
-    args = parse_args()
-    rng = jax.random.PRNGKey(args.seed)
-    train_jit = jax.jit(make_train(args))
-    start_time = time.time()
-    out = jax.block_until_ready(train_jit(rng))
-    print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps / (time.time() - start_time)}")
-
-    actor_state = out["runner_state"][0]
+def save_actor(actor_state):
     directory = epath.Path("trained_model")
     actor_dir = directory / "actor"
     print("Saving actor to ", actor_dir)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
     ckptr.save(actor_dir, actor_state, force=True)
 
+
+def multi_seeds(rng, args):
+    NUM_SEEDS = 10
+    rngs = jax.random.split(rng, NUM_SEEDS)
+    train_vjit = jax.jit(jax.vmap(make_train(args), in_axes=(0,)))
+    start_time = time.time()
+    out = jax.block_until_ready(train_vjit(rngs, None))
+    print(f"total time: {time.time() - start_time}")
+    print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
+
+    for i in range(NUM_SEEDS):
+        returns = out["metrics"]["returned_episode_returns"][i]
+        returns = returns.mean(-1).reshape(-1)
+        returns = returns[returns != 0.0]  # filters out non-terminal returns
+        plt.plot(returns)
+    plt.show()
+
+
+def hp_search(args):
+    NUM_SEEDS = 3
+    hyperparams = jnp.array([1e-4, 5e-4, 1e-3, 5e-3])  # lr
+
+    rng = jax.random.PRNGKey(args.seed)
+    rngs = jax.random.split(rng, NUM_SEEDS)
+    train_vvjit = jax.jit(
+        jax.vmap(
+            jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the hyperparam
+            in_axes=(0, None),  # vmaps over the rngs
+        )
+    )
+    start_time = time.time()
+    out = jax.block_until_ready(train_vvjit(rngs, hyperparams))
+    print(f"total time: {time.time() - start_time}")
+    print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
+
+    import matplotlib.pyplot as plt
+
+    for i in range(len(hyperparams)):
+        returns = out["metrics"]["returned_episode_returns"][:, i, :]
+        returns = returns.mean(0).mean(-1).reshape(-1)
+        returns = returns[returns != 0.0]  # filters out non-terminal returns
+        plt.plot(returns, label="lr=" + str(hyperparams[i]))
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    rng = jax.random.PRNGKey(args.seed)
+
+    train_jit = jax.jit(make_train(args))  # one seed
+    start_time = time.time()
+    out = jax.block_until_ready(train_jit(rng, None))
+    print(f"total time: {time.time() - start_time}")
+    print(f"SPS: {args.total_timesteps / (time.time() - start_time)}")
+
+    actor_state = out["runner_state"][0]
+    save_actor(actor_state)
+
     import matplotlib.pyplot as plt
 
     returns = out["metrics"]["returned_episode_returns"]
     returns = returns.mean(-1).reshape(-1)
     returns = returns[returns != 0.0]  # filters out non-terminal returns
-
     plt.plot(returns, label="episode return")
+
     # plt.plot(out["metrics"]["total_loss"].mean(-1).reshape(-1), label="total loss")
     # plt.plot(out["metrics"]["actor_loss"].mean(-1).reshape(-1), label="actor loss")
     # plt.plot(out["metrics"]["value_loss"].mean(-1).reshape(-1), label="value loss")

@@ -14,6 +14,10 @@ from jax import jit
 from crazy_rl.utils.jax_spaces import Space
 
 
+def _distances_to_target(agents_locations: jnp.ndarray, targets_locations: jnp.ndarray) -> jnp.ndarray:
+    return jnp.linalg.norm(agents_locations - targets_locations, axis=1)
+
+
 @jdc.pytree_dataclass
 class State:
     """State of the environment containing the modifiable variables.

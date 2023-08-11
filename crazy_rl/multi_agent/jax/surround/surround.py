@@ -9,7 +9,11 @@ import jax_dataclasses as jdc
 from gymnasium import spaces
 from jax import jit, random
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
+from crazy_rl.multi_agent.jax.base_parallel_env import (
+    BaseParallelEnv,
+    State,
+    _distances_to_target,
+)
 from crazy_rl.utils.jax_spaces import Box, Space
 from crazy_rl.utils.jax_wrappers import AutoReset, VecEnv
 
@@ -20,6 +24,7 @@ class State(State):
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game
+    prev_agent_locations: jnp.ndarray  # 2D array containing x,y,z coordinates of each agent at last timestep
 
 
 class Surround(BaseParallelEnv):
@@ -81,11 +86,8 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
+        # REWARD DISTANCE FROM OTHERS
         # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
-
-        reward_close_to_target = 0.95 * (
-            2 * self.size - jnp.linalg.norm(state.agents_locations - self._target_location, axis=1)
-        )
         reward_far_from_other_agents = (
             jnp.array(
                 [
@@ -96,12 +98,19 @@ class Surround(BaseParallelEnv):
             * 0.05
             / (self.num_drones - 1)
         )
-        reward_crash = jnp.any(terminations) * -10 * jnp.ones(self.num_drones)
 
-        return (
-            jnp.any(truncations) * (reward_close_to_target + reward_far_from_other_agents)
-            + (1 - jnp.any(truncations)) * reward_crash
-        )
+        # REWARD DISTANCE FROM TARGET
+        cur_dist_to_target = _distances_to_target(state.agents_locations, self._target_location)
+        old_dist = _distances_to_target(state.prev_agent_locations, self._target_location)
+        # reward should be new_potential - old_potential but since the potential should be negated (we want to min distance),
+        # we have to negate the reward, -new_potential - (-old_potential) = old_potential - new_potential
+        reward_close_to_target = 0.95 * (old_dist - cur_dist_to_target)
+
+        reward_crash = -10 * jnp.ones(self.num_drones)
+
+        return (1 - jnp.any(terminations)) * (reward_close_to_target + reward_far_from_other_agents) + jnp.any(
+            terminations
+        ) * reward_crash
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -124,13 +133,14 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_truncation(self, state: State) -> jnp.ndarray:
-        return (state.timestep == 100) * jnp.ones(self.num_drones)
+        return (state.timestep == 200) * jnp.ones(self.num_drones)
 
     @override
     @partial(jit, static_argnums=(0,))
     def reset(self, key: jnp.ndarray) -> Tuple[jnp.ndarray, dict, State]:
         state = State(
             agents_locations=self._init_flying_pos,
+            prev_agent_locations=self._init_flying_pos,
             timestep=0,
         )
         obs = self._compute_obs(state)

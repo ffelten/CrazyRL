@@ -8,7 +8,11 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 from jax import jit, random, vmap
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
+from crazy_rl.multi_agent.jax.base_parallel_env import (
+    BaseParallelEnv,
+    State,
+    _distances_to_target,
+)
 from crazy_rl.utils.jax_spaces import Box, Space
 from crazy_rl.utils.jax_wrappers import AutoReset, LogWrapper, VecEnv
 
@@ -20,6 +24,8 @@ class State(State):
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game
     target_location: jnp.ndarray  # 2D array containing x,y,z coordinates of the target of each agent
+    prev_agent_locations: jnp.ndarray  # 2D array containing x,y,z coordinates of each agent at last timestep
+    prev_target_locations: jnp.ndarray  # 2D array containing x,y,z coordinates of the target of each agent at last timestep
 
 
 class Circle(BaseParallelEnv):
@@ -79,17 +85,27 @@ class Circle(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _transition_state(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
+        new_loc = self._sanitize_action(state, actions)
+        new_targets_locs = self.ref[:, state.timestep % self.num_intermediate_points, :]
+        prev_agent_locations = state.agents_locations
+        prev_target_locations = state.target_location
         return jdc.replace(
             state,
-            agents_locations=self._sanitize_action(state, actions),
-            target_location=self.ref[:, state.timestep % self.num_intermediate_points, :],
+            agents_locations=new_loc,
+            target_location=new_targets_locs,
+            prev_agent_locations=prev_agent_locations,
+            prev_target_locations=prev_target_locations,
         )  # redo the circle if the end is reached
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
-        # Reward is based on the Euclidean distance to the target point
-        return 2 * self.size - jnp.linalg.norm(state.target_location - state.agents_locations, axis=1)
+        # Potential based reward (!) locations and targets must be updated before this
+        dist_from_old_target = _distances_to_target(state.agents_locations, state.prev_target_locations)
+        old_dist = _distances_to_target(state.prev_agent_locations, state.prev_target_locations)
+        # reward should be new_potential - old_potential but since the potential should be negated (we want to min distance),
+        # we have to negate the reward, -new_potential - (-old_potential) = old_potential - new_potential
+        return old_dist - dist_from_old_target
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -107,8 +123,10 @@ class Circle(BaseParallelEnv):
     def reset(self, key: jnp.ndarray) -> Tuple[jnp.ndarray, dict, State]:
         state = State(
             agents_locations=self._init_flying_pos,
+            prev_agent_locations=self._init_flying_pos,
             timestep=0,
             target_location=jnp.copy(self.ref[:, 0, :]),
+            prev_target_locations=jnp.copy(self.ref[:, 0, :]),
         )
         obs = self._compute_obs(state)
         return obs, {}, state

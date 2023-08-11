@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from typing_extensions import override
 
 import numpy as np
+import numpy.typing as npt
 import pygame
 from cflib.crazyflie.swarm import Swarm
 from gymnasium import spaces
@@ -52,6 +53,10 @@ from crazy_rl.utils.graphic import axes, field, point, target_point
 from crazy_rl.utils.utils import run_land, run_sequence, run_take_off
 
 
+def _distance_to_target(agent_location: npt.NDArray[float], target_location: npt.NDArray[float]) -> float:
+    return np.linalg.norm(agent_location - target_location)
+
+
 class BaseParallelEnv(ParallelEnv):
     """The Base environment inheriting from pettingZoo Parallel environment class.
 
@@ -71,7 +76,7 @@ class BaseParallelEnv(ParallelEnv):
 
     metadata = {
         "render_modes": ["human", "real"],
-        "is_parallelizable": True,
+        "is_parallelizable": False,
         "render_fps": 10,
     }
 
@@ -101,8 +106,10 @@ class BaseParallelEnv(ParallelEnv):
         """
         self.size = size  # The size of the square grid
         self._agent_location = init_flying_pos.copy()
+        self._previous_location = init_flying_pos.copy()  # for potential based reward
         self._init_flying_pos = init_flying_pos
         self._target_location = target_location
+        self._previous_target = target_location.copy()
         self.possible_agents = agents_names.tolist()
         self.timestep = 0
         self.agents = []
@@ -135,7 +142,7 @@ class BaseParallelEnv(ParallelEnv):
         """Returns the current observation of the environment. Must be implemented in a subclass."""
         raise NotImplementedError
 
-    def _compute_action(self, action):
+    def _transition_state(self, action):
         """Computes the action passed to `.step()` into action matching the mode environment. Must be implemented in a subclass.
 
         Args:
@@ -164,12 +171,16 @@ class BaseParallelEnv(ParallelEnv):
     def reset(self, seed=None, return_info=False, options=None):
         self.timestep = 0
         self.agents = copy(self.possible_agents)
+        self._target_location = self._target_location.copy()
+        self._previous_target = self._target_location.copy()
 
         if self._mode == "simu":
             self._agent_location = self._init_flying_pos.copy()
+            self._previous_location = self._init_flying_pos.copy()
         elif self._mode == "real":
             # self.swarm.parallel_safe(reset_estimator)
             self._agent_location = self._get_drones_state()
+            self._previous_location = self._agent_location.copy()
             print("reset", self._agent_location)
 
             command = dict()
@@ -199,18 +210,19 @@ class BaseParallelEnv(ParallelEnv):
     def step(self, actions):
         self.timestep += 1
 
-        target_action = self._compute_action(actions)
-
         if self._mode == "simu":
-            self._agent_location = target_action
             self.render()
+            new_locations = self._transition_state(actions)
+            self._previous_location = self._agent_location
+            self._agent_location = new_locations
 
         elif self._mode == "real":
+            new_locations = self._transition_state(actions)
             command = dict()
             # dict target_position URI
             for id in self.drone_ids:
                 uri = "radio://0/4/2M/E7E7E7E7" + str(id).zfill(2)
-                target = target_action["agent_" + str(id)]
+                target = new_locations["agent_" + str(id)]
                 current_location = self._agent_location["agent_" + str(id)]
                 command[uri] = [[current_location, target]]
 
@@ -220,7 +232,8 @@ class BaseParallelEnv(ParallelEnv):
 
             # (!) Updates of location are not relying on cflib because it is too slow in practice
             # So yes, we assume the drones go where we tell them to go
-            self._agent_location = target_action
+            self._previous_location = self._agent_location
+            self._agent_location = new_locations
 
         terminations = self._compute_terminated()
         truncations = self._compute_truncation()

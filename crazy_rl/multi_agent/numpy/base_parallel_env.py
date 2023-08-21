@@ -108,6 +108,7 @@ class BaseParallelEnv(ParallelEnv):
         self._agent_location = init_flying_pos.copy()
         self._previous_location = init_flying_pos.copy()  # for potential based reward
         self._init_flying_pos = init_flying_pos
+        self._init_target_location = target_location
         self._target_location = target_location
         self._previous_target = target_location.copy()
         self.possible_agents = agents_names.tolist()
@@ -171,8 +172,8 @@ class BaseParallelEnv(ParallelEnv):
     def reset(self, seed=None, return_info=False, options=None):
         self.timestep = 0
         self.agents = copy(self.possible_agents)
-        self._target_location = self._target_location.copy()
-        self._previous_target = self._target_location.copy()
+        self._target_location = self._init_target_location.copy()
+        self._previous_target = self._init_target_location.copy()
 
         if self._mode == "simu":
             self._agent_location = self._init_flying_pos.copy()
@@ -273,10 +274,10 @@ class BaseParallelEnv(ParallelEnv):
             glLightfv(GL_LIGHT0, GL_DIFFUSE, [1.0, 1.0, 1.0, 1])
 
             glMatrixMode(GL_PROJECTION)
-            gluPerspective(45, (self.window_size / self.window_size), 0.1, 50.0)
+            gluPerspective(60, (self.window_size / self.window_size), 0.1, 50.0)
 
             glMatrixMode(GL_MODELVIEW)
-            gluLookAt(1, -10, 2, 0, 0, 0, 0, 0, 1)
+            gluLookAt(3, -11, 3, 0, 0, 0, 0, 0, 1)
 
             self.viewMatrix = glGetFloatv(GL_MODELVIEW_MATRIX)
             glLoadIdentity()

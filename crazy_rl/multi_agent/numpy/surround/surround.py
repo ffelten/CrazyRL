@@ -119,15 +119,16 @@ class Surround(BaseParallelEnv):
                     if other_agent != agent:
                         reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
                 reward[agent] /= self.num_drones - 1
+                reward[agent] *= 0.2
 
                 # DISTANCE TO THE TARGET
-                # (!) targets and locations must be updated before this
+                # (!) locations must be updated before this, target is fixed
                 dist_from_old_target = _distance_to_target(self._agent_location[agent], self._target_location["unique"])
                 old_dist = _distance_to_target(self._previous_location[agent], self._target_location["unique"])
 
                 # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
                 # -new_potential - (-old_potential) = old_potential - new_potential
-                reward[agent] += 0.95 * (old_dist - dist_from_old_target)
+                reward[agent] += 0.8 * (old_dist - dist_from_old_target)
 
         return reward
 

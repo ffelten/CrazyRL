@@ -20,7 +20,10 @@ from flax.training.train_state import TrainState
 from jax import vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import State
-from crazy_rl.multi_agent.jax.surround import Surround
+from crazy_rl.multi_agent.jax.catch import Catch
+
+# from crazy_rl.multi_agent.jax.escort import Escort
+# from crazy_rl.multi_agent.jax.surround import Surround
 from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
@@ -125,12 +128,25 @@ class Transition(NamedTuple):
 def make_train(args):
     num_updates = args.total_timesteps // args.num_steps // args.num_envs
     minibatch_size = args.num_envs * args.num_steps // args.num_minibatches
-    num_drones = 3
+    num_drones = 8
 
-    env = Surround(
+    env = Catch(
         num_drones=num_drones,
-        init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-        target_location=jnp.array([1.0, 1.0, 2.0]),
+        init_flying_pos=jnp.array(
+            [
+                [0.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+                [1.0, 0.0, 1.0],
+                [1.0, 2.0, 2.0],
+                [2.0, 0.5, 1.0],
+                [2.0, 2.5, 2.0],
+                [2.0, 1.0, 2.5],
+                [0.5, 0.5, 0.5],
+            ]
+        ),
+        init_target_location=jnp.array([1.0, 1.0, 2.0]),
+        target_speed=0.15,
+        # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
     )
     # env = Circle(
     #     num_drones=num_drones,

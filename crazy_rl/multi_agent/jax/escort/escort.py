@@ -9,7 +9,11 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 from jax import jit, random
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
+from crazy_rl.multi_agent.jax.base_parallel_env import (
+    BaseParallelEnv,
+    State,
+    _distances_to_target,
+)
 from crazy_rl.utils.jax_spaces import Box, Space
 from crazy_rl.utils.jax_wrappers import AutoReset, VecEnv
 
@@ -21,6 +25,8 @@ class State(State):
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
     timestep: int  # represents the number of steps already done in the game
     target_location: jnp.ndarray  # 2D array containing x,y,z coordinates of the common target
+    prev_agent_locations: jnp.ndarray  # 2D array containing x,y,z coordinates of each agent at last timestep
+    prev_target_locations: jnp.ndarray  # 2D array containing x,y,z coordinates of the target of each agent at last timestep
 
 
 class Escort(BaseParallelEnv):
@@ -32,7 +38,7 @@ class Escort(BaseParallelEnv):
         init_flying_pos: jnp.ndarray,
         init_target_location: jnp.ndarray,
         final_target_location: jnp.ndarray,
-        num_intermediate_points: int = 10,
+        num_intermediate_points: int = 100,
         size: int = 3,
     ):
         """Escort environment for Crazyflies 2.
@@ -92,37 +98,39 @@ class Escort(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _transition_state(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
-        finished = state.timestep < self.num_ref_points
+        not_finished = state.timestep < self.num_ref_points
+        prev_agent_locations = state.agents_locations
+        prev_target_locations = state.target_location
         return jdc.replace(
             state,
             agents_locations=self._sanitize_action(state, actions),
-            target_location=jnp.array([finished * self.ref[state.timestep] + (1 - finished) * self.ref[-1]]),
+            target_location=jnp.array([not_finished * self.ref[state.timestep] + (1 - not_finished) * self.ref[-1]]),
+            prev_agent_locations=prev_agent_locations,
+            prev_target_locations=prev_target_locations,
         )
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
-        # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
+        # Potential based reward (!) locations and targets must be updated before this
+        dist_from_old_target = _distances_to_target(state.agents_locations, state.prev_target_locations)
+        old_dist = _distances_to_target(state.prev_agent_locations, state.prev_target_locations)
+        # reward should be new_potential - old_potential but since the potential should be negated (we want to min distance),
+        # we have to negate the reward, -new_potential - (-old_potential) = old_potential - new_potential
+        reward_close_to_target = old_dist - dist_from_old_target
 
-        reward_close_to_target = 0.95 * (
-            2 * self.size - jnp.linalg.norm(state.agents_locations - state.target_location, axis=1)
-        )
-        reward_far_from_other_agents = (
-            jnp.array(
-                [
-                    jnp.sum(jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1))
-                    for agent in range(self.num_drones)
-                ]
-            )
-            * 0.05
-            / (self.num_drones - 1)
-        )
+        reward_far_from_other_agents = jnp.array(
+            [
+                jnp.sum(jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1))
+                for agent in range(self.num_drones)
+            ]
+        ) / (self.num_drones - 1)
         reward_crash = jnp.any(terminations) * -10 * jnp.ones(self.num_drones)
 
-        return (
-            jnp.any(truncations) * (reward_close_to_target + reward_far_from_other_agents)
-            + (1 - jnp.any(truncations)) * reward_crash
-        )
+        # MO reward linearly combined
+        return (1 - jnp.any(terminations)) * (
+            0.9995 * reward_close_to_target + 0.0005 * reward_far_from_other_agents
+        ) + jnp.any(terminations) * reward_crash
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -145,15 +153,17 @@ class Escort(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_truncation(self, state: State) -> jnp.ndarray:
-        return (state.timestep == 100) * jnp.ones(self.num_drones)
+        return (state.timestep == 200) * jnp.ones(self.num_drones)
 
     @override
     @partial(jit, static_argnums=(0,))
     def reset(self, key: jnp.ndarray) -> Tuple[jnp.ndarray, dict, State]:
         state = State(
             agents_locations=self._init_flying_pos,
+            prev_agent_locations=self._init_flying_pos,
             timestep=0,
             target_location=jnp.array([self._target_location]),
+            prev_target_locations=jnp.array([self._target_location]),
         )
         obs = self._compute_obs(state)
         return obs, {}, state

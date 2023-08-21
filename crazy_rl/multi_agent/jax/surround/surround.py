@@ -88,27 +88,24 @@ class Surround(BaseParallelEnv):
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
         # REWARD DISTANCE FROM OTHERS
         # Reward is the mean distance to the other agents plus a maximum value minus the distance to the target
-        reward_far_from_other_agents = (
-            jnp.array(
-                [
-                    jnp.sum(jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1))
-                    for agent in range(self.num_drones)
-                ]
-            )
-            * 0.05
-            / (self.num_drones - 1)
-        )
+        reward_far_from_other_agents = jnp.array(
+            [
+                jnp.sum(jnp.linalg.norm(state.agents_locations[agent] - state.agents_locations, axis=1))
+                for agent in range(self.num_drones)
+            ]
+        ) / (self.num_drones - 1)
 
         # REWARD DISTANCE FROM TARGET
         cur_dist_to_target = _distances_to_target(state.agents_locations, self._target_location)
         old_dist = _distances_to_target(state.prev_agent_locations, self._target_location)
         # reward should be new_potential - old_potential but since the potential should be negated (we want to min distance),
         # we have to negate the reward, -new_potential - (-old_potential) = old_potential - new_potential
-        reward_close_to_target = 0.95 * (old_dist - cur_dist_to_target)
+        reward_close_to_target = old_dist - cur_dist_to_target
 
         reward_crash = -10 * jnp.ones(self.num_drones)
 
-        return (1 - jnp.any(terminations)) * (reward_close_to_target + reward_far_from_other_agents) + jnp.any(
+        # MO reward linearly combined
+        return (1 - jnp.any(terminations)) * (0.8 * reward_close_to_target + 0.2 * reward_far_from_other_agents) + jnp.any(
             terminations
         ) * reward_crash
 

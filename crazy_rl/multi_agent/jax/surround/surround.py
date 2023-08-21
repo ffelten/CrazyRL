@@ -81,7 +81,9 @@ class Surround(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _transition_state(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
-        return jdc.replace(state, agents_locations=self._sanitize_action(state, actions))
+        return jdc.replace(
+            state, agents_locations=self._sanitize_action(state, actions), prev_agent_locations=state.agents_locations
+        )
 
     @override
     @partial(jit, static_argnums=(0,))

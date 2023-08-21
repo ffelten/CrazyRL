@@ -180,6 +180,13 @@ class Surround(BaseParallelEnv):
         info = dict()
         return info
 
+    @override
+    def reset(self, seed=None, return_info=False, options=None):
+        self.crash = dict()
+        for agent in self._agents_names:
+            self.crash[agent] = False
+        return super().reset(seed=seed, return_info=return_info, options=options)
+
 
 if __name__ == "__main__":
     parallel_env = Surround(

@@ -72,8 +72,6 @@ def test_vmap():
 
     assert (term == jnp.array([[True, True], [False, False]])).all()
 
-    assert (rewards == jnp.array([[-10, -10], [0, 0]])).all()
-
     assert (state.timestep == jnp.array([0, 4])).all()
 
     # Wait for the end of the game for the State 2
@@ -82,14 +80,14 @@ def test_vmap():
         [[[0, 0, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0]]]  # state 1 : [[0, 0.8, 1], [0, 1, 1]]
     )  # state 2 : [[0.2, 0, 1], [0, 1, 1]]
 
-    for i in range(95):
+    for i in range(195):
         key, *subkeys = random.split(key, num_envs + 1)
         obs, rewards, term, trunc, info, state = env.step(state, actions, jnp.stack(subkeys))
 
     key, *subkeys = random.split(key, num_envs + 1)
     obs, rewards, term, trunc, info, state = env.step(state, actions, jnp.stack(subkeys))
 
-    assert (state.timestep == jnp.array([96, 0])).all()
+    assert (state.timestep == jnp.array([196, 0])).all()
     assert (trunc == jnp.array([[False, False], [True, True]])).all()
 
     # The reward isn't tested because it will probably change

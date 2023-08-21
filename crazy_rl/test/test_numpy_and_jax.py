@@ -107,7 +107,7 @@ def test_np_jax():
     np_actions = {"agent_0": np.array([0, 0, 0]), "agent_1": np.array([0, 0, 0])}
     jax_actions = jnp.array([[0, 0, 0], [0, 0, 0]])
 
-    for i in range(95):
+    for i in range(195):
         np_obs, np_rewards, np_term, np_trunc, infos = np_env.step(np_actions)
         key, subkey = random.split(key)
         jax_obs, jax_rewards, jax_term, jax_trunc, info, state = jax_env.step(state, jax_actions, subkey)

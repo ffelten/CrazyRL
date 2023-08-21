@@ -80,7 +80,7 @@ class Hover(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_truncation(self, state: State) -> jnp.ndarray:
-        return (state.timestep == 100) * jnp.ones(self.num_drones)
+        return (state.timestep == 200) * jnp.ones(self.num_drones)
 
     @override
     @partial(jit, static_argnums=(0,))

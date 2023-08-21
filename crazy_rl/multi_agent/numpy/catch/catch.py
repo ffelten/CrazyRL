@@ -168,15 +168,15 @@ class Catch(BaseParallelEnv):
                 if other_agent != agent and (
                     np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                 ):
-                    reward[agent] -= 10
+                    reward[agent] = -10
 
             # collision with the ground
             if self._agent_location[agent][2] < 0.2:
-                reward[agent] -= 10
+                reward[agent] = -10
 
             # collision with the target
             if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
-                reward[agent] -= 10
+                reward[agent] = -10
 
         return reward
 

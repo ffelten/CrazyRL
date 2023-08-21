@@ -138,7 +138,7 @@ class Escort(BaseParallelEnv):
                     reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
-            reward[agent] *= 0.1
+            reward[agent] *= 0.2
 
             # distance to the target
             # (!) targets and locations must be updated before this

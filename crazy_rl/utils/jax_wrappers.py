@@ -259,3 +259,24 @@ class ClipActions(Wrapper):
 
     def state(self, state: State) -> chex.Array:
         return self._env.state(state)
+
+
+class LinearizeReward(Wrapper):
+    """Convert MO reward to a single reward."""
+
+    def __init__(self, env, weights: jnp.ndarray):
+        self.weights = weights
+        super().__init__(env)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, State]:
+        return self._env.reset(key)
+
+    def step(
+        self, state: State, action: jnp.ndarray, key: chex.PRNGKey
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, State]:
+        obs, rewards, term, truncated, info, state = self._env.step(state, action, key)
+        rewards = jnp.dot(rewards, self.weights)
+        return obs, rewards, term, truncated, info, state
+
+    def state(self, state: State) -> chex.Array:
+        return self._env.state(state)

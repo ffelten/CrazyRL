@@ -8,7 +8,10 @@ import numpy.typing as npt
 from gymnasium import spaces
 from pettingzoo.test.parallel_test import parallel_api_test
 
-from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import (
+    BaseParallelEnv,
+    _distance_to_target,
+)
 
 
 class Circle(BaseParallelEnv):
@@ -59,7 +62,8 @@ class Circle(BaseParallelEnv):
             self.ref[i][:, 0] = circle_radius * (1 - np.cos(ts)) + (init_flying_pos[i][0] - circle_radius)  # x-position
 
         self._agent_location = self._init_flying_pos.copy()
-        self._target_location = self._init_flying_pos.copy()
+        for i, agent in enumerate(self._agents_names):
+            self._target_location[agent] = self.ref[i][0]
 
         self.size = size
 
@@ -89,21 +93,26 @@ class Circle(BaseParallelEnv):
     @override
     def _compute_obs(self):
         obs = dict()
-        for i, agent in enumerate(self._agents_names):
-            t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
-            self._target_location[agent] = self.ref[i][t]
+        for agent in self._agents_names:
             obs[agent] = np.hstack([self._agent_location[agent], self._target_location[agent]]).reshape(
                 6,
             )
         return obs
 
     @override
-    def _compute_action(self, actions):
+    def _transition_state(self, actions):
         target_point_action = dict()
         state = self._get_drones_state()
 
-        for agent in self._agents_names:
+        for i, agent in enumerate(self._agents_names):
+            # new targets
+            t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
+            self._previous_target[agent] = self._target_location[agent]
+            self._target_location[agent] = self.ref[i][t]
+
+            # Moving agents
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
+            # The state is not update here because there are some stuffs to do for real drones
             target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
 
         return target_point_action
@@ -112,8 +121,14 @@ class Circle(BaseParallelEnv):
     def _compute_reward(self):
         # Reward is based on the euclidean distance to the target point
         reward = dict()
-        for agent in self._agents_names:
-            reward[agent] = 2 * self.size - np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
+        for i, agent in enumerate(self._agents_names):
+            # (!) targets and locations must be updated before this
+            dist_from_old_target = _distance_to_target(self._agent_location[agent], self._previous_target[agent])
+            old_dist = _distance_to_target(self._previous_location[agent], self._previous_target[agent])
+
+            # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
+            # -new_potential - (-old_potential) = old_potential - new_potential
+            reward[agent] = old_dist - dist_from_old_target
         return reward
 
     @override

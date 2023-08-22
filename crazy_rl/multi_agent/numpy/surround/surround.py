@@ -6,7 +6,10 @@ import numpy as np
 import numpy.typing as npt
 from gymnasium import spaces
 
-from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import (
+    BaseParallelEnv,
+    _distance_to_target,
+)
 
 
 class Surround(BaseParallelEnv):
@@ -20,7 +23,7 @@ class Surround(BaseParallelEnv):
         init_flying_pos: npt.NDArray[int],
         target_location: npt.NDArray[int],
         render_mode=None,
-        size: int = 4,
+        size: int = 3,
         swarm=None,
     ):
         """Surround environment for Crazyflies 2.
@@ -53,7 +56,6 @@ class Surround(BaseParallelEnv):
         self.crash = dict()
         for agent in self._agents_names:
             self.crash[agent] = False
-        self.end = False
 
         super().__init__(
             render_mode=render_mode,
@@ -92,7 +94,7 @@ class Surround(BaseParallelEnv):
         return obs
 
     @override
-    def _compute_action(self, actions):
+    def _transition_state(self, actions):
         target_point_action = dict()
         state = self._get_drones_state()
 
@@ -108,44 +110,25 @@ class Surround(BaseParallelEnv):
         reward = dict()
 
         for agent in self._agents_names:
-            reward[agent] = 0
-
-            if self.end:
-                # mean distance to the other agents
+            if self.crash[agent]:
+                reward[agent] = -10
+            else:
+                reward[agent] = 0
+                # MEAN DISTANCE TO THE OTHER AGENTS
                 for other_agent in self._agents_names:
                     if other_agent != agent:
                         reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
-
                 reward[agent] /= self.num_drones - 1
+                reward[agent] *= 0.2
 
-                reward[agent] *= 0.05
+                # DISTANCE TO THE TARGET
+                # (!) locations must be updated before this, target is fixed
+                dist_from_old_target = _distance_to_target(self._agent_location[agent], self._target_location["unique"])
+                old_dist = _distance_to_target(self._previous_location[agent], self._target_location["unique"])
 
-                # a maximum value minus the distance to the target
-                reward[agent] += 0.95 * (
-                    2 * self.size - np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
-                )
-
-            elif self.crash[agent]:
-                reward[agent] = -10
-
-            """
-            # collision between two drones
-            for other_agent in self._agents_names:
-                if other_agent != agent and (
-                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
-                ):
-                    reward[agent] -= 100
-
-            # collision with the ground
-            if self._agent_location[agent][2] < 0.2:
-                reward[agent] -= 100
-
-            # collision with the target
-            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
-                reward[agent] -= 100
-            """
-            self.crash[agent] = False
-        self.end = False
+                # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
+                # -new_potential - (-old_potential) = old_potential - new_potential
+                reward[agent] += 0.8 * (old_dist - dist_from_old_target)
 
         return reward
 
@@ -185,10 +168,9 @@ class Surround(BaseParallelEnv):
 
     @override
     def _compute_truncation(self):
-        if self.timestep == 100:
+        if self.timestep == 200:
             truncation = {agent: True for agent in self._agents_names}
             self.agents = []
-            self.end = True
         else:
             truncation = {agent: False for agent in self._agents_names}
         return truncation
@@ -197,6 +179,13 @@ class Surround(BaseParallelEnv):
     def _compute_info(self):
         info = dict()
         return info
+
+    @override
+    def reset(self, seed=None, return_info=False, options=None):
+        self.crash = dict()
+        for agent in self._agents_names:
+            self.crash[agent] = False
+        return super().reset(seed=seed, return_info=return_info, options=options)
 
 
 if __name__ == "__main__":

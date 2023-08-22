@@ -6,7 +6,10 @@ from typing_extensions import override
 import numpy as np
 from gymnasium import spaces
 
-from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import (
+    BaseParallelEnv,
+    _distance_to_target,
+)
 
 
 class Catch(BaseParallelEnv):
@@ -81,9 +84,19 @@ class Catch(BaseParallelEnv):
     def _compute_obs(self):
         obs = dict()
 
+        for agent in self._agents_names:
+            obs[agent] = self._agent_location[agent].copy()
+            obs[agent] = np.append(obs[agent], self._target_location["unique"])
+
+            for other_agent in self._agents_names:
+                if other_agent != agent:
+                    obs[agent] = np.append(obs[agent], self._agent_location[other_agent])
+
+        return obs
+
+    def _move_target(self):
         # mean of the agent's positions
         mean = np.array([0, 0, 0])
-
         for agent in self.agents:
             mean = mean + self._agent_location[agent]
 
@@ -108,20 +121,14 @@ class Catch(BaseParallelEnv):
             out=self._target_location["unique"],
         )
 
-        for agent in self._agents_names:
-            obs[agent] = self._agent_location[agent].copy()
-            obs[agent] = np.append(obs[agent], self._target_location["unique"])
-
-            for other_agent in self._agents_names:
-                if other_agent != agent:
-                    obs[agent] = np.append(obs[agent], self._agent_location[other_agent])
-
-        return obs
-
     @override
-    def _compute_action(self, actions):
+    def _transition_state(self, actions):
         target_point_action = dict()
         state = self._get_drones_state()
+
+        # new targets
+        self._previous_target = self._target_location.copy()
+        self._move_target()
 
         for agent in self.agents:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
@@ -143,25 +150,33 @@ class Catch(BaseParallelEnv):
                     reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
 
             reward[agent] /= self.num_drones - 1
-            reward[agent] *= 0
+            reward[agent] *= 0.2
 
             # distance to the target
-            reward[agent] -= 1 * np.linalg.norm(self._agent_location[agent] - self._target_location["unique"])
+            # (!) targets and locations must be updated before this
+            dist_from_old_target = _distance_to_target(self._agent_location[agent], self._previous_target["unique"])
+            old_dist = _distance_to_target(self._previous_location[agent], self._previous_target["unique"])
+
+            # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
+            # -new_potential - (-old_potential) = old_potential - new_potential
+            reward[agent] = old_dist - dist_from_old_target
+
+            reward[agent] += 0.8 * (old_dist - dist_from_old_target)
 
             # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent and (
                     np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                 ):
-                    reward[agent] -= 100
+                    reward[agent] = -10
 
             # collision with the ground
             if self._agent_location[agent][2] < 0.2:
-                reward[agent] -= 100
+                reward[agent] = -10
 
             # collision with the target
             if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
-                reward[agent] -= 100
+                reward[agent] = -10
 
         return reward
 

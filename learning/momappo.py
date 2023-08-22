@@ -467,18 +467,15 @@ def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]
 
 def multi_obj(args):
     NUM_SEEDS = 1
-    weights = jnp.array(equally_spaced_weights(2, 20))
+    weights = jnp.array(equally_spaced_weights(2, 5))
 
     rng = jax.random.PRNGKey(args.seed)
     rngs = jax.random.split(rng, NUM_SEEDS)
-    train_vvjit = jax.jit(
-        jax.vmap(
-            jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the weights
-            in_axes=(0, None),  # vmaps over the rngs
-        )
+    train_vjit = jax.jit(
+        jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the weights
     )
     start_time = time.time()
-    out = jax.block_until_ready(train_vvjit(rngs, weights))
+    out = jax.block_until_ready(train_vjit(rngs, weights))
     print(f"total time: {time.time() - start_time}")
     print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
 
@@ -487,6 +484,9 @@ def multi_obj(args):
     for i in range(len(weights)):
         # Plotting Pareto front
         returns = out["metrics"]["returned_episode_returns"][:, i, :]
+        returns = returns.mean(-1)  # agg over envs
+        returns = returns.reshape(-1)  # flatten
+        returns = returns[returns != 0]  # remove zeros
         returns = returns[-1]
         plt.plot(returns, label="weight=" + str(weights[i]))
 

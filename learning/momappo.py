@@ -170,7 +170,7 @@ def make_train(args):
         env = ClipActions(env)
         env = NormalizeObservation(env)
         env = AddIDToObs(env, num_drones)
-        env = LogWrapper(env)
+        env = LogWrapper(env, reward_dim=2)
         env = LinearizeReward(env, weights)
         env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
         env = VecEnv(env)  # vmaps the env public methods
@@ -466,35 +466,35 @@ def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]
 
 
 def multi_obj(args):
-    NUM_SEEDS = 1
-    weights = jnp.array(equally_spaced_weights(2, 5))
+    NUM_WEIGHTS = 50
+    weights = jnp.array(equally_spaced_weights(2, NUM_WEIGHTS))
 
     rng = jax.random.PRNGKey(args.seed)
-    rngs = jax.random.split(rng, NUM_SEEDS)
     train_vjit = jax.jit(
         jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the weights
     )
     start_time = time.time()
-    out = jax.block_until_ready(train_vjit(rngs, weights))
+    out = jax.block_until_ready(train_vjit(rng, weights))
     print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
+    print(f"SPS: {args.total_timesteps *  NUM_WEIGHTS/ (time.time() - start_time)}")
 
     import matplotlib.pyplot as plt
 
     for i in range(len(weights)):
         # Plotting Pareto front
         returns = out["metrics"]["returned_episode_returns"][:, i, :]
-        returns = returns.mean(-1)  # agg over envs
-        returns = returns.reshape(-1)  # flatten
-        returns = returns[returns != 0]  # remove zeros
-        returns = returns[-1]
-        plt.plot(returns, label="weight=" + str(weights[i]))
+        returns = returns.mean(-2)  # agg over envs
+        returns = returns[-1, -1]
+        plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
 
-        save_actor(out["runner_state"][0][i], pathname="actor_" + str(weights[i]))
+        # save_actor(out["runner_state"][i], pathname="actor_" + str(weights[i]))
+    plt.ylabel("far_from_others")
+    plt.xlabel("close_to_target")
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    rng = jax.random.PRNGKey(args.seed)
 
     multi_obj(args)

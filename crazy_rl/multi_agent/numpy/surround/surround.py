@@ -24,6 +24,7 @@ class Surround(BaseParallelEnv):
         target_location: npt.NDArray[int],
         render_mode=None,
         size: int = 3,
+        multi_obj: bool = False,
         swarm=None,
     ):
         """Surround environment for Crazyflies 2.
@@ -34,28 +35,22 @@ class Surround(BaseParallelEnv):
             target_location: Array of the position of the target point
             render_mode: Render mode: "human", "real" or None
             size: Size of the map
+            multi_obj: Whether to return a multi-objective reward
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
         self.num_drones = len(drone_ids)
-
         self._agent_location = dict()
-
         self._target_location = {"unique": target_location}  # unique target location for all agents
-
         self._init_flying_pos = dict()
         self._agents_names = np.array(["agent_" + str(i) for i in drone_ids])
         self.timestep = 0
 
         for i, agent in enumerate(self._agents_names):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
-
         self._agent_location = self._init_flying_pos.copy()
 
         self.size = size
-
-        self.crash = dict()
-        for agent in self._agents_names:
-            self.crash[agent] = False
+        self.multi_obj = multi_obj
 
         super().__init__(
             render_mode=render_mode,
@@ -110,25 +105,48 @@ class Surround(BaseParallelEnv):
         reward = dict()
 
         for agent in self._agents_names:
-            if self.crash[agent]:
-                reward[agent] = -10
+            reward_far_from_other_agents = 0
+            reward_close_to_target = 0
+
+            # mean distance to the other agents
+            for other_agent in self._agents_names:
+                if other_agent != agent:
+                    reward_far_from_other_agents += np.linalg.norm(
+                        self._agent_location[agent] - self._agent_location[other_agent]
+                    )
+
+            reward_far_from_other_agents /= self.num_drones - 1
+
+            # distance to the target
+            # (!) targets and locations must be updated before this
+            dist_from_old_target = _distance_to_target(self._agent_location[agent], self._previous_target["unique"])
+            old_dist = _distance_to_target(self._previous_location[agent], self._previous_target["unique"])
+
+            # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
+            # -new_potential - (-old_potential) = old_potential - new_potential
+            reward_close_to_target = old_dist - dist_from_old_target
+
+            # collision between two drones
+            for other_agent in self._agents_names:
+                if other_agent != agent and (
+                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
+                ):
+                    reward_far_from_other_agents = -10
+                    reward_close_to_target = -10
+
+            # collision with the ground or the target
+            if (
+                self._agent_location[agent][2] < 0.2
+                or np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
+            ):
+                reward_far_from_other_agents = -10
+                reward_close_to_target = -10
+
+            if self.multi_obj:
+                reward[agent] = np.array([reward_close_to_target, reward_far_from_other_agents])
             else:
-                reward[agent] = 0
-                # MEAN DISTANCE TO THE OTHER AGENTS
-                for other_agent in self._agents_names:
-                    if other_agent != agent:
-                        reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
-                reward[agent] /= self.num_drones - 1
-                reward[agent] *= 0.2
-
-                # DISTANCE TO THE TARGET
-                # (!) locations must be updated before this, target is fixed
-                dist_from_old_target = _distance_to_target(self._agent_location[agent], self._target_location["unique"])
-                old_dist = _distance_to_target(self._previous_location[agent], self._target_location["unique"])
-
-                # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
-                # -new_potential - (-old_potential) = old_potential - new_potential
-                reward[agent] += 0.8 * (old_dist - dist_from_old_target)
+                # MO reward linearly combined using hardcoded weights
+                reward[agent] = 0.8 * reward_close_to_target + 0.2 * reward_far_from_other_agents
 
         return reward
 
@@ -147,7 +165,6 @@ class Surround(BaseParallelEnv):
                     and np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                 ):
                     terminated[agent] = True
-                    self.crash[other_agent] = True
 
             # collision with the ground
             terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
@@ -161,8 +178,6 @@ class Surround(BaseParallelEnv):
                 for other_agent in self.agents:
                     terminated[other_agent] = True
                 self.agents = []
-
-                self.crash[agent] = True
 
         return terminated
 
@@ -179,13 +194,6 @@ class Surround(BaseParallelEnv):
     def _compute_info(self):
         info = dict()
         return info
-
-    @override
-    def reset(self, seed=None, return_info=False, options=None):
-        self.crash = dict()
-        for agent in self._agents_names:
-            self.crash[agent] = False
-        return super().reset(seed=seed, return_info=return_info, options=options)
 
 
 if __name__ == "__main__":

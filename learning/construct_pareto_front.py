@@ -18,6 +18,8 @@ from etils import epath
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from pettingzoo import ParallelEnv
+from crazy_rl.utils.pareto import ParetoArchive
+from mplcursors import cursor
 
 # from crazy_rl.multi_agent.numpy.escort import Escort
 from crazy_rl.multi_agent.numpy.surround import Surround
@@ -125,7 +127,6 @@ def load_actor_state(model_path: str, actor_state: TrainState):
     print("Loading actor from ", directory)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
     actor_state = ckptr.restore(model_path, item=actor_state)
-    print(type(actor_state))
 
     return actor_state
 
@@ -215,14 +216,14 @@ def replay_simu(args):
 
     p = epath.Path(args.models_dir)
     model_dirs = [f for f in p.iterdir() if f.is_dir()]
-    policy_evals = []
+    pareto_front = ParetoArchive()
     for model_dir in model_dirs:
         actor_state = load_actor_state(model_dir, actor_state)
         obs, _ = env.reset(seed=args.seed)
         policy_eval = play_episode(actor_module, actor_state, env, obs, key, True)
-        policy_evals.append((model_dir, policy_eval))
+        pareto_front.add(candidate=model_dir, evaluation=policy_eval)
 
-    return policy_evals
+    return pareto_front
     env.close()
 
 
@@ -232,12 +233,13 @@ if __name__ == "__main__":
     model_dirs = [f for f in p.iterdir() if f.is_dir()]
     print(model_dirs)
 
-    evals = replay_simu(args=args)
+    pf = replay_simu(args=args)
 
-    for eval in evals:
-        plt.scatter(eval[1][0], eval[1][1], label=eval[0].name)
+    for candidate, eval in zip(pf.individuals, pf.evaluations):
+        plt.scatter(eval[0], eval[1], label=candidate.name, alpha=0.5)
 
-    plt.ylabel("far_from_others")
-    plt.xlabel("close_to_target")
-    plt.legend()
+    cursor(hover=True)
+    plt.ylabel("Far from others")
+    plt.xlabel("Close to target")
+    plt.grid(alpha=0.25)
     plt.show()

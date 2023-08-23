@@ -25,7 +25,7 @@ from crazy_rl.multi_agent.numpy.catch import Catch
 from crazy_rl.multi_agent.numpy.circle import Circle
 
 # from crazy_rl.multi_agent.numpy.escort import Escort
-# from crazy_rl.multi_agent.numpy.surround import Surround
+from crazy_rl.multi_agent.numpy.surround import Surround
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 
@@ -164,8 +164,8 @@ def replay_simu(args):
     #     init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
     # )
 
-    env = Catch(
-        drone_ids=np.arange(8),
+    env = Surround(
+        drone_ids=np.arange(4),
         render_mode="human",
         init_flying_pos=np.array(
             [
@@ -173,17 +173,16 @@ def replay_simu(args):
                 [0.0, 1.0, 1.0],
                 [1.0, 0.0, 1.0],
                 [1.0, 2.0, 2.0],
-                [2.0, 0.5, 1.0],
-                [2.0, 2.5, 2.0],
-                [2.0, 1.0, 2.5],
-                [0.5, 0.5, 0.5],
+                # [2.0, 0.5, 1.0],
+                # [2.0, 2.5, 2.0],
+                # [2.0, 1.0, 2.5],
+                # [0.5, 0.5, 0.5],
             ]
         ),
-        init_target_location=np.array([1.0, 1.0, 2.0]),
-        target_speed=0.15,
-        # final_target_location=np.array([-2.0, -2.0, 1.0]),
-        # num_intermediate_points=100,
+        target_location=np.array([1.0, 1.0, 2.0]),
     )
+
+
 
     # env: ParallelEnv = Circle(
     #     drone_ids=np.array([0, 1, 2, 3, 4]),

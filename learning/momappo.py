@@ -55,7 +55,7 @@ def parse_args():
     # Algorithm specific arguments
     parser.add_argument("--num-envs", type=int, default=128, help="the number of parallel environments")
     parser.add_argument("--num-steps", type=int, default=10, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=3e6,
+    parser.add_argument("--total-timesteps", type=int, default=10000,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")
@@ -466,7 +466,7 @@ def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]
 
 
 def multi_obj(args):
-    NUM_WEIGHTS = 50
+    NUM_WEIGHTS = 4
     weights = jnp.array(equally_spaced_weights(2, NUM_WEIGHTS))
 
     rng = jax.random.PRNGKey(args.seed)
@@ -482,12 +482,17 @@ def multi_obj(args):
 
     for i in range(len(weights)):
         # Plotting Pareto front
-        returns = out["metrics"]["returned_episode_returns"][:, i, :]
+        returns = out["metrics"]["returned_episode_returns"][i]
         returns = returns.mean(-2)  # agg over envs
-        returns = returns[-1, -1]
+        returns = returns.reshape((-1, 2))  # flatten
+        returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
+        returns = returns[-1]
         plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
 
-        # save_actor(out["runner_state"][i], pathname="actor_" + str(weights[i]))
+        # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
+        actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
+        save_actor(actor_i, pathname="actor_" + str(weights[i]))
+
     plt.ylabel("far_from_others")
     plt.xlabel("close_to_target")
     plt.legend()

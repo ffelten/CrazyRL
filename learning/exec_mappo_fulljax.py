@@ -21,11 +21,10 @@ from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from pettingzoo import ParallelEnv
 
-from crazy_rl.multi_agent.numpy.catch import Catch
-from crazy_rl.multi_agent.numpy.circle import Circle
-
-# from crazy_rl.multi_agent.numpy.escort import Escort
-from crazy_rl.multi_agent.numpy.surround import Surround
+from crazy_rl.multi_agent.numpy.catch import Catch  # noqa
+from crazy_rl.multi_agent.numpy.circle import Circle  # noqa
+from crazy_rl.multi_agent.numpy.escort import Escort  # noqa
+from crazy_rl.multi_agent.numpy.surround import Surround  # noqa
 from crazy_rl.utils.utils import LoggingCrazyflie
 
 
@@ -181,8 +180,6 @@ def replay_simu(args):
         ),
         target_location=np.array([1.0, 1.0, 2.0]),
     )
-
-
 
     # env: ParallelEnv = Circle(
     #     drone_ids=np.array([0, 1, 2, 3, 4]),

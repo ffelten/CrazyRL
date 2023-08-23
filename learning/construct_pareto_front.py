@@ -17,12 +17,12 @@ from distrax import MultivariateNormalDiag
 from etils import epath
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
-from pettingzoo import ParallelEnv
-from crazy_rl.utils.pareto import ParetoArchive
 from mplcursors import cursor
+from pettingzoo import ParallelEnv
 
 # from crazy_rl.multi_agent.numpy.escort import Escort
 from crazy_rl.multi_agent.numpy.surround import Surround
+from crazy_rl.utils.pareto import ParetoArchive
 
 
 # from crazy_rl.multi_agent.numpy.catch import Catch

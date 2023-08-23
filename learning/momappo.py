@@ -22,15 +22,12 @@ from etils import epath
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from jax import vmap
-
-# from crazy_rl.multi_agent.jax.escort import Escort
-# from crazy_rl.multi_agent.jax.surround import Surround
 from pymoo.util.ref_dirs import get_reference_directions
 
 from crazy_rl.multi_agent.jax.base_parallel_env import State
-
-# from crazy_rl.multi_agent.jax.catch import Catch
-from crazy_rl.multi_agent.jax.surround import Surround
+from crazy_rl.multi_agent.jax.catch import Catch  # noqa
+from crazy_rl.multi_agent.jax.escort import Escort  # noqa
+from crazy_rl.multi_agent.jax.surround import Surround  # noqa
 from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
@@ -468,13 +465,15 @@ def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]
 def multi_obj(args):
     NUM_WEIGHTS = 30
     weights = jnp.array(equally_spaced_weights(2, NUM_WEIGHTS))
-    weights = jnp.array([
-        [0.96, 0.04],
-        [0.97, 0.03],
-        [0.975, 0.025],
-        [0.98, 0.02],
-        [0.99, 0.01],
-    ])
+    weights = jnp.array(
+        [
+            [0.96, 0.04],
+            [0.97, 0.03],
+            [0.975, 0.025],
+            [0.98, 0.02],
+            [0.99, 0.01],
+        ]
+    )
 
     rng = jax.random.PRNGKey(args.seed)
     train_vjit = jax.jit(
@@ -484,8 +483,6 @@ def multi_obj(args):
     out = jax.block_until_ready(train_vjit(rng, weights))
     print(f"total time: {time.time() - start_time}")
     print(f"SPS: {args.total_timesteps *  NUM_WEIGHTS/ (time.time() - start_time)}")
-
-    import matplotlib.pyplot as plt
 
     for i in range(len(weights)):
         # Plotting online Pareto front

@@ -39,6 +39,7 @@ class Escort(BaseParallelEnv):
         init_target_location: jnp.ndarray,
         final_target_location: jnp.ndarray,
         num_intermediate_points: int = 100,
+        multi_obj: bool = False,
         size: int = 3,
     ):
         """Escort environment for Crazyflies 2.
@@ -49,6 +50,7 @@ class Escort(BaseParallelEnv):
             init_target_location: Array of the initial position of the moving target
             final_target_location: Array of the final position of the moving target
             num_intermediate_points: Number of intermediate points in the target trajectory
+            multi_obj: Whether to return a multi-objective reward
             size: Size of the map in meters
         """
         self.num_drones = num_drones
@@ -56,7 +58,7 @@ class Escort(BaseParallelEnv):
         self._target_location = init_target_location  # unique target location for all agents
 
         self._init_flying_pos = init_flying_pos
-
+        self.multi_obj = multi_obj
         # There are two more ref points than intermediate points, one for the initial and final target locations
         self.num_ref_points = num_intermediate_points + 2
         # Ref is a 2d arrays for the target
@@ -127,10 +129,15 @@ class Escort(BaseParallelEnv):
         ) / (self.num_drones - 1)
         reward_crash = jnp.any(terminations) * -10 * jnp.ones(self.num_drones)
 
-        # MO reward linearly combined
-        return (1 - jnp.any(terminations)) * (
-            0.9995 * reward_close_to_target + 0.0005 * reward_far_from_other_agents
-        ) + jnp.any(terminations) * reward_crash
+        if self.multi_obj:
+            return (1 - jnp.any(terminations)) * jnp.column_stack(
+                (reward_close_to_target, reward_far_from_other_agents)
+            ) + jnp.any(terminations) * jnp.column_stack((reward_crash, reward_crash))
+        else:
+            # MO reward linearly combined using hardcoded weights
+            return (1 - jnp.any(terminations)) * (
+                0.9995 * reward_close_to_target + 0.0005 * reward_far_from_other_agents
+            ) + jnp.any(terminations) * reward_crash
 
     @override
     @partial(jit, static_argnums=(0,))

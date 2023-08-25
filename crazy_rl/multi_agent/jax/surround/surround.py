@@ -35,6 +35,7 @@ class Surround(BaseParallelEnv):
         num_drones: int,
         init_flying_pos: jnp.ndarray,
         target_location: jnp.ndarray,
+        multi_obj: bool = False,
         size: int = 3,
     ):
         """Surround environment for Crazyflies 2.
@@ -43,14 +44,13 @@ class Surround(BaseParallelEnv):
             num_drones: Number of drones
             init_flying_pos: Array of initial positions of the drones when they are flying
             target_location: Array of the position of the target point
+            multi_obj: Whether to return a multi-objective reward
             size: Size of the map in meters
         """
         self.num_drones = num_drones
-
         self._target_location = target_location  # unique target location for all agents
-
         self._init_flying_pos = init_flying_pos
-
+        self.multi_obj = multi_obj
         self.size = size
 
     @override
@@ -106,10 +106,15 @@ class Surround(BaseParallelEnv):
 
         reward_crash = -10 * jnp.ones(self.num_drones)
 
-        # MO reward linearly combined
-        return (1 - jnp.any(terminations)) * (0.8 * reward_close_to_target + 0.2 * reward_far_from_other_agents) + jnp.any(
-            terminations
-        ) * reward_crash
+        if self.multi_obj:
+            return (1 - jnp.any(terminations)) * jnp.column_stack(
+                (reward_close_to_target, reward_far_from_other_agents)
+            ) + jnp.any(terminations) * jnp.column_stack((reward_crash, reward_crash))
+        else:
+            # MO reward linearly combined using hardcoded weights
+            return (1 - jnp.any(terminations)) * (0.8 * reward_close_to_target + 0.2 * reward_far_from_other_agents) + jnp.any(
+                terminations
+            ) * reward_crash
 
     @override
     @partial(jit, static_argnums=(0,))

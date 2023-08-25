@@ -45,13 +45,14 @@ class LogEnvState:
 class LogWrapper(Wrapper):
     """Log the episode returns and lengths."""
 
-    def __init__(self, env):
+    def __init__(self, env, reward_dim=1):
+        self.reward_dim = reward_dim
         super().__init__(env)
 
     @partial(jax.jit, static_argnums=(0,))
     def reset(self, key: chex.PRNGKey, total_timestep: int = 0) -> Tuple[chex.Array, dict, LogEnvState]:
         obs, info, env_state = self._env.reset(key)
-        state = LogEnvState(env_state, 0, 0, 0, 0, 0, total_timestep)
+        state = LogEnvState(env_state, jnp.zeros(self.reward_dim), 0, jnp.zeros(self.reward_dim), 0, 0, total_timestep)
         return obs, info, state
 
     @partial(jax.jit, static_argnums=(0,))
@@ -63,7 +64,7 @@ class LogWrapper(Wrapper):
     ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, LogEnvState]:
         obs, rewards, terminateds, truncateds, info, env_state = self._env.step(state.env_state, action, key)
         done = jnp.logical_or(jnp.any(terminateds), jnp.any(truncateds))
-        new_episode_return = state.episode_returns + rewards.sum()  # rewards are summed over agents "team reward"
+        new_episode_return = state.episode_returns + rewards.sum(axis=0)  # rewards are summed over agents "team reward"
         new_episode_length = state.episode_lengths + 1
         state = LogEnvState(
             env_state=env_state,
@@ -256,6 +257,27 @@ class ClipActions(Wrapper):
     ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, State]:
         action = jnp.clip(action, self._env.action_space(0).low, self._env.action_space(0).high)
         return self._env.step(state, action, key)
+
+    def state(self, state: State) -> chex.Array:
+        return self._env.state(state)
+
+
+class LinearizeReward(Wrapper):
+    """Convert MO reward to a single reward."""
+
+    def __init__(self, env, weights: jnp.ndarray):
+        self.weights = weights
+        super().__init__(env)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, dict, State]:
+        return self._env.reset(key)
+
+    def step(
+        self, state: State, action: jnp.ndarray, key: chex.PRNGKey
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, dict, State]:
+        obs, rewards, term, truncated, info, state = self._env.step(state, action, key)
+        rewards = jnp.dot(rewards, self.weights)
+        return obs, rewards, term, truncated, info, state
 
     def state(self, state: State) -> chex.Array:
         return self._env.state(state)

@@ -21,7 +21,7 @@ class Hover(BaseParallelEnv):
         drone_ids: npt.NDArray[int],
         init_flying_pos: npt.NDArray[int],
         render_mode=None,
-        size: int = 4,
+        size: int = 3,
     ):
         """Hover environment for Crazyflies 2.
 

@@ -24,7 +24,8 @@ class Catch(BaseParallelEnv):
         init_target_location: np.ndarray,
         target_speed: float,
         render_mode=None,
-        size: int = 4,
+        size: int = 3,
+        multi_obj: bool = False,
         swarm=None,
     ):
         """Catch environment for Crazyflies 2.
@@ -36,6 +37,7 @@ class Catch(BaseParallelEnv):
             target_speed: Distance traveled by the target at each timestep
             render_mode: Render mode: "human", "real" or None
             size: Size of the map
+            multi_obj: Whether to return a multi-objective reward
             swarm: Swarm object, used for real tests. Ignored otherwise.
         """
         self.num_drones = len(drone_ids)
@@ -54,7 +56,7 @@ class Catch(BaseParallelEnv):
             self._init_flying_pos[agent] = init_flying_pos[i].copy()
 
         self._agent_location = self._init_flying_pos.copy()
-
+        self.multi_obj = multi_obj
         self.size = size
 
         super().__init__(
@@ -142,15 +144,17 @@ class Catch(BaseParallelEnv):
         reward = dict()
 
         for agent in self._agents_names:
-            reward[agent] = 0
+            reward_far_from_other_agents = 0
+            reward_close_to_target = 0
 
             # mean distance to the other agents
             for other_agent in self._agents_names:
                 if other_agent != agent:
-                    reward[agent] += np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent])
+                    reward_far_from_other_agents += np.linalg.norm(
+                        self._agent_location[agent] - self._agent_location[other_agent]
+                    )
 
-            reward[agent] /= self.num_drones - 1
-            reward[agent] *= 0.2
+            reward_far_from_other_agents /= self.num_drones - 1
 
             # distance to the target
             # (!) targets and locations must be updated before this
@@ -159,24 +163,29 @@ class Catch(BaseParallelEnv):
 
             # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
             # -new_potential - (-old_potential) = old_potential - new_potential
-            reward[agent] = old_dist - dist_from_old_target
-
-            reward[agent] += 0.8 * (old_dist - dist_from_old_target)
+            reward_close_to_target = old_dist - dist_from_old_target
 
             # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent and (
                     np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
                 ):
-                    reward[agent] = -10
+                    reward_far_from_other_agents = -10
+                    reward_close_to_target = -10
 
-            # collision with the ground
-            if self._agent_location[agent][2] < 0.2:
-                reward[agent] = -10
+            # collision with the ground or the target
+            if (
+                self._agent_location[agent][2] < 0.2
+                or np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
+            ):
+                reward_far_from_other_agents = -10
+                reward_close_to_target = -10
 
-            # collision with the target
-            if np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2:
-                reward[agent] = -10
+            if self.multi_obj:
+                reward[agent] = np.array([reward_close_to_target, reward_far_from_other_agents])
+            else:
+                # MO reward linearly combined using hardcoded weights
+                reward[agent] = 0.9995 * reward_close_to_target + 0.0005 * reward_far_from_other_agents
 
         return reward
 

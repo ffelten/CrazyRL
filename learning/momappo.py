@@ -1,11 +1,13 @@
-"""This heavily based on PPO from PureJaxRL https://github.com/luchris429/purejaxrl/tree/main/purejaxrl.
+"""This extends MAPPO to MOMARL environments.
 
-It is a super fast implementation of MAPPO, fully compiled on the GPU."""
+It scalarizes the reward vector using weighted sum scalarization. Multiple weights are generated to learn multiple policies.
+The search over multiple weights is done in parallel (vmap).
+"""
 import argparse
 import os
 import time
 from distutils.util import strtobool
-from typing import List, NamedTuple, Optional, Sequence, Tuple
+from typing import List, NamedTuple, Sequence, Tuple
 
 import chex
 import distrax
@@ -20,16 +22,17 @@ from etils import epath
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from jax import vmap
+from pymoo.util.ref_dirs import get_reference_directions
 
 from crazy_rl.multi_agent.jax.base_parallel_env import State
-from crazy_rl.multi_agent.jax.catch import Catch
-
-# from crazy_rl.multi_agent.jax.escort import Escort
-# from crazy_rl.multi_agent.jax.surround import Surround
+from crazy_rl.multi_agent.jax.catch import Catch  # noqa
+from crazy_rl.multi_agent.jax.escort import Escort  # noqa
+from crazy_rl.multi_agent.jax.surround import Surround  # noqa
 from crazy_rl.utils.jax_wrappers import (
     AddIDToObs,
     AutoReset,
     ClipActions,
+    LinearizeReward,
     LogWrapper,
     NormalizeObservation,
     NormalizeVecReward,
@@ -131,9 +134,13 @@ def make_train(args):
     num_updates = args.total_timesteps // args.num_steps // args.num_envs
     minibatch_size = args.num_envs * args.num_steps // args.num_minibatches
 
-    def train(key: chex.PRNGKey, lr: Optional[float] = None):
-        num_drones = 8
-        env = Catch(
+    def linear_schedule(count):
+        frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / num_updates
+        return args.lr * frac
+
+    def train(key: chex.PRNGKey, weights: jnp.ndarray):
+        num_drones = 4
+        env = Surround(
             num_drones=num_drones,
             init_flying_pos=jnp.array(
                 [
@@ -141,14 +148,15 @@ def make_train(args):
                     [0.0, 1.0, 1.0],
                     [1.0, 0.0, 1.0],
                     [1.0, 2.0, 2.0],
-                    [2.0, 0.5, 1.0],
-                    [2.0, 2.5, 2.0],
-                    [2.0, 1.0, 2.5],
-                    [0.5, 0.5, 0.5],
+                    # [2.0, 0.5, 1.0],
+                    # [2.0, 2.5, 2.0],
+                    # [2.0, 1.0, 2.5],
+                    # [0.5, 0.5, 0.5],
                 ]
             ),
-            init_target_location=jnp.array([1.0, 1.0, 2.0]),
-            target_speed=0.15,
+            target_location=jnp.array([1.0, 1.0, 2.0]),
+            multi_obj=True
+            # target_speed=0.15,
             # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
         )
         # env = Circle(
@@ -159,19 +167,14 @@ def make_train(args):
         env = ClipActions(env)
         env = NormalizeObservation(env)
         env = AddIDToObs(env, num_drones)
-        env = LogWrapper(env)
+        env = LogWrapper(env, reward_dim=2)
+        env = LinearizeReward(env, weights)
         env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
         env = VecEnv(env)  # vmaps the env public methods
         env = NormalizeVecReward(env, args.gamma)
 
         # Initial reset to have correct dimensions in the observations
         obs, info, state = env.reset(key=jax.random.PRNGKey(args.seed))
-
-        lr = args.lr if lr is None else lr
-
-        def linear_schedule(count):
-            frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / num_updates
-            return lr * frac
 
         # INIT NETWORKS
         actor = Actor(env.action_space(0).shape[0], activation=args.activation)
@@ -437,83 +440,71 @@ def make_train(args):
     return train
 
 
-def save_actor(actor_state):
+def save_actor(actor_state, pathname: str = "actor"):
     directory = epath.Path("trained_model")
-    actor_dir = directory / "actor"
+    actor_dir = directory / pathname
     print("Saving actor to ", actor_dir)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
     ckptr.save(actor_dir, actor_state, force=True)
 
 
-def multi_seeds(rng, args):
-    NUM_SEEDS = 10
-    rngs = jax.random.split(rng, NUM_SEEDS)
-    train_vjit = jax.jit(jax.vmap(make_train(args), in_axes=(0,)))
-    start_time = time.time()
-    out = jax.block_until_ready(train_vjit(rngs, None))
-    print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
+# Taken from MORL-Baselines
+def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]:
+    """Generate weight vectors that are equally spaced in the weight simplex.
 
-    for i in range(NUM_SEEDS):
-        returns = out["metrics"]["returned_episode_returns"][i]
-        returns = returns.mean(-1).reshape(-1)
-        returns = returns[returns != 0.0]  # filters out non-terminal returns
-        plt.plot(returns)
-    plt.show()
+    It uses the Riesz s-Energy method from pymoo: https://pymoo.org/misc/reference_directions.html
+
+    Args:
+        dim: size of the weight vector
+        n: number of weight vectors to generate
+        seed: random seed
+    """
+    return list(get_reference_directions("energy", dim, n, seed=seed))
 
 
-def hp_search(args):
-    NUM_SEEDS = 3
-    hyperparams = jnp.array([1e-4, 5e-4, 1e-3, 5e-3])  # lr
+def multi_obj(args):
+    NUM_WEIGHTS = 30
+    weights = jnp.array(equally_spaced_weights(2, NUM_WEIGHTS))
+    weights = jnp.array(
+        [
+            [0.96, 0.04],
+            [0.97, 0.03],
+            [0.975, 0.025],
+            [0.98, 0.02],
+            [0.99, 0.01],
+        ]
+    )
 
     rng = jax.random.PRNGKey(args.seed)
-    rngs = jax.random.split(rng, NUM_SEEDS)
-    train_vvjit = jax.jit(
-        jax.vmap(
-            jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the hyperparam
-            in_axes=(0, None),  # vmaps over the rngs
-        )
+    train_vjit = jax.jit(
+        jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the weights
     )
     start_time = time.time()
-    out = jax.block_until_ready(train_vvjit(rngs, hyperparams))
+    out = jax.block_until_ready(train_vjit(rng, weights))
     print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
+    print(f"SPS: {args.total_timesteps *  NUM_WEIGHTS/ (time.time() - start_time)}")
 
-    import matplotlib.pyplot as plt
+    for i in range(len(weights)):
+        # Plotting online Pareto front
+        # returns = out["metrics"]["returned_episode_returns"][i]
+        # returns = returns.mean(-2)  # agg over envs
+        # returns = returns.reshape((-1, 2))  # flatten
+        # returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
+        # returns = returns[-1]
+        # plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
 
-    for i in range(len(hyperparams)):
-        returns = out["metrics"]["returned_episode_returns"][:, i, :]
-        returns = returns.mean(0).mean(-1).reshape(-1)
-        returns = returns[returns != 0.0]  # filters out non-terminal returns
-        plt.plot(returns, label="lr=" + str(hyperparams[i]))
+        # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
+        actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
+        save_actor(actor_i, pathname="actor_" + str(weights[i]))
+
+    # plt.title("Online pareto front")
+    # plt.ylabel("far_from_others")
+    # plt.xlabel("close_to_target")
+    # plt.legend()
+    # plt.show()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    rng = jax.random.PRNGKey(args.seed)
 
-    train_jit = jax.jit(make_train(args))  # one seed
-    start_time = time.time()
-    out = jax.block_until_ready(train_jit(rng, None))
-    print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps / (time.time() - start_time)}")
-
-    actor_state = out["runner_state"][0]
-    save_actor(actor_state)
-
-    import matplotlib.pyplot as plt
-
-    returns = out["metrics"]["returned_episode_returns"]
-    returns = returns.mean(-1).reshape(-1)
-    returns = returns[returns != 0.0]  # filters out non-terminal returns
-    plt.plot(returns, label="episode return")
-
-    # plt.plot(out["metrics"]["total_loss"].mean(-1).reshape(-1), label="total loss")
-    # plt.plot(out["metrics"]["actor_loss"].mean(-1).reshape(-1), label="actor loss")
-    # plt.plot(out["metrics"]["value_loss"].mean(-1).reshape(-1), label="value loss")
-    # plt.plot(out["metrics"]["entropy"].mean(-1).reshape(-1), label="entropy")
-    # plt.plot(out["metrics"]["approx_kl"].mean(-1).reshape(-1), label="approx kl")
-    plt.xlabel("Update Step")
-    plt.ylabel("")
-    plt.legend()
-    plt.show()
+    multi_obj(args)

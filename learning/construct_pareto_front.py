@@ -122,7 +122,7 @@ def play_episode(actor_module, actor_state, env, init_obs, key, simu):
     return ep_return
 
 
-def load_actor_state(model_path: str, actor_state: TrainState):
+def load_actor_state(model_path, actor_state: TrainState):
     directory = epath.Path(model_path)
     print("Loading actor from ", directory)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
@@ -223,8 +223,8 @@ def replay_simu(args):
         policy_eval = play_episode(actor_module, actor_state, env, obs, key, True)
         pareto_front.add(candidate=model_dir, evaluation=policy_eval)
 
-    return pareto_front
     env.close()
+    return pareto_front
 
 
 if __name__ == "__main__":

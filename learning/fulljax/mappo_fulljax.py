@@ -23,6 +23,7 @@ from jax import vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import State
 from crazy_rl.multi_agent.jax.catch import Catch
+from crazy_rl.utils.experiments_and_plots import save_results
 
 # from crazy_rl.multi_agent.jax.escort import Escort
 # from crazy_rl.multi_agent.jax.surround import Surround
@@ -495,8 +496,9 @@ if __name__ == "__main__":
     train_jit = jax.jit(make_train(args))  # one seed
     start_time = time.time()
     out = jax.block_until_ready(train_jit(rng, None))
-    print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps / (time.time() - start_time)}")
+    total_time = time.time() - start_time
+    print(f"total time: {total_time}")
+    print(f"SPS: {args.total_timesteps / total_time}")
 
     actor_state = out["runner_state"][0]
     save_actor(actor_state)
@@ -504,8 +506,25 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     returns = out["metrics"]["returned_episode_returns"]
+    ep_length = out["metrics"]["returned_episode_lengths"]
     returns = returns.mean(-1).reshape(-1)
     returns = returns[returns != 0.0]  # filters out non-terminal returns
+
+    return_with_timestep_and_time = []
+    for i in range(len(returns)):
+        timestep = i * args.num_envs * 200  # Episodes are roughly always 200 timesteps (truncation)
+        return_with_timestep_and_time.append(
+            (
+                timestep,
+                total_time
+                / len(returns),  # assumes consistent SPS because it is impossible to get time inside jitted function
+                returns[i],
+            )
+        )
+
+    return_with_timestep_and_time = np.array(return_with_timestep_and_time)
+    save_results(return_with_timestep_and_time, f"MAPPO GPU (${args.num_envs} envs)", args.seed)
+
     plt.plot(returns, label="episode return")
 
     # plt.plot(out["metrics"]["total_loss"].mean(-1).reshape(-1), label="total loss")

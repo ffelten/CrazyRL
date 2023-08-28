@@ -35,6 +35,7 @@ from crazy_rl.multi_agent.jax.escort import Escort  # noqa
 from crazy_rl.multi_agent.jax.surround import Surround  # noqa
 from crazy_rl.multi_agent.numpy.catch import Catch  # noqa
 from crazy_rl.multi_agent.numpy.circle import Circle
+from crazy_rl.utils.experiments_and_plots import save_results
 
 
 def parse_args():
@@ -347,7 +348,7 @@ def train(args, key: chex.PRNGKey):
                 team_return = sum(list(info["episode"]["r"].values()))
                 if args.debug:
                     print(f"Episode return: ${team_return}, length: ${info['episode']['l']}")
-                episode_returns.append((current_timestep, team_return))
+                episode_returns.append((current_timestep, time.time() - start_time, team_return))
                 obs, info = env.reset()
 
             runner_state = (actor_state, critic_state, obs, key)
@@ -529,7 +530,8 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     returns = out["metrics"]["returned_episode_returns"]
-    plt.plot(returns[:, 0], returns[:, 1], label="episode return")
+    save_results(returns, "MAPPO_CPU_<ENV>", args.seed)
+    plt.plot(returns[:, 0], returns[:, 2], label="episode return")
 
     # plt.plot(out["metrics"]["total_loss"].mean(-1).reshape(-1), label="total loss")
     # plt.plot(out["metrics"]["actor_loss"].mean(-1).reshape(-1), label="actor loss")

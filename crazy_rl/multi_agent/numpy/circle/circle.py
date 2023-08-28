@@ -103,10 +103,9 @@ class Circle(BaseParallelEnv):
     def _transition_state(self, actions):
         target_point_action = dict()
         state = self._get_drones_state()
-
+        t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
         for i, agent in enumerate(self._agents_names):
             # new targets
-            t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
             self._previous_target[agent] = self._target_location[agent]
             self._target_location[agent] = self.ref[i][t]
 
@@ -151,6 +150,12 @@ class Circle(BaseParallelEnv):
         for agent in self._agents_names:
             info[agent] = {"distance": np.linalg.norm(self._agent_location[agent] - self._target_location[agent], ord=1)}
         return info
+
+    @override
+    def state(self):
+        return np.append(
+            np.array(list(self._agent_location.values())), np.array(list(self._target_location.values()))
+        ).flatten()
 
 
 if __name__ == "__main__":

@@ -441,7 +441,7 @@ def make_train(args):
 
 
 def save_actor(actor_state, pathname: str = "actor"):
-    directory = epath.Path("trained_model")
+    directory = epath.Path("../trained_model")
     actor_dir = directory / pathname
     print("Saving actor to ", actor_dir)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()

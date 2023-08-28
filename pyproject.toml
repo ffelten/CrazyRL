@@ -38,10 +38,12 @@ optax = "^0.1"
 chex = "^0.1"
 orbax-checkpoint = "^0.3"
 matplotlib = "^3.7"
-distrax = "^0.1"
+distrax = {git = "https://github.com/deepmind/distrax.git", rev = "93c54a8b15c07e57a58b95b519e5510ab99220c9"}
 jax_dataclasses = "^1.5"
 pymoo = "^0.6"
 mplcursors = "^0.5.2"
+supersuit = "^3.9.0"
+tqdm = "^4.66.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.20"

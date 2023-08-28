@@ -219,6 +219,10 @@ class Escort(BaseParallelEnv):
         info = dict()
         return info
 
+    @override
+    def state(self):
+        return np.append(np.array(list(self._agent_location.values())).flatten(), self._target_location["unique"])
+
 
 if __name__ == "__main__":
     parallel_env = Escort(

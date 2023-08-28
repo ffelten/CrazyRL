@@ -49,7 +49,7 @@ def parse_args():
 
     # Algorithm specific arguments
     parser.add_argument("--num-steps", type=int, default=1280, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=1e4,
+    parser.add_argument("--total-timesteps", type=int, default=1e5,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")
@@ -530,7 +530,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     returns = out["metrics"]["returned_episode_returns"]
-    save_results(returns, "MAPPO_CPU_<ENV>", args.seed)
+    save_results(returns, "MAPPO_CPU_Circle_(1env)", args.seed)
     plt.plot(returns[:, 0], returns[:, 2], label="episode return")
 
     # plt.plot(out["metrics"]["total_loss"].mean(-1).reshape(-1), label="total loss")

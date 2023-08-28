@@ -14,6 +14,8 @@ def save_results(returns, exp_name, seed):
         exp_name: experiment name
         seed: seed of the experiment
     """
+    if not os.path.exists("results"):
+        os.makedirs("results")
     filename = f"results/results_{exp_name}_{seed}.csv"
     print(f"Saving results to {filename}")
     df = pd.DataFrame(returns)
@@ -84,4 +86,11 @@ def load_and_plot(exp_names, env_name):
 
 
 if __name__ == "__main__":
-    load_and_plot({"MAPPO CPU env": "../../results/results_MAPPO_CPU_*"}, "Circle")
+    load_and_plot(
+        {
+            # "MAPPO CPU (1 env)": "../../results/results_MAPPO_CPU_*",
+            "MAPPO GPU (1 env)": "../../results/results_MAPPO_GPU_Circle_(1env*",
+            "MAPPO GPU (128nv)": "../../results/results_MAPPO_GPU_Circle_(128envs*",
+        },
+        "Circle",
+    )

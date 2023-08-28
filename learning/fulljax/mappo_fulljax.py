@@ -22,7 +22,8 @@ from flax.training.train_state import TrainState
 from jax import vmap
 
 from crazy_rl.multi_agent.jax.base_parallel_env import State
-from crazy_rl.multi_agent.jax.catch import Catch
+from crazy_rl.multi_agent.jax.catch import Catch  # noqa
+from crazy_rl.multi_agent.jax.circle import Circle  # noqa
 from crazy_rl.utils.experiments_and_plots import save_results
 
 # from crazy_rl.multi_agent.jax.escort import Escort
@@ -50,7 +51,7 @@ def parse_args():
     # Algorithm specific arguments
     parser.add_argument("--num-envs", type=int, default=128, help="the number of parallel environments")
     parser.add_argument("--num-steps", type=int, default=10, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=3e6,
+    parser.add_argument("--total-timesteps", type=int, default=1e5,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")
@@ -133,29 +134,29 @@ def make_train(args):
     minibatch_size = args.num_envs * args.num_steps // args.num_minibatches
 
     def train(key: chex.PRNGKey, lr: Optional[float] = None):
-        num_drones = 8
-        env = Catch(
-            num_drones=num_drones,
-            init_flying_pos=jnp.array(
-                [
-                    [0.0, 0.0, 1.0],
-                    [0.0, 1.0, 1.0],
-                    [1.0, 0.0, 1.0],
-                    [1.0, 2.0, 2.0],
-                    [2.0, 0.5, 1.0],
-                    [2.0, 2.5, 2.0],
-                    [2.0, 1.0, 2.5],
-                    [0.5, 0.5, 0.5],
-                ]
-            ),
-            init_target_location=jnp.array([1.0, 1.0, 2.0]),
-            target_speed=0.15,
-            # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
-        )
-        # env = Circle(
+        num_drones = 3
+        # env = Catch(
         #     num_drones=num_drones,
-        #     init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        #     init_flying_pos=jnp.array(
+        #         [
+        #             [0.0, 0.0, 1.0],
+        #             [0.0, 1.0, 1.0],
+        #             [1.0, 0.0, 1.0],
+        #             [1.0, 2.0, 2.0],
+        #             [2.0, 0.5, 1.0],
+        #             [2.0, 2.5, 2.0],
+        #             [2.0, 1.0, 2.5],
+        #             [0.5, 0.5, 0.5],
+        #         ]
+        #     ),
+        #     init_target_location=jnp.array([1.0, 1.0, 2.0]),
+        #     target_speed=0.15,
+        #     # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
         # )
+        env = Circle(
+            num_drones=num_drones,
+            init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        )
 
         env = ClipActions(env)
         env = NormalizeObservation(env)
@@ -500,8 +501,8 @@ if __name__ == "__main__":
     print(f"total time: {total_time}")
     print(f"SPS: {args.total_timesteps / total_time}")
 
-    actor_state = out["runner_state"][0]
-    save_actor(actor_state)
+    # actor_state = out["runner_state"][0]
+    # save_actor(actor_state)
 
     import matplotlib.pyplot as plt
 
@@ -523,7 +524,7 @@ if __name__ == "__main__":
         )
 
     return_with_timestep_and_time = np.array(return_with_timestep_and_time)
-    save_results(return_with_timestep_and_time, f"MAPPO GPU (${args.num_envs} envs)", args.seed)
+    save_results(return_with_timestep_and_time, f"MAPPO_GPU_Circle_({args.num_envs}envs)", args.seed)
 
     plt.plot(returns, label="episode return")
 

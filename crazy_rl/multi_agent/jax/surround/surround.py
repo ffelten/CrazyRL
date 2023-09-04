@@ -112,9 +112,9 @@ class Surround(BaseParallelEnv):
             ) + jnp.any(terminations) * jnp.column_stack((reward_crash, reward_crash))
         else:
             # MO reward linearly combined using hardcoded weights
-            return (1 - jnp.any(terminations)) * (0.8 * reward_close_to_target + 0.2 * reward_far_from_other_agents) + jnp.any(
-                terminations
-            ) * reward_crash
+            return (1 - jnp.any(terminations)) * (
+                0.995 * reward_close_to_target + 0.005 * reward_far_from_other_agents
+            ) + jnp.any(terminations) * reward_crash
 
     @override
     @partial(jit, static_argnums=(0,))

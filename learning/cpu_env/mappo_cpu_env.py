@@ -212,10 +212,10 @@ def train(args, key: chex.PRNGKey):
     )
 
     env = clip_actions_v0(env)
-    env = normalize_obs_v0(env)
+    env = normalize_obs_v0(env, env_min=-1.0, env_max=1.0)
     env = agent_indicator_v0(env)
-    env = NormalizeReward(env)
     env = RecordEpisodeStatistics(env)
+    env = NormalizeReward(env, args.gamma)
 
     # Initial reset to have correct dimensions in the observations
     env.reset(seed=args.seed)
@@ -509,7 +509,7 @@ def train(args, key: chex.PRNGKey):
 
 def save_actor(actor_state):
     directory = epath.Path("../trained_model")
-    actor_dir = directory / "actor"
+    actor_dir = directory / "actor_cpu"
     print("Saving actor to ", actor_dir)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
     ckptr.save(actor_dir, actor_state, force=True)
@@ -518,6 +518,7 @@ def save_actor(actor_state):
 if __name__ == "__main__":
     args = parse_args()
     rng = jax.random.PRNGKey(args.seed)
+    np.random.seed(args.seed)
 
     start_time = time.time()
     out = train(args, rng)

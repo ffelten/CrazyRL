@@ -164,21 +164,21 @@ def replay_simu(args):
     # )
 
     env = Surround(
-        drone_ids=np.arange(4),
+        drone_ids=np.arange(5),
         render_mode="human",
         init_flying_pos=np.array(
             [
-                [0.0, 0.0, 1.0],
-                [0.0, 1.0, 1.0],
                 [1.0, 0.0, 1.0],
-                [1.0, 2.0, 2.0],
-                # [2.0, 0.5, 1.0],
+                [0.0, 1.0, 1.0],
+                [-1.0, 0.0, 1.0],
+                [-1.0, 0.5, 1.5],
+                [2.0, 0.5, 1.0],
                 # [2.0, 2.5, 2.0],
                 # [2.0, 1.0, 2.5],
                 # [0.5, 0.5, 0.5],
             ]
         ),
-        target_location=np.array([1.0, 1.0, 2.0]),
+        target_location=np.array([0.0, 0.5, 1.5]),
     )
 
     # env: ParallelEnv = Circle(

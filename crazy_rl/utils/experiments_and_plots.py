@@ -79,18 +79,19 @@ def load_and_plot(exp_names, env_name):
     ax[0].set_ylabel("")
     fig.supylabel("Episodic return")
     h, l = ax[0].get_legend_handles_labels()
-    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure)
+    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=len(exp_names))
     fig.tight_layout()
-    fig.savefig(f"../../results/{env_name}.png", bbox_inches="tight")
+    fig.savefig(f"results/{env_name}.png", bbox_inches="tight")
     # fig.savefig(f"../../results/{env_name}.pdf", bbox_inches="tight")
 
 
 if __name__ == "__main__":
     load_and_plot(
         {
-            # "MAPPO CPU (1 env)": "../../results/results_MAPPO_CPU_*",
-            "MAPPO GPU (1 env)": "../../results/results_MAPPO_GPU_Circle_(1env*",
-            "MAPPO GPU (128nv)": "../../results/results_MAPPO_GPU_Circle_(128envs*",
+            "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
+            "MAPPO GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
+            # "MAPPO GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
+            # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
         },
         "Circle",
     )

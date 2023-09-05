@@ -21,6 +21,7 @@ from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from pettingzoo import ParallelEnv
 
+import crazy_rl.utils.geometry
 from crazy_rl.multi_agent.numpy.catch import Catch  # noqa
 from crazy_rl.multi_agent.numpy.circle import Circle  # noqa
 from crazy_rl.multi_agent.numpy.escort import Escort  # noqa
@@ -225,23 +226,21 @@ def replay_real(args):
 
     # Init swarm config of crazyflie
     cflib.crtp.init_drivers()
-    uris = {
-        "radio://0/4/2M/E7E7E7E700",
-        "radio://0/4/2M/E7E7E7E701",
-        # Add more URIs if you want more copters in the swarm
-    }
-    # uri = 'radio://0/4/2M/E7E7E7E7' + str(id).zfill(2) # you can browse the drone_id and add as this code at the end of the uri
+    drones_ids = np.array([0, 1, 2])
+    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in drones_ids]
+
+    # Writes geometry to crazyflie
+    for id in drones_ids:
+        crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", id, verbose=True)
 
     # the Swarm class will automatically launch the method in parameter of parallel_safe method
-    factory = CachedCfFactory(rw_cache="./cache")
-
-    with Swarm(uris, factory=factory) as swarm:
+    with Swarm(uris, factory=CachedCfFactory(rw_cache="./cache")) as swarm:
         swarm.parallel_safe(LoggingCrazyflie)
         # swarm.reset_estimators()
         swarm.get_estimated_positions()
 
         env: ParallelEnv = Circle(
-            drone_ids=np.array([0, 1, 2, 3, 4]),
+            drone_ids=drones_ids,
             render_mode="human",
             init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
             # target_location=np.array([1, 1, 2.5]),
@@ -269,7 +268,7 @@ def replay_real(args):
         )
         actor_state = load_actor_state(args.model_dir, actor_state)
 
-        play_episode(actor_module, actor_state, env, obs, key, True)
+        play_episode(actor_module, actor_state, env, obs, key, False)
 
         env.close()
 

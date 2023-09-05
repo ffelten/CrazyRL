@@ -9,7 +9,7 @@
 
 :warning: Work in progress, suggestions are welcome. :warning:
 
-A library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones.
+A hardware-accelerated library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones.
 
 It has:
 
@@ -35,8 +35,7 @@ The drones learn to hover in a fixed position.
 
 The yellow balls represent the target position of the drones.
 
-Available in [Numpy](crazy_rl/multi_agent/numpy/hover/hover.py) and [JAX](crazy_rl/multi_agent/jax/hover/hover.py)
-version.
+Available in [Numpy](crazy_rl/multi_agent/numpy/hover/hover.py) and [JAX](crazy_rl/multi_agent/jax/hover/hover.py) version.
 
 ### Circle
 The drones learn to perform a coordinated circle.
@@ -45,8 +44,7 @@ The drones learn to perform a coordinated circle.
 
 The yellow balls represent the target position of the drones.
 
-Available in [Numpy](crazy_rl/multi_agent/numpy/circle/circle.py) and [JAX](crazy_rl/multi_agent/jax/circle/circle.py)
-version.
+Available in [Numpy](crazy_rl/multi_agent/numpy/circle/circle.py) and [JAX](crazy_rl/multi_agent/jax/circle/circle.py) version.
 
 ### Surround
 The drones learn to surround a fixed target point.
@@ -55,8 +53,7 @@ The drones learn to surround a fixed target point.
 
 The yellow ball represents the target the drones have to surround.
 
-Available in [Numpy](crazy_rl/multi_agent/numpy/surround/surround.py) and
-[JAX](crazy_rl/multi_agent/jax/surround/surround.py) version.
+Available in [Numpy](crazy_rl/multi_agent/numpy/surround/surround.py) and [JAX](crazy_rl/multi_agent/jax/surround/surround.py) version.
 
 ### Escort
 The drones learn to escort a target moving straight to one point to another.
@@ -65,8 +62,7 @@ The drones learn to escort a target moving straight to one point to another.
 
 The yellow ball represents the target the drones have to surround.
 
-Available in [Numpy](crazy_rl/multi_agent/numpy/escort/escort.py) and [JAX](crazy_rl/multi_agent/jax/escort/escort.py)
-version.
+Available in [Numpy](crazy_rl/multi_agent/numpy/escort/escort.py) and [JAX](crazy_rl/multi_agent/jax/escort/escort.py) version.
 
 ### Catch
 The drones learn to catch a target trying to escape.
@@ -75,8 +71,14 @@ The drones learn to catch a target trying to escape.
 
 The yellow ball represents the target the drones have to surround.
 
-Available in [Numpy](crazy_rl/multi_agent/numpy/catch/catch.py) and [JAX](crazy_rl/multi_agent/jax/catch/catch.py)
-version.
+Available in [Numpy](crazy_rl/multi_agent/numpy/catch/catch.py) and [JAX](crazy_rl/multi_agent/jax/catch/catch.py) version.
+
+## Learning
+We provide implementations of MAPPO [1] both compatible with a CPU env (PettingZoo parallel API), and a GPU env (our JAX API). These implementations should be very close to each others in terms of sample efficiency but the GPU version is immensely faster in terms of time.
+We also have a multi-agent version of SAC, [MASAC](https://github.com/ffelten/MASAC), which is compatible with the CPU envs.
+
+<img src="results/Circle.png">
+In the above image, we can see that sample efficiency of both MAPPO versions are very close, but the JAX version is much faster in terms of time. Notice that the Jax version can be improved further by relying on vectorized envs.
 
 ## API
 
@@ -162,12 +164,6 @@ for i in range(301):
 
     # where you would learn or add to buffer
 ```
-
-## Learning
-We provide implementations of MAPPO [1] both compatible with a CPU env (PettingZoo parallel API), and a GPU env (our JAX API). These implementations should be very close to each others in terms of sample efficiency but the GPU version is immensely faster in terms of time.
-We also have a multi-agent version of SAC, [MASAC](https://github.com/ffelten/MASAC), which is compatible with the CPU envs.
-
-See <img src="results/Circle.png">
 
 
 ## Install & run
@@ -268,6 +264,13 @@ Numpy and JAX versions.
 The envs often try to minimize the distance towards the target of each drone. While we initially modelled this as the negative distance, it seems that PPO doesn't like having only negative reward signals. Thus, we opted for potential based rewards [2] instead.
 
 In some cases, an additional conflicting reward is also needed: maximizing the distance towards the other drones. Both rewards are then linearly combined using weights which pre-defined. To find the weights, we used a multi-objective technique consisting in exposing the rewards as vectors and let the learning algorithm try multiple weights (in the Jax version, it is trivially performed by `vmapping` the learning loop under a few weights). While this seems very simple, it is blazing fast because there is no coordination needed between threads.
+
+## Related projects
+* [PettingZoo](https://pettingzoo.farama.org/): MARL API and environments;
+* [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/): Crazyflie Python library;
+* [gymnax](https://github.com/RobertTLange/gymnax): RL environments in Jax, but not multi-agent;
+* [PureJaxRL](https://github.com/luchris429/purejaxrl): End-to-end RL in Jax, but not multi-agent;
+* [CrazyFlyt](https://github.com/jjshoots/CrazyFlyt): Simulation and real life control of Crazyflies, the main difference with this project is that the simulator is an actual, heavyweight simulator (Pybullet). Hence, it does not have a full jax version. It is in practice more fit for learning controllers, while our project focuses on learning swarm formation.
 
 ## Citation
 If you use this code for your research, please cite this using:

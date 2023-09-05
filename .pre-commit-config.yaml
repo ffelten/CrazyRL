@@ -51,7 +51,7 @@ repos:
     rev: 6.3.0
     hooks:
       - id: pydocstyle
-        exclude: ^(tests/)|(docs/)|(setup.py)|(examples/)|(crazy_rl/mono_agent/)|(learning/)|(crazy_rl/utils/jax_wrappers)
+        exclude: ^(tests/)|(docs/)|(setup.py)|(examples/)|(crazy_rl/mono_agent/)|(learning/)|(crazy_rl/utils/jax_wrappers)|(crazy_rl/utils/geometry)
         args:
           - --source
           - --explain

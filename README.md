@@ -145,29 +145,41 @@ parallel_env = Circle(
         num_intermediate_points=100,
     )
 
-num_envs = 3  # number of states in parallel
-seed = 5  # test value
+num_envs = 3  # number of envs in parallel
+seed = 5  # PRNG seed
 key = random.PRNGKey(seed)
-key, *subkeys = random.split(key, num_envs + 1)
+key, subkeys = random.split(key)
+subkeys = random.split(subkeys, num_envs)
 
 # Wrappers
 env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
-env = VecEnv(env)  # vmaps the env public methods
+env = VecEnv(env)  # Vectorizes the env public methods
 
-obs, info, state = env.reset(jnp.stack(subkeys))
+obs, info, state = env.reset(subkeys)
 
+# Example of stepping through the 5 parallel environments
 for i in range(301):
-
     actions = jnp.zeros((num_envs, parallel_env.num_drones, parallel_env.action_space(0).shape[0]))
-    for env_id, obs in enumerate(states.observations):
+    for env_id, obs in enumerate(obs):
         for agent_id in range(parallel_env.num_drones):
-            actions[env_id, agent_id] = actor.get_action(obs, agent_id, key) # YOUR POLICY HERE
+            key, subkey = random.split(key)
+            actions[env_id, agent_id] = actor.get_action(obs, agent_id, subkey) # YOUR POLICY HERE
 
     key, *subkeys = random.split(key, num_envs + 1)
     obs, rewards, term, trunc, info, state = env.step(state, actions, jnp.stack(subkeys))
 
     # where you would learn or add to buffer
 ```
+
+## Learning
+We provide implementations of MAPPO [1] both compatible with a CPU env (PettingZoo parallel API), and a GPU env (our JAX API). These implementations should be very close to each others in terms of sample efficiency but the GPU version is immensely faster in terms of time.
+We also have a multi-agent version of SAC, [MASAC](https://github.com/ffelten/MASAC), which is compatible with the CPU env.
+
+See <img src="results/Circle.png">
+
+
+[1] C. Yu et al., “The Surprising Effectiveness of PPO in Cooperative Multi-Agent Games,” presented at the Thirty-sixth Conference on Neural Information Processing Systems Datasets and Benchmarks Track, Jun. 2022. Accessed: Sep. 05, 2023. [Online]. Available: https://openreview.net/forum?id=YVXaxB6L2Pl
+
 
 ## Install & run
 
@@ -233,11 +245,7 @@ Available in the Numpy version.
 
 ### Guidelines
 
-Firstly configuration of the positioning system has to be saved in a config file. The following explains quickly how to set up the LightHouse positioning system.
-
-Then, connect your Crazyflie through the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/), manage the geometry for the lighthouse, estimate geometry simple and save the configuration on a yaml file. You can then connect the other drones and load the geometry in them using the client.
-
-(optional) Refer the path on [utils.py](crazy_rl/utils/utils.py) on the load_config method and the configuration will be load on drones at each start up. *This line has been commented out because it was very slow in practice. We just made sure the config was loaded before running the experiments.*
+Firstly configuration of the positioning system has to be saved in a config file using the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/). We have a script which does that in [geometry.py](crazy_rl/utils/geometry.py). You have to run it for each drone id, e.g. `python geometry.py geometry.yaml 1,2,4 0`.
 
 Secondly place the turned on drones on your environment, on the ground below the positions given to `init_flying_pos` in your code. Be careful to put your drones at their right place depending on their id to avoid any crash at start up.
 
@@ -265,12 +273,6 @@ add automatic behaviours to JAX version.
 
 You can explore the [test files](crazy_rl/test) to gain examples of usage and make comparisons between the
 Numpy and JAX versions.
-
-## Contributors
-* Florian Felten made the design, architecture, vision, reviews and cleanup.
-* Pierre-Yves Houitte wrote an original proof-of-concept of the library.
-* Coline Ledez adapted the environments to Jax, added tests.
-* El-Ghazali Talbi and Grégoire Danoy supervised the work.
 
 ## Citation
 If you use this code for your research, please cite this using:

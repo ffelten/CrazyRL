@@ -54,6 +54,7 @@ class Hover(BaseParallelEnv):
             init_flying_pos=self._init_flying_pos,
             target_location=self._target_location,
             drone_ids=drone_ids,
+            target_id=None,  # Should be none for multi target envs
         )
 
     @override
@@ -81,7 +82,7 @@ class Hover(BaseParallelEnv):
     @override
     def _transition_state(self, actions: Dict[str, np.ndarray]):
         target_point_action = dict()
-        state = self._get_drones_state()
+        _, state = self._get_drones_state()
         for agent in self._agents_names:
             target_point_action[agent] = np.clip(state[agent] + actions[agent], [-self.size, -self.size, 0], self.size)
         return target_point_action

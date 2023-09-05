@@ -140,7 +140,7 @@ def run_sequence(scf, command):
     else:
         commander = scf.cf.high_level_commander
         # z limitation for safety
-        z = np.clip(target_pos[2], 0.3, 2)
+        z = np.clip(target_pos[2], 0.3, 2.5)
         commander.go_to(target_pos[0], target_pos[1], z, yaw, flight_time, relative=False)
         time.sleep(flight_time * 0.65)
 

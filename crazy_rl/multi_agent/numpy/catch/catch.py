@@ -1,6 +1,7 @@
 """Catch environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point trying to escape."""
 
 import time
+from typing import Optional
 from typing_extensions import override
 
 import numpy as np
@@ -23,6 +24,7 @@ class Catch(BaseParallelEnv):
         init_flying_pos: np.ndarray,
         init_target_location: np.ndarray,
         target_speed: float,
+        target_id: Optional[int] = None,
         render_mode=None,
         size: int = 3,
         multi_obj: bool = False,
@@ -35,6 +37,7 @@ class Catch(BaseParallelEnv):
             init_flying_pos: Array of initial positions of the drones when they are flying
             init_target_location: Array of the initial position of the moving target
             target_speed: Distance traveled by the target at each timestep
+            target_id: Target id if you want a real target
             render_mode: Render mode: "human", "real" or None
             size: Size of the map
             multi_obj: Whether to return a multi-objective reward
@@ -66,6 +69,7 @@ class Catch(BaseParallelEnv):
             target_location=self._target_location,
             agents_names=self._agents_names,
             drone_ids=drone_ids,
+            target_id=target_id,
             swarm=swarm,
         )
 
@@ -126,7 +130,7 @@ class Catch(BaseParallelEnv):
     @override
     def _transition_state(self, actions):
         target_point_action = dict()
-        state = self._get_drones_state()
+        _, state = self._get_drones_state()
 
         # new targets
         self._previous_target = self._target_location.copy()

@@ -84,9 +84,10 @@ class BaseParallelEnv(ParallelEnv):
         self,
         agents_names: np.ndarray,
         drone_ids: np.ndarray,
+        target_id: Optional[int] = None,
         init_flying_pos: Optional[Dict[str, np.ndarray]] = None,
         target_location: Optional[Dict[str, np.ndarray]] = None,
-        size: int = 4,
+        size: int = 3,
         render_mode: Optional[str] = None,
         swarm: Optional[Swarm] = None,
     ):
@@ -95,6 +96,7 @@ class BaseParallelEnv(ParallelEnv):
         Args:
             agents_names (list): list of agent names use as key for the dict
             drone_ids (list): ids of the drones (ignored in simulation mode)
+            target_id (int, optional): ids of the targets (ignored in simulation mode). This is to control a real target with a real drone. Only supported in envs with one target.
             init_flying_pos (Dict, optional): A dictionary containing the name of the agent as key and where each value
                 is a (3)-shaped array containing the initial XYZ position of the drones.
             target_location (Dict, optional): A dictionary containing a (3)-shaped array for the XYZ position of the target.
@@ -125,6 +127,7 @@ class BaseParallelEnv(ParallelEnv):
             self.clock = None
         elif self.render_mode == "real":
             self.drone_ids = drone_ids
+            self.target_id = target_id
             assert swarm is not None, "Swarm object must be provided in real mode"
             self.swarm = swarm
             while not self.swarm:
@@ -180,7 +183,7 @@ class BaseParallelEnv(ParallelEnv):
             self._previous_location = self._init_flying_pos.copy()
         elif self._mode == "real":
             # self.swarm.parallel_safe(reset_estimator)
-            self._agent_location = self._get_drones_state()
+            target_loc, self._agent_location = self._get_drones_state()
             self._previous_location = self._agent_location.copy()
             print("reset", self._agent_location)
 
@@ -188,16 +191,25 @@ class BaseParallelEnv(ParallelEnv):
             # dict target_position URI
             for id in self.drone_ids:
                 uri = "radio://0/4/2M/E7E7E7E7" + str(id).zfill(2)
-                target = self._init_flying_pos["agent_" + str(id)]
-                agent = self._agent_location["agent_" + str(id)]
-                command[uri] = [[agent, target]]
+                next_loc = self._init_flying_pos["agent_" + str(id)]
+                current_loc = self._agent_location["agent_" + str(id)]
+                command[uri] = [[current_loc, next_loc]]
+
+            # Move target drone into position
+            if self.target_id is not None:
+                uri = "radio://0/4/2M/E7E7E7E7" + str(self.target_id[0]).zfill(2)
+                current = target_loc
+                target = list(self._init_target_location.values())[0]
+                command[uri] = [[current, target]]
 
             self.swarm.parallel_safe(run_take_off)
             print("Take off successful.")
             print(f"Setting the drone positions to the initial positions. {command}")
             self.swarm.parallel_safe(run_sequence, args_dict=command)
 
-            self._agent_location = self._get_drones_state()
+            target_loc, self._agent_location = self._get_drones_state()
+            if self.target_id is not None:
+                self._target_location = {"unique": target_loc}
 
         observation = self._compute_obs()
         infos = self._compute_info()
@@ -226,6 +238,12 @@ class BaseParallelEnv(ParallelEnv):
                 target = new_locations["agent_" + str(id)]
                 current_location = self._agent_location["agent_" + str(id)]
                 command[uri] = [[current_location, target]]
+
+            if self.target_id is not None:
+                uri = "radio://0/4/2M/E7E7E7E7" + str(self.target_id[0]).zfill(2)
+                current = list(self._previous_target.values())[0]
+                target = list(self._target_location.values())[0]
+                command[uri] = [[current, target]]
 
             start = time.time()
             self.swarm.parallel_safe(run_sequence, args_dict=command)
@@ -351,11 +369,15 @@ class BaseParallelEnv(ParallelEnv):
     def _get_drones_state(self):
         """Return the state of all drones (xyz position) inside a dict with the same keys of agent_location and target_location."""
         if self._mode == "simu":
-            return self._agent_location
+            return list(self._target_location.values()), self._agent_location
         elif self._mode == "real":
-            temp = dict()
+            agent_locs = dict()
+            target_loc = None
             pos = self.swarm.get_estimated_positions()
             for uri in pos:
-                temp["agent_" + uri[-1]] = np.array(pos[uri])
+                if int(uri[-1]) in self.target_id:
+                    target_loc = np.array(pos[uri])
+                else:
+                    agent_locs["agent_" + uri[-1]] = np.array(pos[uri])
 
-            return temp
+            return target_loc, agent_locs

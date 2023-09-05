@@ -1,6 +1,7 @@
 """Escort environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point moving to one point to another."""
 
 import time
+from typing import Optional
 from typing_extensions import override
 
 import numpy as np
@@ -24,6 +25,7 @@ class Escort(BaseParallelEnv):
         init_flying_pos: npt.NDArray[int],
         init_target_location: npt.NDArray[int],
         final_target_location: npt.NDArray[int],
+        target_id: Optional[int] = None,
         num_intermediate_points: int = 10,
         render_mode=None,
         size: int = 3,
@@ -37,6 +39,7 @@ class Escort(BaseParallelEnv):
             init_flying_pos: Array of initial positions of the drones when they are flying
             init_target_location: Array of the initial position of the moving target
             final_target_location: Array of the final position of the moving target
+            target_id: target id if you want a real drone target
             num_intermediate_points: Number of intermediate points in the target trajectory
             render_mode: Render mode: "human", "real" or None
             size: Size of the map
@@ -77,6 +80,7 @@ class Escort(BaseParallelEnv):
             target_location=self._target_location,
             agents_names=self._agents_names,
             drone_ids=drone_ids,
+            target_id=target_id,
             swarm=swarm,
         )
 
@@ -109,7 +113,7 @@ class Escort(BaseParallelEnv):
     @override
     def _transition_state(self, actions):
         target_point_action = dict()
-        state = self._get_drones_state()
+        _, state = self._get_drones_state()
         # new targets
         self._previous_target = self._target_location.copy()
         if self.timestep < self.num_ref_points:

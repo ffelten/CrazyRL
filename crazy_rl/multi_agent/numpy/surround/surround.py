@@ -1,5 +1,6 @@
 """Surround environment for Crazyflie 2. Each agent is supposed to learn to surround a common target point."""
 import time
+from typing import Optional
 from typing_extensions import override
 
 import numpy as np
@@ -22,6 +23,7 @@ class Surround(BaseParallelEnv):
         drone_ids: npt.NDArray[int],
         init_flying_pos: npt.NDArray[int],
         target_location: npt.NDArray[int],
+        target_id: Optional[int] = None,
         render_mode=None,
         size: int = 3,
         multi_obj: bool = False,
@@ -33,6 +35,7 @@ class Surround(BaseParallelEnv):
             drone_ids: Array of drone ids
             init_flying_pos: Array of initial positions of the drones when they are flying
             target_location: Array of the position of the target point
+            target_id: Target id if you want a real drone target
             render_mode: Render mode: "human", "real" or None
             size: Size of the map
             multi_obj: Whether to return a multi-objective reward
@@ -59,6 +62,7 @@ class Surround(BaseParallelEnv):
             target_location=self._target_location,
             agents_names=self._agents_names,
             drone_ids=drone_ids,
+            target_id=target_id,
             swarm=swarm,
         )
 
@@ -91,7 +95,7 @@ class Surround(BaseParallelEnv):
     @override
     def _transition_state(self, actions):
         target_point_action = dict()
-        state = self._get_drones_state()
+        _, state = self._get_drones_state()
 
         for agent in self.agents:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step

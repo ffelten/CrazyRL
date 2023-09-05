@@ -74,6 +74,7 @@ class Circle(BaseParallelEnv):
             target_location=self._target_location,
             agents_names=self._agents_names,
             drone_ids=drone_ids,
+            target_id=None,  # Should be none in the case of multi target envs
             swarm=swarm,
         )
 
@@ -102,7 +103,7 @@ class Circle(BaseParallelEnv):
     @override
     def _transition_state(self, actions):
         target_point_action = dict()
-        state = self._get_drones_state()
+        _, state = self._get_drones_state()
         t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
         for i, agent in enumerate(self._agents_names):
             # new targets

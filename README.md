@@ -13,17 +13,12 @@ A library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://
 
 It has:
 
-⚡️ A lightweight and fast simulator that is good enough to control [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/) in practice;
-
-🚁 A set of utilities based on the [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/) to control actual Crazyflies;
-
-🤝 A Numpy version, unified under a standard API from [PettingZoo](https://pettingzoo.farama.org/) parallel environments;
-
-🚀 A [JAX](https://github.com/google/jax) version that can be run fully on GPU;
-
-✅ Good quality, tested and documented Python code;
-
-👷 A set of example environments to learn swarming behaviors (in progress).
+* ⚡️ A lightweight and fast simulator that is good enough to control [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/) in practice;
+* 🤝 A set of environments implemented in Python and Numpy, under the [PettingZoo](https://pettingzoo.farama.org/) parallel API;
+* 🚀 The same environments implemented in [Jax](https://github.com/google/jax), that can be run fully on GPU;
+* 🧠 MARL algorithms implemented in Jax, both for PettingZoo and for full Jax environments;
+* 🚁 A set of utilities based on the [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/api/cflib/) to control actual Crazyflies;
+* ✅ Good quality, tested and documented Python code;
 
 
 The real-life example shown in the video is the result of executing the policies in real-life after learning in the lightweight simulator. The learning was performed by with [MASAC](https://github.com/ffelten/MASAC). Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/).
@@ -85,8 +80,7 @@ version.
 
 ## API
 
-### Training
-I suggest to have a look at [MASAC](https://github.com/ffelten/MASAC) for training the agents.
+There are examples of usage in the [test files](crazy_rl/test) and main methods of the environments. Moreover, the [learning](learning/) folder contains examples of MARL algorithms.
 
 ### Numpy version
 
@@ -116,8 +110,7 @@ while not done:
     done = terminated or truncated
 ```
 
-You can have a look at the `learning/` folder to see how we execute pre-trained policies
-using [MASAC](https://github.com/ffelten/MASAC) in both Torch and Jax.
+You can have a look at the `learning/` folder to see how we execute pre-trained policies.
 
 ### JAX version
 
@@ -127,8 +120,7 @@ However, simulation and real-world functionalities are not available in this ver
 Moreover, it is not compliant with the PettingZoo API as it heavily relies on functional programming.
 We sacrificed the API compatibility for huge performance gains.
 
-Some functionalities are automatically done by wrappers, such as vmap, enabling parallelized training, allowing to leverage
-all the cores on the GPU.
+Some functionalities are automatically done by wrappers, such as `vmap`, enabling parallelized training, allowing to leverage  all the cores on the GPU.
 While it offers faster performance on GPUs, it may exhibit slower execution on CPUs.
 
 You can find other wrappers you may need defined in [jax_wrappers](crazy_rl/utils/jax_wrappers.py).
@@ -173,12 +165,9 @@ for i in range(301):
 
 ## Learning
 We provide implementations of MAPPO [1] both compatible with a CPU env (PettingZoo parallel API), and a GPU env (our JAX API). These implementations should be very close to each others in terms of sample efficiency but the GPU version is immensely faster in terms of time.
-We also have a multi-agent version of SAC, [MASAC](https://github.com/ffelten/MASAC), which is compatible with the CPU env.
+We also have a multi-agent version of SAC, [MASAC](https://github.com/ffelten/MASAC), which is compatible with the CPU envs.
 
 See <img src="results/Circle.png">
-
-
-[1] C. Yu et al., “The Surprising Effectiveness of PPO in Cooperative Multi-Agent Games,” presented at the Thirty-sixth Conference on Neural Information Processing Systems Datasets and Benchmarks Track, Jun. 2022. Accessed: Sep. 05, 2023. [Online]. Available: https://openreview.net/forum?id=YVXaxB6L2Pl
 
 
 ## Install & run
@@ -225,7 +214,8 @@ prefer to switch to the CPU without reinstalling, you can manually set the devic
 jax.config.update("jax_platform_name", "cpu")
 ```
 
-## Simulation
+## Modes
+### Simulation
 
 `render_mode = "human"`
 
@@ -234,7 +224,7 @@ It is sufficient since the control of the CrazyFlies is high-level and precise e
 
 Available in the Numpy version.
 
-## Real
+### Real
 
 `render_mode = "real"`
 
@@ -243,13 +233,13 @@ It can probably be deployed with other positioning systems too.
 
 Available in the Numpy version.
 
-### Guidelines
+#### Guidelines
 
 Firstly configuration of the positioning system has to be saved in a config file using the [cfclient app](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/userguides/userguide_client/). We have a script which does that in [geometry.py](crazy_rl/utils/geometry.py). You have to run it for each drone id, e.g. `python geometry.py geometry.yaml 1,2,4 0`.
 
 Secondly place the turned on drones on your environment, on the ground below the positions given to `init_flying_pos` in your code. Be careful to put your drones at their right place depending on their id to avoid any crash at start up.
 
-### Tips
+#### Tips
 
 Verify also that the LEDs on drones aren't red: it means the drone have not enough battery to pursue the mission.
 
@@ -274,6 +264,11 @@ add automatic behaviours to JAX version.
 You can explore the [test files](crazy_rl/test) to gain examples of usage and make comparisons between the
 Numpy and JAX versions.
 
+### Env design
+The envs often try to minimize the distance towards the target of each drone. While we initially modelled this as the negative distance, it seems that PPO doesn't like having only negative reward signals. Thus, we opted for potential based rewards [2] instead.
+
+In some cases, an additional conflicting reward is also needed: maximizing the distance towards the other drones. Both rewards are then linearly combined using weights which pre-defined. To find the weights, we used a multi-objective technique consisting in exposing the rewards as vectors and let the learning algorithm try multiple weights (in the Jax version, it is trivially performed by `vmapping` the learning loop under a few weights). While this seems very simple, it is blazing fast because there is no coordination needed between threads.
+
 ## Citation
 If you use this code for your research, please cite this using:
 
@@ -287,3 +282,8 @@ If you use this code for your research, please cite this using:
     howpublished = {\url{https://github.com/ffelten/CrazyRL}},
 }
 ```
+
+## Bibliography
+[1] C. Yu et al., “The Surprising Effectiveness of PPO in Cooperative Multi-Agent Games,” presented at the Thirty-sixth Conference on Neural Information Processing Systems Datasets and Benchmarks Track, Jun. 2022. Accessed: Sep. 05, 2023. [Online]. Available: https://openreview.net/forum?id=YVXaxB6L2Pl
+
+[2] A. Ng, D. Harada, and S. J. Russell, “Policy Invariance Under Reward Transformations: Theory and Application to Reward Shaping,” presented at the International Conference on Machine Learning, Jun. 1999. Accessed: Aug. 10, 2023. [Online]. Available: https://www.semanticscholar.org/paper/Policy-Invariance-Under-Reward-Transformations%3A-and-Ng-Harada/94066dc12fe31e96af7557838159bde598cb4f10

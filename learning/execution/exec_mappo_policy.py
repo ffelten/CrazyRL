@@ -226,12 +226,14 @@ def replay_real(args):
 
     # Init swarm config of crazyflie
     cflib.crtp.init_drivers()
+    target_id = 3
     drones_ids = np.array([0, 1, 2])
-    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in drones_ids]
+    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in np.concatenate((drones_ids, [target_id]))]
 
     # Writes geometry to crazyflie
     for id in drones_ids:
         crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", id, verbose=True)
+    crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", target_id, verbose=True)
 
     # the Swarm class will automatically launch the method in parameter of parallel_safe method
     with Swarm(uris, factory=CachedCfFactory(rw_cache="./cache")) as swarm:
@@ -239,12 +241,32 @@ def replay_real(args):
         # swarm.reset_estimators()
         swarm.get_estimated_positions()
 
-        env: ParallelEnv = Circle(
+        # env: ParallelEnv = Circle(
+        #     drone_ids=drones_ids,
+        #     render_mode="real",
+        #     init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        #     # target_location=np.array([1, 1, 2.5]),
+        #     swarm=swarm,
+        #     # target_id=target_id,
+        # )
+
+        env = Surround(
             drone_ids=drones_ids,
-            render_mode="human",
-            init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-            # target_location=np.array([1, 1, 2.5]),
-            swarm=swarm,
+            render_mode="real",
+            init_flying_pos=np.array(
+                [
+                    [1.0, 0.0, 1.0],
+                    [0.0, 1.0, 1.0],
+                    [-1.0, 0.0, 1.0],
+                    [-1.0, 0.5, 1.5],
+                    [2.0, 0.5, 1.0],
+                    # [2.0, 2.5, 2.0],
+                    # [2.0, 1.0, 2.5],
+                    # [0.5, 0.5, 0.5],
+                ]
+            ),
+            target_location=np.array([0.0, 0.5, 1.5]),
+            target_id=target_id,
         )
 
         obs, _ = env.reset(seed=args.seed)

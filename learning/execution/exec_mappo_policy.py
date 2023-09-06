@@ -130,7 +130,10 @@ def play_episode(actor_module, actor_state, env, init_obs, key, simu):
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
 
-        done = terminated or truncated
+        if not simu:
+            done = env.timestep == 30
+        else:
+            done = terminated or truncated
         obs = next_obs
     print("==========Episode return: ", ep_return)
 
@@ -161,19 +164,19 @@ def replay_simu(args):
     # env = Circle(
     #     drone_ids=np.array([0, 1, 2]),
     #     render_mode="human",
-    #     init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+    #     init_flying_pos=np.array([[-0.5, 0.0, 1.0], [0.0, 0.5, 1.0], [0.5, 0.0, 1.0]]),
     # )
 
     env = Surround(
-        drone_ids=np.arange(5),
+        drone_ids=np.arange(4),
         render_mode="human",
         init_flying_pos=np.array(
             [
-                [1.0, 0.0, 1.0],
-                [0.0, 1.0, 1.0],
                 [-1.0, 0.0, 1.0],
                 [-1.0, 0.5, 1.5],
-                [2.0, 0.5, 1.0],
+                [0.0, 0.5, 1.5],
+                # [0.5, 0.0, 1.0],
+                [0.5, -0.5, 1.5],
                 # [2.0, 2.5, 2.0],
                 # [2.0, 1.0, 2.5],
                 # [0.5, 0.5, 0.5],
@@ -226,25 +229,25 @@ def replay_real(args):
 
     # Init swarm config of crazyflie
     cflib.crtp.init_drivers()
-    target_id = 3
-    drones_ids = np.array([0, 1, 2])
+    target_id = 7
+    drones_ids = np.array([0, 2, 3, 5, 9])
     uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in np.concatenate((drones_ids, [target_id]))]
 
     # Writes geometry to crazyflie
     for id in drones_ids:
-        crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", id, verbose=True)
-    crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", target_id, verbose=True)
+        crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(id), verbose=True)
+    crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(target_id), verbose=True)
 
     # the Swarm class will automatically launch the method in parameter of parallel_safe method
     with Swarm(uris, factory=CachedCfFactory(rw_cache="./cache")) as swarm:
         swarm.parallel_safe(LoggingCrazyflie)
         # swarm.reset_estimators()
-        swarm.get_estimated_positions()
+        # swarm.get_estimated_positions()
 
         # env: ParallelEnv = Circle(
         #     drone_ids=drones_ids,
         #     render_mode="real",
-        #     init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
+        #     init_flying_pos=np.array([[-0.5, 0.0, 1.0], [0.0, 0.5, 1.0], [0.5, 0.0, 1.0]]),
         #     # target_location=np.array([1, 1, 2.5]),
         #     swarm=swarm,
         #     # target_id=target_id,
@@ -255,18 +258,19 @@ def replay_real(args):
             render_mode="real",
             init_flying_pos=np.array(
                 [
-                    [1.0, 0.0, 1.0],
-                    [0.0, 1.0, 1.0],
                     [-1.0, 0.0, 1.0],
                     [-1.0, 0.5, 1.5],
-                    [2.0, 0.5, 1.0],
+                    [0.0, 0.5, 1.5],
+                    # [0.5, 0.0, 1.0],
+                    [0.5, -0.5, 1.5],
                     # [2.0, 2.5, 2.0],
                     # [2.0, 1.0, 2.5],
                     # [0.5, 0.5, 0.5],
                 ]
             ),
-            target_location=np.array([0.0, 0.5, 1.5]),
+            target_location=np.array([0.0, 0.0, 1.5]),
             target_id=target_id,
+            swarm=swarm,
         )
 
         obs, _ = env.reset(seed=args.seed)

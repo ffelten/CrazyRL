@@ -84,7 +84,9 @@ class BaseParallelEnv:
         """
         # Actions are clipped to stay in the map and scaled to do max 20cm in one step
         return jnp.clip(
-            state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), [self.size, self.size, 3]
+            state.agents_locations + actions * 0.2,
+            jnp.array([-self.size, -self.size, 0]),
+            jnp.array([self.size, self.size, 3]),
         )
 
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:

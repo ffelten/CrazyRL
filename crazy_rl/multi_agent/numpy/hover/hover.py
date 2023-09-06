@@ -21,7 +21,7 @@ class Hover(BaseParallelEnv):
         drone_ids: npt.NDArray[int],
         init_flying_pos: npt.NDArray[int],
         render_mode=None,
-        size: int = 3,
+        size: int = 2,
     ):
         """Hover environment for Crazyflies 2.
 
@@ -61,7 +61,7 @@ class Hover(BaseParallelEnv):
     def _observation_space(self, agent):
         return spaces.Box(
             low=np.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=np.float32),
-            high=np.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=np.float32),
+            high=np.array([self.size, self.size, 3, self.size, self.size, 3], dtype=np.float32),
             shape=(6,),
             dtype=np.float32,
         )
@@ -82,9 +82,11 @@ class Hover(BaseParallelEnv):
     @override
     def _transition_state(self, actions: Dict[str, np.ndarray]):
         target_point_action = dict()
-        _, state = self._get_drones_state()
+        state = self._agent_location
         for agent in self._agents_names:
-            target_point_action[agent] = np.clip(state[agent] + actions[agent], [-self.size, -self.size, 0], self.size)
+            target_point_action[agent] = np.clip(
+                state[agent] + actions[agent], [-self.size, -self.size, 0], [self.size, self.size, 3]
+            )
         return target_point_action
 
     @override

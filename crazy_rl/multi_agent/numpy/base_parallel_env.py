@@ -57,6 +57,9 @@ def _distance_to_target(agent_location: npt.NDArray[float], target_location: npt
     return np.linalg.norm(agent_location - target_location)
 
 
+CLOSENESS_THRESHOLD = 0.1
+
+
 class BaseParallelEnv(ParallelEnv):
     """The Base environment inheriting from pettingZoo Parallel environment class.
 
@@ -197,7 +200,7 @@ class BaseParallelEnv(ParallelEnv):
 
             # Move target drone into position
             if self.target_id is not None:
-                uri = "radio://0/4/2M/E7E7E7E7" + str(self.target_id[0]).zfill(2)
+                uri = "radio://0/4/2M/E7E7E7E7" + str(self.target_id).zfill(2)
                 current = target_loc
                 target = list(self._init_target_location.values())[0]
                 command[uri] = [[current, target]]
@@ -240,7 +243,7 @@ class BaseParallelEnv(ParallelEnv):
                 command[uri] = [[current_location, target]]
 
             if self.target_id is not None:
-                uri = "radio://0/4/2M/E7E7E7E7" + str(self.target_id[0]).zfill(2)
+                uri = "radio://0/4/2M/E7E7E7E7" + str(self.target_id).zfill(2)
                 current = list(self._previous_target.values())[0]
                 target = list(self._target_location.values())[0]
                 command[uri] = [[current, target]]
@@ -375,7 +378,7 @@ class BaseParallelEnv(ParallelEnv):
             target_loc = None
             pos = self.swarm.get_estimated_positions()
             for uri in pos:
-                if int(uri[-1]) in self.target_id:
+                if self.target_id is not None and int(uri[-1]) == self.target_id:
                     target_loc = np.array(pos[uri])
                 else:
                     agent_locs["agent_" + uri[-1]] = np.array(pos[uri])

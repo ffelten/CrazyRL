@@ -10,6 +10,7 @@ from gymnasium import spaces
 from jax import jit, random
 
 from crazy_rl.multi_agent.jax.base_parallel_env import (
+    CLOSENESS_THRESHOLD,
     BaseParallelEnv,
     State,
     _distances_to_target,
@@ -36,7 +37,7 @@ class Surround(BaseParallelEnv):
         init_flying_pos: jnp.ndarray,
         target_location: jnp.ndarray,
         multi_obj: bool = False,
-        size: int = 3,
+        size: int = 2,
     ):
         """Surround environment for Crazyflies 2.
 
@@ -57,7 +58,7 @@ class Surround(BaseParallelEnv):
     def observation_space(self, agent: int) -> Space:
         return spaces.Box(
             low=-self.size,
-            high=self.size,
+            high=3,
             shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
             dtype=jnp.float32,
         )
@@ -121,7 +122,8 @@ class Surround(BaseParallelEnv):
     def _compute_terminated(self, state: State) -> jnp.ndarray:
         # collision with the ground and the target
         terminated = jnp.logical_or(
-            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - self._target_location, axis=1) < 0.2
+            state.agents_locations[:, 2] < CLOSENESS_THRESHOLD,
+            jnp.linalg.norm(state.agents_locations - self._target_location, axis=1) < CLOSENESS_THRESHOLD,
         )
 
         for agent in range(self.num_drones):
@@ -129,7 +131,7 @@ class Surround(BaseParallelEnv):
 
             # collision between two drones
             terminated = terminated.at[agent].set(
-                jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < 0.2)))
+                jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < CLOSENESS_THRESHOLD)))
             )
 
         return jnp.any(terminated) * jnp.ones(self.num_drones)

@@ -28,7 +28,7 @@ class Hover(BaseParallelEnv):
         self,
         num_drones: int,
         init_flying_pos: jnp.ndarray,
-        size: int = 3,
+        size: int = 2,
     ):
         """Hover environment for Crazyflies 2.
 
@@ -48,7 +48,7 @@ class Hover(BaseParallelEnv):
     def observation_space(self, agent: int) -> Space:
         return Box(
             low=-self.size,
-            high=self.size,
+            high=3,
             shape=(6,),
         )
 

@@ -8,6 +8,7 @@ import numpy.typing as npt
 from gymnasium import spaces
 
 from crazy_rl.multi_agent.numpy.base_parallel_env import (
+    CLOSENESS_THRESHOLD,
     BaseParallelEnv,
     _distance_to_target,
 )
@@ -25,7 +26,7 @@ class Surround(BaseParallelEnv):
         target_location: npt.NDArray[int],
         target_id: Optional[int] = None,
         render_mode=None,
-        size: int = 3,
+        size: int = 2,
         multi_obj: bool = False,
         swarm=None,
     ):
@@ -70,7 +71,7 @@ class Surround(BaseParallelEnv):
     def _observation_space(self, agent):
         return spaces.Box(
             low=np.tile(np.array([-self.size, -self.size, 0], dtype=np.float32), self.num_drones + 1),
-            high=np.tile(np.array([self.size, self.size, self.size], dtype=np.float32), self.num_drones + 1),
+            high=np.tile(np.array([self.size, self.size, 3], dtype=np.float32), self.num_drones + 1),
             shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
             dtype=np.float32,
         )
@@ -95,11 +96,13 @@ class Surround(BaseParallelEnv):
     @override
     def _transition_state(self, actions):
         target_point_action = dict()
-        _, state = self._get_drones_state()
+        state = self._agent_location
 
         for agent in self.agents:
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-            target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
+            target_point_action[agent] = np.clip(
+                state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], [self.size, self.size, 3]
+            )
 
         return target_point_action
 
@@ -133,15 +136,15 @@ class Surround(BaseParallelEnv):
             # collision between two drones
             for other_agent in self._agents_names:
                 if other_agent != agent and (
-                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
+                    np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < CLOSENESS_THRESHOLD
                 ):
                     reward_far_from_other_agents = -10
                     reward_close_to_target = -10
 
             # collision with the ground or the target
             if (
-                self._agent_location[agent][2] < 0.2
-                or np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
+                self._agent_location[agent][2] < CLOSENESS_THRESHOLD
+                or np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < CLOSENESS_THRESHOLD
             ):
                 reward_far_from_other_agents = -10
                 reward_close_to_target = -10
@@ -166,19 +169,19 @@ class Surround(BaseParallelEnv):
             for other_agent in self.agents:
                 if (
                     other_agent != agent
-                    and np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < 0.2
+                    and np.linalg.norm(self._agent_location[agent] - self._agent_location[other_agent]) < CLOSENESS_THRESHOLD
                 ):
                     terminated[agent] = True
 
             # collision with the ground
-            terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < 0.2)
+            terminated[agent] = terminated[agent] or (self._agent_location[agent][2] < CLOSENESS_THRESHOLD)
 
             # collision with the target
             terminated[agent] = terminated[agent] or (
-                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < 0.2
+                np.linalg.norm(self._agent_location[agent] - self._target_location["unique"]) < CLOSENESS_THRESHOLD
             )
 
-            if terminated[agent]:
+            if terminated[agent] and self.render_mode != "real":
                 for other_agent in self.agents:
                     terminated[other_agent] = True
                 self.agents = []

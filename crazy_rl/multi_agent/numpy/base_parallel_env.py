@@ -87,7 +87,7 @@ class BaseParallelEnv(ParallelEnv):
         self,
         agents_names: np.ndarray,
         drone_ids: np.ndarray,
-        target_id: Optional[int] = None,
+        target_id: Optional[str] = None,
         init_flying_pos: Optional[Dict[str, np.ndarray]] = None,
         target_location: Optional[Dict[str, np.ndarray]] = None,
         size: int = 3,
@@ -378,7 +378,7 @@ class BaseParallelEnv(ParallelEnv):
             target_loc = None
             pos = self.swarm.get_estimated_positions()
             for uri in pos:
-                if self.target_id is not None and int(uri[-1]) == self.target_id:
+                if self.target_id is not None and uri[-1] == self.target_id:
                     target_loc = np.array(pos[uri])
                 else:
                     agent_locs["agent_" + uri[-1]] = np.array(pos[uri])

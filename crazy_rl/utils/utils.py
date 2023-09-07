@@ -113,8 +113,8 @@ def run_land(scf):
 
     commander = scf.cf.high_level_commander
 
-    commander.land(0.0, 2.0)
-    time.sleep(2)
+    commander.land(0.0, 2.3)
+    time.sleep(2.5)
 
     commander.stop()
 

@@ -27,7 +27,7 @@ class Escort(BaseParallelEnv):
         init_target_location: npt.NDArray[int],
         final_target_location: npt.NDArray[int],
         target_id: Optional[int] = None,
-        num_intermediate_points: int = 10,
+        num_intermediate_points: int = 50,
         render_mode=None,
         size: int = 2,
         multi_obj: bool = False,

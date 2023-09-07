@@ -39,7 +39,7 @@ class Escort(BaseParallelEnv):
         init_flying_pos: jnp.ndarray,
         init_target_location: jnp.ndarray,
         final_target_location: jnp.ndarray,
-        num_intermediate_points: int = 100,
+        num_intermediate_points: int = 20,
         multi_obj: bool = False,
         size: int = 2,
     ):
@@ -137,7 +137,7 @@ class Escort(BaseParallelEnv):
         else:
             # MO reward linearly combined using hardcoded weights
             return (1 - jnp.any(terminations)) * (
-                0.9995 * reward_close_to_target + 0.0005 * reward_far_from_other_agents
+                0.995995 * reward_close_to_target + 0.004005 * reward_far_from_other_agents
             ) + jnp.any(terminations) * reward_crash
 
     @override

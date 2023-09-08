@@ -112,7 +112,7 @@ class Catch(BaseParallelEnv):
             # if the mean of the agents is too close to the target, move the target in a random direction,
             # slowly because it hesitates
             + (surrounded * random.uniform(key, (3,), minval=-1, maxval=1) * self.target_speed * 0.1),
-            jnp.array([-self.size, -self.size, 0.2]),
+            jnp.array([-self.size, -self.size, CLOSENESS_THRESHOLD]),
             jnp.array([self.size, self.size, 3]),
         )
 

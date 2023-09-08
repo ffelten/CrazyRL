@@ -110,6 +110,7 @@ class Catch(BaseParallelEnv):
         mean = mean / self.num_drones
 
         dist = np.linalg.norm(mean - self._target_location["unique"])
+        self._target_location["unique"] = self._target_location["unique"].copy()
 
         # go to the opposite direction of the mean of the agents
         if dist > 0.2:
@@ -124,7 +125,7 @@ class Catch(BaseParallelEnv):
         np.clip(
             self._target_location["unique"],
             [-self.size, -self.size, 0.2],
-            [self.size, self.size, self.size],
+            [self.size, self.size, 3],
             out=self._target_location["unique"],
         )
 

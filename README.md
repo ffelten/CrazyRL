@@ -25,17 +25,21 @@ The real-life example shown in the video is the result of executing the policies
 
 ## Environments
 
-The red balls represent the position of the drones.
+The red balls represent the position of the controlled drones.
 
-### Hover
+[//]: # (### Hover)
 
-The drones learn to hover in a fixed position.
+[//]: # ()
+[//]: # (The drones learn to hover in a fixed position.)
 
-<img src="hover.gif" alt="Hover" width="30%"/>
+[//]: # ()
+[//]: # (<img src="hover.gif" alt="Hover" width="30%"/>)
 
-The yellow balls represent the target position of the drones.
+[//]: # ()
+[//]: # (The yellow balls represent the target position of the drones.)
 
-Available in [Numpy](crazy_rl/multi_agent/numpy/hover/hover.py) and [JAX](crazy_rl/multi_agent/jax/hover/hover.py) version.
+[//]: # ()
+[//]: # (Available in [Numpy]&#40;crazy_rl/multi_agent/numpy/hover/hover.py&#41; and [JAX]&#40;crazy_rl/multi_agent/jax/hover/hover.py&#41; version.)
 
 ### Circle
 The drones learn to perform a coordinated circle.

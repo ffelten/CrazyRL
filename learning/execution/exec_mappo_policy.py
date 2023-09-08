@@ -164,27 +164,69 @@ def replay_simu(args):
     # env = Circle(
     #     drone_ids=np.array([0, 1, 2]),
     #     render_mode="human",
-    #     init_flying_pos=np.array([[-0.5, 0.0, 1.0], [0.0, 0.5, 1.0], [0.5, 0.0, 1.0]]),
+    #     init_flying_pos=np.array([[-0.5, 0.0, 1.5], [0.0, 0.5, 0.5], [0.5, 0.0, 1.5]]),
     # )
 
-    env = Escort(
-        drone_ids=np.arange(4),
+    # env = Escort(
+    #     drone_ids=np.arange(4),
+    #     render_mode="human",
+    #     init_flying_pos=np.array(
+    #         [
+    #             # [-0.7, -0.5, 1.5],
+    #             [-0.8, 0.5, 0.5],
+    #             [1.0, 0.5, 1.5],
+    #             [0.5, 0.0, 0.5],
+    #             [0.5, -0.5, 1.0],
+    #             # [2.0, 2.5, 2.0],
+    #             # [2.0, 1.0, 2.5],
+    #             # [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     # target_location=jnp.array([0.0, 0.5, 1.5]),
+    #     init_target_location=np.array([-0.1, 0.6, 1.1]),
+    #     final_target_location=np.array([1.2, -1.3, 2.3]),
+    # )
+
+    # env = Catch(
+    #     drone_ids=np.arange(4),
+    #     render_mode="human",
+    #     init_flying_pos=np.array(
+    #         [
+    #             # [-0.7, -0.5, 1.5],
+    #             [-0.8, 0.5, 0.5],
+    #             [1.0, 0.5, 1.5],
+    #             [0.5, 0.0, 0.5],
+    #             [0.5, -0.5, 1.0],
+    #             # [2.0, 2.5, 2.0],
+    #             # [2.0, 1.0, 2.5],
+    #             # [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     init_target_location=np.array([0.0, 0.5, 1.5]),
+    #     # init_target_location=np.array([-0.5, 0.7, 1.1]),
+    #     # final_target_location=np.array([1.2, -1.3, 2.3]),
+    #     target_speed=0.1,
+    #     size=1.3,
+    # )
+    #
+    env = Catch(
+        drone_ids=np.arange(8),
         render_mode="human",
         init_flying_pos=np.array(
             [
-                # [-0.7, -0.5, 1.5],
+                [-0.7, -0.5, 1.5],
                 [-0.8, 0.5, 0.5],
                 [1.0, 0.5, 1.5],
                 [0.5, 0.0, 0.5],
                 [0.5, -0.5, 1.0],
-                # [2.0, 2.5, 2.0],
-                # [2.0, 1.0, 2.5],
-                # [0.5, 0.5, 0.5],
+                [2.0, 2.5, 2.0],
+                [2.0, 1.0, 2.5],
+                [0.5, 0.5, 0.5],
             ]
         ),
-        # target_location=jnp.array([0.0, 0.5, 1.5]),
-        init_target_location=np.array([-0.5, 0.7, 1.1]),
-        final_target_location=np.array([1.2, -1.3, 2.3]),
+        init_target_location=np.array([0.0, 0.5, 1.5]),
+        target_speed=0.15,
+        size=5,
     )
 
     # env = Surround(
@@ -203,13 +245,6 @@ def replay_simu(args):
     #         ]
     #     ),
     #     target_location=np.array([0.0, 0.5, 1.5]),
-    # )
-
-    # env: ParallelEnv = Circle(
-    #     drone_ids=np.array([0, 1, 2, 3, 4]),
-    #     render_mode="human",
-    #     init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-    #     # target_location=np.array([1, 1, 2.5]),
     # )
 
     _ = env.reset(seed=args.seed)
@@ -249,53 +284,51 @@ def replay_real(args):
 
     # Init swarm config of crazyflie
     cflib.crtp.init_drivers()
-    target_id = "0"
-    drones_ids = np.array(["2", "5", "7", "9"])
-    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in np.concatenate((drones_ids, [target_id]))]
+    # target_id = "0"
+    drones_ids = np.array(["9", "2", "0"])
+    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in drones_ids]
 
     # Writes geometry to crazyflie
     for id in drones_ids:
         if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(id), verbose=True):
             exit(-1)
-    if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(target_id), verbose=True):
-        exit(-1)
+    # if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(target_id), verbose=True):
+    #     exit(-1)
 
     # the Swarm class will automatically launch the method in parameter of parallel_safe method
     with Swarm(uris, factory=CachedCfFactory(rw_cache="./cache")) as swarm:
         swarm.parallel_safe(LoggingCrazyflie)
-        # swarm.reset_estimators()
-        # swarm.get_estimated_positions()
 
-        # env: ParallelEnv = Circle(
-        #     drone_ids=drones_ids,
-        #     render_mode="real",
-        #     init_flying_pos=np.array([[-0.5, 0.0, 1.0], [0.0, 0.5, 1.0], [0.5, 0.0, 1.0]]),
-        #     # target_location=np.array([1, 1, 2.5]),
-        #     swarm=swarm,
-        #     # target_id=target_id,
-        # )
-
-        env = Escort(
+        env: ParallelEnv = Circle(
             drone_ids=drones_ids,
             render_mode="real",
-            init_flying_pos=np.array(
-                [
-                    # [-0.7, -0.5, 1.5],
-                    [-0.8, 0.5, 0.5],
-                    [1.0, 0.5, 1.5],
-                    [0.5, 0.0, 0.5],
-                    [0.5, -0.5, 1.0],
-                    # [2.0, 2.5, 2.0],
-                    # [2.0, 1.0, 2.5],
-                    # [0.5, 0.5, 0.5],
-                ]
-            ),
-            # target_location=jnp.array([0.0, 0.5, 1.5]),
-            init_target_location=np.array([-0.1, 0.6, 1.1]),
-            final_target_location=np.array([1.2, -1.3, 2.3]),
-            target_id=target_id,
+            init_flying_pos=np.array([[-0.5, 0.0, 1.5], [0.0, 0.5, 0.5], [0.5, 0.0, 1.5]]),
             swarm=swarm,
         )
+
+        # env = Catch(
+        #     drone_ids=drones_ids,
+        #     render_mode="real",
+        #     init_flying_pos=np.array(
+        #         [
+        #             # [-0.7, -0.5, 1.5],
+        #             [-0.8, 0.5, 0.5],
+        #             [-0.8, 0.5, 1.0],
+        #             [0.5, 0.5, 0.5],
+        #             [0.5, -0.5, 1.0],
+        #             # [2.0, 2.5, 2.0],
+        #             # [2.0, 1.0, 2.5],
+        #             # [0.5, 0.5, 0.5],
+        #         ]
+        #     ),
+        #     init_target_location=np.array([0.0, 0.0, 1.0]),
+        #     # init_target_location=np.array([-0.5, 0.7, 1.1]),
+        #     # final_target_location=np.array([1.2, -1.3, 2.3]),
+        #     target_speed=0.1,
+        #     size=1.3,
+        #     target_id=target_id,
+        #     swarm=swarm,
+        # )
 
         # env = Surround(
         #     drone_ids=drones_ids,

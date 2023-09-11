@@ -82,7 +82,52 @@ def load_and_plot(exp_names, env_name):
     fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=len(exp_names))
     fig.tight_layout()
     fig.savefig(f"results/{env_name}.png", bbox_inches="tight")
-    # fig.savefig(f"../../results/{env_name}.pdf", bbox_inches="tight")
+    # fig.savefig(f"results/{env_name}.pdf", bbox_inches="tight")
+
+
+def plot_training_time_mo(file_pattern: str = "results/mo/*"):
+    """Plot for training time when training multiple policies.
+
+    Args:
+        file_pattern: file pattern to match the results
+    """
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5), sharex=False)
+
+    colors = [
+        "#5CB5FF",
+        # "#D55E00",
+        # "#009E73",
+        # "#e6194b",
+    ]
+
+    ex = expt.Experiment("MO Surround")
+    print(os.getcwd())
+    runs = expt.get_runs(file_pattern)
+    h = runs.to_hypothesis("MO Surround")
+    ex.add_hypothesis(h)
+
+    print(ex.summary())
+    ex.plot(
+        ax=ax[0],
+        x="Number of policies",
+        y="Training time",
+        err_style="fill",
+        legend=False,
+        std_alpha=0.1,
+        rolling=100,
+        n_samples=10000,
+        colors=colors,
+    )
+
+    ax[0].set_title("")
+    ax[0].set_xlabel("Number of policies")
+    ax[0].set_ylabel("")
+    fig.supylabel("Training time (seconds)")
+    h, l = ax[0].get_legend_handles_labels()
+    # fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=len(exp_names))
+    fig.tight_layout()
+    fig.savefig("results/mo/training_time.png", bbox_inches="tight")
+    # fig.savefig("results/mo/training_time.pdf", bbox_inches="tight")
 
 
 if __name__ == "__main__":

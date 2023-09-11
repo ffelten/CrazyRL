@@ -8,7 +8,11 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 from jax import jit, random, vmap
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State, _distances_to_target
+from crazy_rl.multi_agent.jax.base_parallel_env import (
+    BaseParallelEnv,
+    State,
+    _distances_to_target,
+)
 from crazy_rl.utils.jax_spaces import Box, Space
 from crazy_rl.utils.jax_wrappers import AutoReset, VecEnv
 

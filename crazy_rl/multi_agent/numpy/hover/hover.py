@@ -8,7 +8,10 @@ import numpy.typing as npt
 from gymnasium import spaces
 from pettingzoo.test.parallel_test import parallel_api_test
 
-from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv, _distance_to_target
+from crazy_rl.multi_agent.numpy.base_parallel_env import (
+    BaseParallelEnv,
+    _distance_to_target,
+)
 
 
 class Hover(BaseParallelEnv):

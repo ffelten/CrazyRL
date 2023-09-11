@@ -95,7 +95,7 @@ def load_and_plot(exp_names, env_name):
     # fig.savefig(f"results/{env_name}.pdf", bbox_inches="tight")
 
 
-def plot_training_time_mo(file_pattern: str = "results/mo/*"):
+def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround*"):
     """Plot for training time when training multiple policies.
 
     Args:
@@ -104,37 +104,38 @@ def plot_training_time_mo(file_pattern: str = "results/mo/*"):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5), sharex=False)
 
     colors = [
-        "#5CB5FF",
+        # "#5CB5FF",
         # "#D55E00",
         # "#009E73",
-        # "#e6194b",
+        "#e6194b",
     ]
 
     ex = expt.Experiment("MO Surround")
     print(os.getcwd())
     runs = expt.get_runs(file_pattern)
+    print(runs)
     h = runs.to_hypothesis("MO Surround")
     ex.add_hypothesis(h)
 
     print(ex.summary())
     ex.plot(
-        ax=ax[0],
+        ax=ax,
         x="Number of policies",
         y="Training time",
-        err_style="fill",
+        err_style="runs",
         err_fn=_ci,
         legend=False,
         std_alpha=0.1,
-        rolling=100,
-        n_samples=10000,
+        # rolling=100,
+        # n_samples=10000,
         colors=colors,
     )
 
-    ax[0].set_title("")
-    ax[0].set_xlabel("Number of policies")
-    ax[0].set_ylabel("")
+    ax.set_title("")
+    ax.set_xlabel("Number of policies (3M steps/policy)")
+    ax.set_ylabel("")
     fig.supylabel("Training time (seconds)")
-    h, l = ax[0].get_legend_handles_labels()
+    h, l = ax.get_legend_handles_labels()
     # fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=len(exp_names))
     fig.tight_layout()
     fig.savefig("results/mo/training_time.png", bbox_inches="tight")
@@ -142,13 +143,15 @@ def plot_training_time_mo(file_pattern: str = "results/mo/*"):
 
 
 if __name__ == "__main__":
-    load_and_plot(
-        {
-            "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
-            "MAPPO GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
-            "MAPPO GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
-            # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
-            # "MAPPO GPU (128 envs)": "results/results_MAPPO_GPU_Circle_(128envs*",
-        },
-        "Circle",
-    )
+    # load_and_plot(
+    #     {
+    #         "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
+    #         "MAPPO GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
+    #         "MAPPO GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
+    #         # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
+    #         # "MAPPO GPU (128 envs)": "results/results_MAPPO_GPU_Circle_(128envs*",
+    #     },
+    #     "Circle",
+    # )
+
+    plot_training_time_mo()

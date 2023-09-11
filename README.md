@@ -1,4 +1,4 @@
-<img src="swarm.gif" alt="Swarm" align="right" width="50%"/>
+<img src="surround.gif" alt="Swarm" align="right" width="50%"/>
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -44,7 +44,7 @@ The red balls represent the position of the controlled drones.
 ### Circle
 The drones learn to perform a coordinated circle.
 
-<img src="circle.gif" alt="Circle" width="30%"/>
+<img src="circle.gif" alt="Circle" width="500"/>
 
 The yellow balls represent the target position of the drones.
 
@@ -53,7 +53,7 @@ Available in [Numpy](crazy_rl/multi_agent/numpy/circle/circle.py) and [JAX](craz
 ### Surround
 The drones learn to surround a fixed target point.
 
-<img src="surround.gif" alt="Surround" width="30%"/>
+<img src="surround.gif" alt="Surround" width="500"/>
 
 The yellow ball represents the target the drones have to surround.
 
@@ -62,7 +62,7 @@ Available in [Numpy](crazy_rl/multi_agent/numpy/surround/surround.py) and [JAX](
 ### Escort
 The drones learn to escort a target moving straight to one point to another.
 
-<img src="escort.gif" alt="Escort" width="30%"/>
+<img src="escort.gif" alt="Escort" width="500"/>
 
 The yellow ball represents the target the drones have to surround.
 
@@ -71,7 +71,7 @@ Available in [Numpy](crazy_rl/multi_agent/numpy/escort/escort.py) and [JAX](craz
 ### Catch
 The drones learn to catch a target trying to escape.
 
-<img src="catch.gif" alt="Catch" width="30%"/>
+<img src="catch.gif" alt="Catch" width="500"/>
 
 The yellow ball represents the target the drones have to surround.
 

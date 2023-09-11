@@ -3,6 +3,7 @@ import os
 
 import expt
 import pandas as pd
+from expt import Hypothesis
 from matplotlib import pyplot as plt
 
 
@@ -48,11 +49,18 @@ def load_and_plot(exp_names, env_name):
         ex.add_hypothesis(h)
 
     print(ex.summary())
+
+    def ci(hypothesis: Hypothesis):
+        group = hypothesis.grouped
+        mean, sem = group.mean(), group.sem()
+        return (mean - 1.96 * sem, mean + 1.96 * sem)
+
     ex.plot(
         ax=ax[0],
         x="Total timesteps",
         y="Episodic return",
         err_style="fill",
+        err_fn=ci,
         legend=False,
         std_alpha=0.1,
         rolling=100,
@@ -64,6 +72,7 @@ def load_and_plot(exp_names, env_name):
         x="Time",
         y="Episodic return",
         err_style="fill",
+        err_fn=ci,
         legend=False,
         std_alpha=0.1,
         rolling=100,
@@ -90,8 +99,9 @@ if __name__ == "__main__":
         {
             "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
             "MAPPO GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
-            # "MAPPO GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
+            "MAPPO GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
             # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
+            # "MAPPO GPU (128 envs)": "results/results_MAPPO_GPU_Circle_(128envs*",
         },
         "Circle",
     )

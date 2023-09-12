@@ -139,7 +139,7 @@ def make_train(args):
         return args.lr * frac
 
     def train(key: chex.PRNGKey, weights: jnp.ndarray):
-        num_drones = 4
+        num_drones = 8
         env = Surround(
             num_drones=num_drones,
             init_flying_pos=jnp.array(
@@ -148,10 +148,10 @@ def make_train(args):
                     [0.0, 1.0, 1.0],
                     [1.0, 0.0, 1.0],
                     [1.0, 2.0, 2.0],
-                    # [2.0, 0.5, 1.0],
-                    # [2.0, 2.5, 2.0],
-                    # [2.0, 1.0, 2.5],
-                    # [0.5, 0.5, 0.5],
+                    [2.0, 0.5, 1.0],
+                    [2.0, 2.5, 2.0],
+                    [2.0, 1.0, 2.5],
+                    [0.5, 0.5, 0.5],
                 ]
             ),
             target_location=jnp.array([1.0, 1.0, 2.0]),
@@ -463,7 +463,7 @@ def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]
 
 
 def multi_obj(args):
-    NUM_WEIGHTS = 30
+    NUM_WEIGHTS = 10
     weights = jnp.array(equally_spaced_weights(2, NUM_WEIGHTS))
     weights = jnp.array(
         [
@@ -476,26 +476,26 @@ def multi_obj(args):
     )
 
     rng = jax.random.PRNGKey(args.seed)
+    start_time = time.time()
     train_vjit = jax.jit(
         jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the weights
     )
-    start_time = time.time()
-    out = jax.block_until_ready(train_vjit(rng, weights))
+    out = jax.block_until_ready(train_vjit(rng, weights))  # noqa
     print(f"total time: {time.time() - start_time}")
     print(f"SPS: {args.total_timesteps *  NUM_WEIGHTS/ (time.time() - start_time)}")
 
-    for i in range(len(weights)):
-        # Plotting online Pareto front
-        # returns = out["metrics"]["returned_episode_returns"][i]
-        # returns = returns.mean(-2)  # agg over envs
-        # returns = returns.reshape((-1, 2))  # flatten
-        # returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
-        # returns = returns[-1]
-        # plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
+    # for i in range(len(weights)):
+    # Plotting online Pareto front
+    # returns = out["metrics"]["returned_episode_returns"][i]
+    # returns = returns.mean(-2)  # agg over envs
+    # returns = returns.reshape((-1, 2))  # flatten
+    # returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
+    # returns = returns[-1]
+    # plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
 
-        # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
-        actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
-        save_actor(actor_i, pathname="actor_" + str(weights[i]))
+    # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
+    # actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
+    # save_actor(actor_i, pathname="actor_" + str(weights[i]))
 
     # plt.title("Online pareto front")
     # plt.ylabel("far_from_others")

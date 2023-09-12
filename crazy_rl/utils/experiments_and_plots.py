@@ -117,6 +117,9 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
     h = runs.to_hypothesis("MO Surround")
     ex.add_hypothesis(h)
 
+    # Plots a line with the function x = y
+    ax.plot([0, 1], [0, 1], transform=ax.transAxes, ls="--", c=".3")
+
     print(ex.summary())
     ex.plot(
         ax=ax,
@@ -143,15 +146,15 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
 
 
 if __name__ == "__main__":
-    load_and_plot(
-        {
-            "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
-            "MAPPO GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
-            "MAPPO GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
-            # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
-            # "MAPPO GPU (128 envs)": "results/results_MAPPO_GPU_Circle_(128envs*",
-        },
-        "Circle",
-    )
+    # load_and_plot(
+    #     {
+    #         "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
+    #         "MAPPO GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
+    #         "MAPPO GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
+    #         # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
+    #         # "MAPPO GPU (128 envs)": "results/results_MAPPO_GPU_Circle_(128envs*",
+    #     },
+    #     "Circle",
+    # )
 
     plot_training_time_mo()

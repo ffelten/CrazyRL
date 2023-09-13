@@ -133,29 +133,49 @@ def make_train(args):
     minibatch_size = args.num_envs * args.num_steps // args.num_minibatches
 
     def train(key: chex.PRNGKey, lr: Optional[float] = None):
-        num_drones = 8
-        env = Catch(
+        num_drones = 2
+        # env = Catch(
+        #     num_drones=num_drones,
+        #     init_flying_pos=jnp.array(
+        #         [
+        #             [-0.7, -0.5, 1.5],
+        #             [-0.8, 0.5, 0.5],
+        #             [1.0, 0.5, 1.5],
+        #             [0.5, 0.0, 0.5],
+        #             [0.5, -0.5, 1.0],
+        #             [2.0, 2.5, 2.0],
+        #             [2.0, 1.0, 2.5],
+        #             [0.5, 0.5, 0.5],
+        #         ]
+        #     ),
+        #     init_target_location=jnp.array([0.0, 0.5, 1.5]),
+        #     target_speed=0.15,
+        #     size=5,
+        # )
+        # env = Circle(
+        #     num_drones=num_drones,
+        #     init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        # )
+        env = Surround(
             num_drones=num_drones,
             init_flying_pos=jnp.array(
                 [
-                    [-0.7, -0.5, 1.5],
-                    [-0.8, 0.5, 0.5],
-                    [1.0, 0.5, 1.5],
-                    [0.5, 0.0, 0.5],
-                    [0.5, -0.5, 1.0],
-                    [2.0, 2.5, 2.0],
-                    [2.0, 1.0, 2.5],
-                    [0.5, 0.5, 0.5],
+                    [0.0, 0.0, 1.0],
+                    [0.0, 1.0, 1.0],
+                    # [1.0, 0.0, 1.0],
+                    # [1.0, 2.0, 2.0],
+                    # [2.0, 0.5, 1.0],
+                    # [2.0, 2.5, 2.0],
+                    # [2.0, 1.0, 2.5],
+                    # [0.5, 0.5, 0.5],
                 ]
             ),
-            init_target_location=jnp.array([0.0, 0.5, 1.5]),
-            target_speed=0.15,
+            target_location=jnp.array([1.0, 1.0, 2.0]),
+            multi_obj=False,
             size=5,
+            # target_speed=0.15,
+            # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
         )
-        # env = Circle(
-        #     num_drones=num_drones,
-        #     init_flying_pos=jnp.array([[-0.5, 0.0, 1.5], [0.0, 0.5, 0.5], [0.5, 0.0, 1.5]]),
-        # )
 
         env = ClipActions(env)
         env = NormalizeObservation(env)
@@ -534,7 +554,7 @@ if __name__ == "__main__":
     # plt.plot(out["metrics"]["value_loss"].mean(-1).reshape(-1), label="value loss")
     # plt.plot(out["metrics"]["entropy"].mean(-1).reshape(-1), label="entropy")
     # plt.plot(out["metrics"]["approx_kl"].mean(-1).reshape(-1), label="approx kl")
-    plt.xlabel("Update Step")
-    plt.ylabel("")
-    plt.legend()
-    plt.show()
+    # plt.xlabel("Update Step")
+    # plt.ylabel("")
+    # plt.legend()
+    # plt.show()

@@ -139,15 +139,15 @@ def make_train(args):
         return args.lr * frac
 
     def train(key: chex.PRNGKey, weights: jnp.ndarray):
-        num_drones = 4
+        num_drones = 2
         env = Surround(
             num_drones=num_drones,
             init_flying_pos=jnp.array(
                 [
                     [0.0, 0.0, 1.0],
                     [0.0, 1.0, 1.0],
-                    [1.0, 0.0, 1.0],
-                    [1.0, 2.0, 2.0],
+                    # [1.0, 0.0, 1.0],
+                    # [1.0, 2.0, 2.0],
                     # [2.0, 0.5, 1.0],
                     # [2.0, 2.5, 2.0],
                     # [2.0, 1.0, 2.5],
@@ -155,19 +155,16 @@ def make_train(args):
                 ]
             ),
             target_location=jnp.array([1.0, 1.0, 2.0]),
-            multi_obj=True
+            multi_obj=True,
+            size=5,
             # target_speed=0.15,
             # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
         )
-        # env = Circle(
-        #     num_drones=num_drones,
-        #     init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-        # )
 
         env = ClipActions(env)
         env = NormalizeObservation(env)
         env = AddIDToObs(env, num_drones)
-        env = LogWrapper(env, reward_dim=2)
+        # env = LogWrapper(env, reward_dim=2)
         env = LinearizeReward(env, weights)
         env = AutoReset(env)  # Auto reset the env when done, stores additional info in the dict
         env = VecEnv(env)  # vmaps the env public methods
@@ -393,41 +390,41 @@ def make_train(args):
             actor_train_state = update_state[0]
             critic_train_state = update_state[1]
             key = update_state[-1]
-            metric = traj_batch.info
+            metric = [] # traj_batch.info
 
             # Careful, metric has a shape of (num_steps, num_envs) and loss_info has a shape of (update_epochs, num_minibatches)
-            losses = (
-                loss_info[0],
-                loss_info[1][0],
-                loss_info[1][1],
-                loss_info[1][2],
-                loss_info[1][3],
-            )
+            # losses = (
+            #     loss_info[0],
+            #     loss_info[1][0],
+            #     loss_info[1][1],
+            #     loss_info[1][2],
+            #     loss_info[1][3],
+            # )
             # metric["total_loss"] = losses[0]
             # metric["value_loss"] = losses[1]
             # metric["actor_loss"] = losses[2]
             # metric["entropy"] = losses[3]
             # metric["approx_kl"] = losses[4]
 
-            if args.debug:
-
-                def callback(info, loss):
-                    print(f"total loss: {loss[0].mean()}")
-                    print(f"value loss: {loss[1].mean()}")
-                    print(f"actor loss: {loss[2].mean()}")
-                    print(f"entropy: {loss[3].mean()}")
-                    print(f"approx kl: {loss[4].mean()}")
-                    return_values = info["returned_episode_returns"][info["returned_episode"]]
-                    length = info["returned_episode_lengths"][info["returned_episode"]]
-                    timesteps_when_done = info["timestep"][info["returned_episode"]] * args.num_envs
-                    total_timesteps = info["total_timestep"][-1].sum()
-                    if len(timesteps_when_done) > 0:
-                        print(
-                            f"global step={timesteps_when_done[0]}, episodic return={return_values.mean()}, length={length.mean()}"
-                        )
-                    print(f"==== total timesteps: {total_timesteps}")
-
-                jax.debug.callback(callback, metric, losses)
+            # if args.debug:
+            #
+            #     def callback(info, loss):
+            #         print(f"total loss: {loss[0].mean()}")
+            #         print(f"value loss: {loss[1].mean()}")
+            #         print(f"actor loss: {loss[2].mean()}")
+            #         print(f"entropy: {loss[3].mean()}")
+            #         print(f"approx kl: {loss[4].mean()}")
+            #         return_values = info["returned_episode_returns"][info["returned_episode"]]
+            #         length = info["returned_episode_lengths"][info["returned_episode"]]
+            #         timesteps_when_done = info["timestep"][info["returned_episode"]] * args.num_envs
+            #         total_timesteps = info["total_timestep"][-1].sum()
+            #         if len(timesteps_when_done) > 0:
+            #             print(
+            #                 f"global step={timesteps_when_done[0]}, episodic return={return_values.mean()}, length={length.mean()}"
+            #             )
+            #         print(f"==== total timesteps: {total_timesteps}")
+            #
+            #     jax.debug.callback(callback, metric, losses)
 
             runner_state = (actor_train_state, critic_train_state, obs, env_states, key)
             return runner_state, metric
@@ -441,7 +438,7 @@ def make_train(args):
 
 
 def save_actor(actor_state, pathname: str = "actor"):
-    directory = epath.Path("../trained_model")
+    directory = epath.Path("trained_model")
     actor_dir = directory / pathname
     print("Saving actor to ", actor_dir)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
@@ -463,39 +460,40 @@ def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]
 
 
 def multi_obj(args):
-    NUM_WEIGHTS = 30
+    NUM_WEIGHTS = 5
     weights = jnp.array(equally_spaced_weights(2, NUM_WEIGHTS))
-    weights = jnp.array(
-        [
-            [0.96, 0.04],
-            [0.97, 0.03],
-            [0.975, 0.025],
-            [0.98, 0.02],
-            [0.99, 0.01],
-        ]
-    )
+    # weights = jnp.array(
+    #     [
+    #         [0.96, 0.04],
+    #         [0.97, 0.03],
+    #         [0.975, 0.025],
+    #         [0.98, 0.02],
+    #         [0.99, 0.01],
+    #     ]
+    # )
+    for i in range(10):
+        start_time = time.time()
+        train_vjit = jax.jit(jax.vmap(make_train(args), in_axes=(None, 0)))  # vmaps over the weights
+        print(jax.devices())
+        rng = jax.random.PRNGKey(args.seed)
+        weights = jax.device_put(weights, jax.devices()[0])
+        out = jax.block_until_ready(train_vjit(rng, weights))
 
-    rng = jax.random.PRNGKey(args.seed)
-    train_vjit = jax.jit(
-        jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the weights
-    )
-    start_time = time.time()
-    out = jax.block_until_ready(train_vjit(rng, weights))
-    print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps *  NUM_WEIGHTS/ (time.time() - start_time)}")
+        print(f"total time: {time.time() - start_time}")
+        print(f"SPS: {args.total_timesteps *  NUM_WEIGHTS/ (time.time() - start_time)}")
 
-    for i in range(len(weights)):
-        # Plotting online Pareto front
-        # returns = out["metrics"]["returned_episode_returns"][i]
-        # returns = returns.mean(-2)  # agg over envs
-        # returns = returns.reshape((-1, 2))  # flatten
-        # returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
-        # returns = returns[-1]
-        # plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
+    # for i in range(len(weights)):
+    # Plotting online Pareto front
+    # returns = out["metrics"]["returned_episode_returns"][i]
+    # returns = returns.mean(-2)  # agg over envs
+    # returns = returns.reshape((-1, 2))  # flatten
+    # returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
+    # returns = returns[-1]
+    # plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
 
-        # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
-        actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
-        save_actor(actor_i, pathname="actor_" + str(weights[i]))
+    # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
+    #     actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
+    #     save_actor(actor_i, pathname="actor_" + str(weights[i]))
 
     # plt.title("Online pareto front")
     # plt.ylabel("far_from_others")

@@ -31,8 +31,8 @@ from pettingzoo import ParallelEnv
 from supersuit import agent_indicator_v0, clip_actions_v0, normalize_obs_v0
 from tqdm import tqdm
 
-from crazy_rl.multi_agent.jax.escort import Escort  # noqa
-from crazy_rl.multi_agent.jax.surround import Surround  # noqa
+from crazy_rl.multi_agent.numpy.escort import Escort  # noqa
+from crazy_rl.multi_agent.numpy.surround import Surround  # noqa
 from crazy_rl.multi_agent.numpy.catch import Catch  # noqa
 from crazy_rl.multi_agent.numpy.circle import Circle
 from crazy_rl.utils.experiments_and_plots import save_results
@@ -49,7 +49,7 @@ def parse_args():
 
     # Algorithm specific arguments
     parser.add_argument("--num-steps", type=int, default=1280, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=1e5,
+    parser.add_argument("--total-timesteps", type=int, default=3e6,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")
@@ -187,34 +187,37 @@ def train(args, key: chex.PRNGKey):
         frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / num_updates
         return args.lr * frac
 
-    num_drones = 3
-    # env: ParallelEnv = Catch(
-    #     drone_ids=np.arange(num_drones),
-    #     init_flying_pos=np.array(
-    #         [
-    #             [0.0, 0.0, 1.0],
-    #             [0.0, 1.0, 1.0],
-    #             [1.0, 0.0, 1.0],
-    #             [1.0, 2.0, 2.0],
-    #             [2.0, 0.5, 1.0],
-    #             [2.0, 2.5, 2.0],
-    #             [2.0, 1.0, 2.5],
-    #             [0.5, 0.5, 0.5],
-    #         ]
-    #     ),
-    #     init_target_location=np.array([1.0, 1.0, 2.0]),
-    #     target_speed=0.15,
-    # )
-
-    env: ParallelEnv = Circle(
+    num_drones = 2
+    env = Surround(
         drone_ids=np.arange(num_drones),
-        init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+        init_flying_pos=np.array(
+            [
+                [0.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+                # [1.0, 0.0, 1.0],
+                # [1.0, 2.0, 2.0],
+                # [2.0, 0.5, 1.0],
+                # [2.0, 2.5, 2.0],
+                # [2.0, 1.0, 2.5],
+                # [0.5, 0.5, 0.5],
+            ]
+        ),
+        target_location=np.array([1.0, 1.0, 2.0]),
+        multi_obj=False,
+        size=5,
+        # target_speed=0.15,
+        # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
     )
+
+    # env: ParallelEnv = Circle(
+    #     drone_ids=np.arange(num_drones),
+    #     init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+    # )
 
     env = clip_actions_v0(env)
     env = normalize_obs_v0(env, env_min=-1.0, env_max=1.0)
     env = agent_indicator_v0(env)
-    env = RecordEpisodeStatistics(env)
+    # env = RecordEpisodeStatistics(env)
     env = NormalizeReward(env, args.gamma)
 
     # Initial reset to have correct dimensions in the observations
@@ -345,10 +348,10 @@ def train(args, key: chex.PRNGKey):
             )
 
             if terminated:
-                team_return = sum(list(info["episode"]["r"].values()))
-                if args.debug:
-                    print(f"Episode return: ${team_return}, length: ${info['episode']['l']}")
-                episode_returns.append((current_timestep, time.time() - start_time, team_return))
+                # team_return = sum(list(info["episode"]["r"].values()))
+                # if args.debug:
+                #     print(f"Episode return: ${team_return}, length: ${info['episode']['l']}")
+                # episode_returns.append((current_timestep, time.time() - start_time, team_return))
                 obs, info = env.reset()
 
             runner_state = (actor_state, critic_state, obs, key)
@@ -471,29 +474,29 @@ def train(args, key: chex.PRNGKey):
         metric = traj_batch.info
 
         # Careful, metric has a shape of (num_steps) and loss_info has a shape of (update_epochs, num_minibatches)
-        losses = (
-            loss_info[0],
-            loss_info[1][0],
-            loss_info[1][1],
-            loss_info[1][2],
-            loss_info[1][3],
-        )
+        # losses = (
+        #     loss_info[0],
+        #     loss_info[1][0],
+        #     loss_info[1][1],
+        #     loss_info[1][2],
+        #     loss_info[1][3],
+        # )
         # metric["total_loss"] = losses[0]
         # metric["value_loss"] = losses[1]
         # metric["actor_loss"] = losses[2]
         # metric["entropy"] = losses[3]
         # metric["approx_kl"] = losses[4]
 
-        if args.debug:
-
-            def callback(info, loss):
-                print(f"total loss: {loss[0].mean()}")
-                print(f"value loss: {loss[1].mean()}")
-                print(f"actor loss: {loss[2].mean()}")
-                print(f"entropy: {loss[3].mean()}")
-                print(f"approx kl: {loss[4].mean()}")
-
-            jax.debug.callback(callback, metric, losses)
+        # if args.debug:
+        #
+        #     def callback(info, loss):
+        #         print(f"total loss: {loss[0].mean()}")
+        #         print(f"value loss: {loss[1].mean()}")
+        #         print(f"actor loss: {loss[2].mean()}")
+        #         print(f"entropy: {loss[3].mean()}")
+        #         print(f"approx kl: {loss[4].mean()}")
+        #
+        #     jax.debug.callback(callback, metric, losses)
 
         runner_state = (actor_train_state, critic_train_state, obs, key)
         return runner_state, metric
@@ -528,18 +531,18 @@ if __name__ == "__main__":
     # actor_state = out["runner_state"][0]
     # save_actor(actor_state)
 
-    import matplotlib.pyplot as plt
-
-    returns = out["metrics"]["returned_episode_returns"]
-    save_results(returns, "MAPPO_CPU_Circle_(1env)", args.seed)
-    plt.plot(returns[:, 0], returns[:, 2], label="episode return")
+    # import matplotlib.pyplot as plt
+    #
+    # returns = out["metrics"]["returned_episode_returns"]
+    # save_results(returns, "MAPPO_CPU_Circle_(1env)", args.seed)
+    # plt.plot(returns[:, 0], returns[:, 2], label="episode return")
 
     # plt.plot(out["metrics"]["total_loss"].mean(-1).reshape(-1), label="total loss")
     # plt.plot(out["metrics"]["actor_loss"].mean(-1).reshape(-1), label="actor loss")
     # plt.plot(out["metrics"]["value_loss"].mean(-1).reshape(-1), label="value loss")
     # plt.plot(out["metrics"]["entropy"].mean(-1).reshape(-1), label="entropy")
     # plt.plot(out["metrics"]["approx_kl"].mean(-1).reshape(-1), label="approx kl")
-    plt.xlabel("Timestep")
-    plt.ylabel("Team return")
-    plt.legend()
-    plt.show()
+    # plt.xlabel("Timestep")
+    # plt.ylabel("Team return")
+    # plt.legend()
+    # plt.show()

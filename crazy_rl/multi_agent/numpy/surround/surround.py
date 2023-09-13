@@ -200,6 +200,8 @@ class Surround(BaseParallelEnv):
     @override
     def _compute_info(self):
         info = dict()
+        for agent in self._agents_names:
+            info[agent] = {}
         return info
 
     @override

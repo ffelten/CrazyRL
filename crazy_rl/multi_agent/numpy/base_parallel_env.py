@@ -295,7 +295,7 @@ class BaseParallelEnv(ParallelEnv):
             glLightfv(GL_LIGHT0, GL_DIFFUSE, [1.0, 1.0, 1.0, 1])
 
             glMatrixMode(GL_PROJECTION)
-            gluPerspective(60, (self.window_size / self.window_size), 0.1, 50.0)
+            gluPerspective(75, (self.window_size / self.window_size), 0.1, 50.0)
 
             glMatrixMode(GL_MODELVIEW)
             gluLookAt(3, -11, 3, 0, 0, 0, 0, 0, 1)

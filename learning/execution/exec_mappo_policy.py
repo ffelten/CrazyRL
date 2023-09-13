@@ -188,64 +188,44 @@ def replay_simu(args):
     # )
 
     # env = Catch(
-    #     drone_ids=np.arange(4),
+    #     drone_ids=np.arange(8),
     #     render_mode="human",
     #     init_flying_pos=np.array(
     #         [
-    #             # [-0.7, -0.5, 1.5],
+    #             [-0.7, -0.5, 1.5],
     #             [-0.8, 0.5, 0.5],
     #             [1.0, 0.5, 1.5],
     #             [0.5, 0.0, 0.5],
     #             [0.5, -0.5, 1.0],
-    #             # [2.0, 2.5, 2.0],
-    #             # [2.0, 1.0, 2.5],
-    #             # [0.5, 0.5, 0.5],
+    #             [2.0, 2.5, 2.0],
+    #             [2.0, 1.0, 2.5],
+    #             [0.5, 0.5, 0.5],
     #         ]
     #     ),
     #     init_target_location=np.array([0.0, 0.5, 1.5]),
-    #     # init_target_location=np.array([-0.5, 0.7, 1.1]),
-    #     # final_target_location=np.array([1.2, -1.3, 2.3]),
-    #     target_speed=0.1,
-    #     size=1.3,
+    #     target_speed=0.15,
+    #     size=5,
     # )
-    #
-    env = Catch(
+
+    env = Surround(
         drone_ids=np.arange(8),
         render_mode="human",
         init_flying_pos=np.array(
             [
-                [-0.7, -0.5, 1.5],
-                [-0.8, 0.5, 0.5],
-                [1.0, 0.5, 1.5],
-                [0.5, 0.0, 0.5],
-                [0.5, -0.5, 1.0],
+                [0.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+                [1.0, 0.0, 1.0],
+                [1.0, 2.0, 2.0],
+                [2.0, 0.5, 1.0],
                 [2.0, 2.5, 2.0],
                 [2.0, 1.0, 2.5],
                 [0.5, 0.5, 0.5],
             ]
         ),
-        init_target_location=np.array([0.0, 0.5, 1.5]),
-        target_speed=0.15,
+        target_location=np.array([1.0, 1.0, 2.0]),
+        multi_obj=False,
         size=5,
     )
-
-    # env = Surround(
-    #     drone_ids=np.arange(5),
-    #     render_mode="human",
-    #     init_flying_pos=np.array(
-    #         [
-    #             [-1.0, 0.0, 1.0],
-    #             [-1.0, 0.5, 1.5],
-    #             [0.0, 1.0, 1.0],
-    #             [0.5, 0.0, 0.5],
-    #             [0.5, -0.5, 1.5],
-    #             # [2.0, 2.5, 2.0],
-    #             # [2.0, 1.0, 2.5],
-    #             # [0.5, 0.5, 0.5],
-    #         ]
-    #     ),
-    #     target_location=np.array([0.0, 0.5, 1.5]),
-    # )
 
     _ = env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])

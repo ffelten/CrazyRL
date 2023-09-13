@@ -118,14 +118,14 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
     ex.add_hypothesis(h)
 
     # Plots a line with the function x = y
-    ax.plot([0, 1], [0, 1], transform=ax.transAxes, ls="--", c=".3")
+    ax.plot([0, 1], [0, 10], transform=ax.transAxes, ls="--", c=".3")
 
     print(ex.summary())
     ex.plot(
         ax=ax,
         x="Number of policies",
         y="Training time",
-        err_style="runs",
+        err_style="fill",
         err_fn=_ci,
         legend=False,
         std_alpha=0.1,
@@ -135,11 +135,10 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
     )
 
     ax.set_title("")
-    ax.set_xlabel("Number of policies (3M steps/policy)")
+    ax.set_xlabel("Number of policies (3M steps per policy)")
     ax.set_ylabel("")
     fig.supylabel("Training time (seconds)")
     h, l = ax.get_legend_handles_labels()
-    # fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=len(exp_names))
     fig.tight_layout()
     fig.savefig("results/mo/training_time.png", bbox_inches="tight")
     fig.savefig("results/mo/training_time.pdf", bbox_inches="tight")

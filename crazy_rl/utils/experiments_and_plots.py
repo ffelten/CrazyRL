@@ -51,6 +51,8 @@ def load_and_plot(exp_names, env_name):
     print(os.getcwd())
     for exp_name, exp_file_pattern in exp_names.items():
         runs = expt.get_runs(exp_file_pattern)
+        for run in runs:
+            print(run.summary())
         h = runs.to_hypothesis(exp_name)
         ex.add_hypothesis(h)
 
@@ -101,26 +103,44 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
     Args:
         file_pattern: file pattern to match the results
     """
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5), sharex=False)
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5), sharex=True)
 
     colors = [
-        # "#5CB5FF",
+        "#5CB5FF",
         # "#D55E00",
+        # "#e6194b",
         # "#009E73",
-        "#e6194b",
     ]
 
-    ex = expt.Experiment("MO Surround")
+    ex = expt.Experiment("Fully accelerated MOMARL")
     print(os.getcwd())
     runs = expt.get_runs(file_pattern)
     print(runs)
-    h = runs.to_hypothesis("MO Surround")
+    h = runs.to_hypothesis("Fully accelerated MOMARL")
     ex.add_hypothesis(h)
 
-    # Plots a line with the function x = y
-    ax.plot([0, 1], [0, 10], transform=ax.transAxes, ls="--", c=".3")
+    # cpu_env_training_time = [
+    #     7264.94,
+    #     7239.02,
+    #     7220.11,
+    #     7194.72,
+    #     7249.48,
+    #     7215.46,
+    #     7235.19,
+    #     7210.7,
+    #     7251.2,
+    #     7205.2,
+    # ]
+    # mean = sum(cpu_env_training_time) / len(cpu_env_training_time)
+    # df = pd.DataFrame({"Training time": [mean] * 7, "Number of policies": [1, 5, 10, 15, 20, 25, 30]})
+    # runs_cpu = expt.Run("MAPPO CPU env (1 policy)", df)
+    # print(runs_cpu)
+    # h = runs_cpu.to_hypothesis()
+    # print(h)
+    # ex.add_hypothesis(h)
 
     print(ex.summary())
+    # for ax in axs:
     ex.plot(
         ax=ax,
         x="Number of policies",
@@ -133,12 +153,40 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
         # n_samples=10000,
         colors=colors,
     )
+    # Plots a line with the function x = y
+    ax.plot([0, 30], [0, 10 * 30], ls="-.", c=".3", alpha=0.7, label="Linear scaling")
+    # ax.plot([0, 30], [7264, 7264], ls="--", c=".3", label="Training 1 MAPPO policy (CPU env)")
 
+    # axs[0].set_ylim([7000, 7500])
+    # axs[1].set_ylim([0, 100])
+
+    # ax = axs[0]
+    # ax2 = axs[1]
+
+    # ax.spines["bottom"].set_visible(False)
+    # ax2.spines["top"].set_visible(False)
+    # ax.xaxis.tick_top()
+    # ax.tick_params(labeltop=False)  # don't put tick labels at the top
+    # ax2.xaxis.tick_bottom()
+
+    # d = 0.01  # how big to make the diagonal lines in axes coordinates
+    # arguments to pass to plot, just so we don't keep repeating them
+    # kwargs = dict(transform=ax.transAxes, color="k", clip_on=False)
+    # ax.plot((-d, +d), (-d, +d), **kwargs)  # top-left diagonal
+    # ax.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
+
+    # kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
+    # ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+    # ax2.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+
+    # for ax in axs:
     ax.set_title("")
-    ax.set_xlabel("Number of policies (3M steps per policy)")
     ax.set_ylabel("")
+    ax.set_xlabel("")
     fig.supylabel("Training time (seconds)")
+    fig.supxlabel("Number of policies (3M steps per policy)")
     h, l = ax.get_legend_handles_labels()
+    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=3)
     fig.tight_layout()
     fig.savefig("results/mo/training_time.png", bbox_inches="tight")
     fig.savefig("results/mo/training_time.pdf", bbox_inches="tight")

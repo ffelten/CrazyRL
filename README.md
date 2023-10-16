@@ -274,6 +274,7 @@ In some cases, an additional conflicting reward is also needed: maximizing the d
 * [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/): Crazyflie Python library;
 * [gymnax](https://github.com/RobertTLange/gymnax): RL environments in Jax, but not multi-agent;
 * [PureJaxRL](https://github.com/luchris429/purejaxrl): End-to-end RL in Jax, but not multi-agent;
+* [MORL-Baselines](https://github.com/LucasAlegre/morl-baselines) and [MO-Gymnasium](https://github.com/Farama-Foundation/MO-Gymnasium): Algorithms and environments for multi-objective RL, but not multi-agent :-);
 * [CrazyFlyt](https://github.com/jjshoots/CrazyFlyt): Simulation and real life control of Crazyflies, the main difference with this project is that the simulator is an actual, heavyweight simulator (Pybullet). Hence, it does not have a full jax version. It is in practice more fit for learning controllers, while our project focuses on learning swarm formation.
 
 ## Citation

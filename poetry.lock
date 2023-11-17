@@ -889,7 +889,7 @@ xml = ["lxml (>=4.8.0)"]
 
 [[package]]
 name = "pettingzoo"
-version = "1.24.2"
+version = "1.24.0"
 description = "Gymnasium for multi-agent reinforcement learning."
 category = "main"
 optional = false
@@ -907,7 +907,7 @@ classic = ["chess (==1.9.4)", "pygame (==2.3.0)", "rlcard (==1.0.5)", "shimmy[op
 mpe = ["pygame (==2.3.0)"]
 other = ["pillow (>=8.0.1)"]
 sisl = ["box2d-py (==2.3.5)", "pygame (==2.3.0)", "pymunk (==6.2.0)", "scipy (>=1.4.1)"]
-testing = ["AutoROM", "pre-commit", "pynput", "pytest", "pytest-cov", "pytest-markdown-docs", "pytest-xdist"]
+testing = ["AutoROM", "pre-commit", "pynput", "pytest", "pytest-cov"]
 
 [[package]]
 name = "pillow"
@@ -1327,7 +1327,7 @@ pytest = ["pytest"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9, <3.12"
-content-hash = "8f84a7ae3bbd4acd487179a6e5b4befd426c22c777d607010c0e7f32b63f49b4"
+content-hash = "8af048b4333dde78bfbc7bcae91c077d83159c8775dbae217da444fb528c6904"
 
 [metadata.files]
 about-time = [
@@ -2041,8 +2041,8 @@ pandas = [
     {file = "pandas-2.1.3.tar.gz", hash = "sha256:22929f84bca106921917eb73c1521317ddd0a4c71b395bcf767a106e3494209f"},
 ]
 pettingzoo = [
-    {file = "pettingzoo-1.24.2-py3-none-any.whl", hash = "sha256:00268cf990d243654c2bbbbf8c88322c12b041dc0a879b74747f14ee8aa93dd6"},
-    {file = "pettingzoo-1.24.2.tar.gz", hash = "sha256:0a5856d47de78ab20feddfdac4940959dc892f6becc92107247b1c3a210c0984"},
+    {file = "pettingzoo-1.24.0-py3-none-any.whl", hash = "sha256:c9ad75739869dff19ee41a58a948e39cde6c6e3f34af6de6639f7e2438bc3829"},
+    {file = "pettingzoo-1.24.0.tar.gz", hash = "sha256:7d28d847964680ae554eb3fcc639f733174f1901883bf18cc9715607c4675418"},
 ]
 pillow = [
     {file = "Pillow-10.1.0-cp310-cp310-macosx_10_10_x86_64.whl", hash = "sha256:1ab05f3db77e98f93964697c8efc49c7954b08dd61cff526b7f2531a22410106"},

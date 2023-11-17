@@ -23,8 +23,8 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.9, <3.12"
-gymnasium = "^0.28"
-pettingzoo = "^1.23"
+gymnasium = "==0.28.1"
+pettingzoo = "==1.24.0"
 numpy = "*"
 torch = "^1.13, <2.0.0"
 pygame = "^2.5"

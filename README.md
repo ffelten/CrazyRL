@@ -7,8 +7,6 @@
 
 # CrazyRL
 
-:warning: Work in progress, suggestions are welcome. :warning:
-
 A hardware-accelerated library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones.
 
 It has:
@@ -21,7 +19,7 @@ It has:
 * ✅ Good quality, tested and documented Python code;
 
 
-The real-life example shown in the video is the result of executing the policies in real-life after learning in the lightweight simulator. The learning was performed by with [MASAC](https://github.com/ffelten/MASAC). Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/).
+The real-life example shown in the video is the result of executing the policies in real-life after learning in the lightweight simulator. Once the environment trained it can be displayed on simulation environment or in reality with the [Crazyflies](https://www.bitcraze.io/products/crazyflie-2-1/).
 
 ## Environments
 
@@ -88,7 +86,7 @@ In the above image, we can see that sample efficiency of both MAPPO versions are
 
 There are examples of usage in the [test files](crazy_rl/test) and main methods of the environments. Moreover, the [learning](learning/) folder contains examples of MARL algorithms.
 
-### Numpy version
+### Python/Numpy version
 
 Basic version which can be used for training, simulation and the real drones.
 It follows the [PettingZoo parallel API](https://pettingzoo.farama.org/).
@@ -270,11 +268,13 @@ The envs often try to minimize the distance towards the target of each drone. Wh
 In some cases, an additional conflicting reward is also needed: maximizing the distance towards the other drones. Both rewards are then linearly combined using weights which pre-defined. To find the weights, we used a multi-objective technique consisting in exposing the rewards as vectors and let the learning algorithm try multiple weights (in the Jax version, it is trivially performed by `vmapping` the learning loop under a few weights). While this seems very simple, it is blazing fast because there is no coordination needed between threads.
 
 ## Related projects
-* [PettingZoo](https://pettingzoo.farama.org/): MARL API and environments;
-* [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/): Crazyflie Python library;
+* [MORL-Baselines](https://github.com/LucasAlegre/morl-baselines) and [MO-Gymnasium](https://github.com/Farama-Foundation/MO-Gymnasium): Algorithms and environments for multi-objective RL, but not multi-agent :-);
+* [JaxMARL](https://github.com/flairox/jaxmarl): Multi-agent RL environments in Jax, published at the same time as this work, but not multi-objective :-);
 * [gymnax](https://github.com/RobertTLange/gymnax): RL environments in Jax, but not multi-agent;
 * [PureJaxRL](https://github.com/luchris429/purejaxrl): End-to-end RL in Jax, but not multi-agent;
-* [MORL-Baselines](https://github.com/LucasAlegre/morl-baselines) and [MO-Gymnasium](https://github.com/Farama-Foundation/MO-Gymnasium): Algorithms and environments for multi-objective RL, but not multi-agent :-);
+* [PettingZoo](https://pettingzoo.farama.org/): MARL API and environments;
+* [MOMAland](https://github.com/rradules/momaland): MOMARL API and environments, including CrazyRLs, under construction;
+* [cflib](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/): Crazyflie Python library;
 * [CrazyFlyt](https://github.com/jjshoots/CrazyFlyt): Simulation and real life control of Crazyflies, the main difference with this project is that the simulator is an actual, heavyweight simulator (Pybullet). Hence, it does not have a full jax version. It is in practice more fit for learning controllers, while our project focuses on learning swarm formation.
 
 ## Citation

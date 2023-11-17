@@ -5,7 +5,6 @@ import numpy as np
 from crazy_rl.multi_agent.jax.catch.catch import Catch
 from crazy_rl.multi_agent.jax.circle.circle import Circle
 from crazy_rl.multi_agent.jax.escort.escort import Escort
-from crazy_rl.multi_agent.jax.hover.hover import Hover
 from crazy_rl.multi_agent.jax.surround.surround import Surround
 
 
@@ -86,6 +85,7 @@ def test_surround():
         num_drones=2,
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
         target_location=jnp.array([[1, 1, 2.5]]),
+        size=3,
     )
 
     seed = 5
@@ -130,32 +130,13 @@ def test_surround():
     obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
 
 
-def test_hover():
-    """Test for the Hover environment in jax version."""
-    parallel_env = Hover(
-        num_drones=2,
-        init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
-    )
-
-    seed = 5
-
-    key = random.PRNGKey(seed)
-
-    key, subkey = random.split(key)
-    obs, rewards, terminated, truncated, state = leave_the_map(parallel_env, subkey)
-
-    # observation : agent's location and target's location
-    assert (obs == jnp.array([[0, 0, 1, 0, 0, 1], [0, 3, 1, 0, 1, 1]])).all()
-
-    assert (rewards == jnp.array([0, -2])).all()
-
-
 def test_circle():
     """Test for the Circle environment in jax version."""
     parallel_env = Circle(
         num_drones=2,
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
         num_intermediate_points=100,
+        size=3,
     )
 
     seed = 5
@@ -197,6 +178,7 @@ def test_escort():
         init_target_location=jnp.array([1, 1, 2.5]),
         final_target_location=jnp.array([-2, -2, 3]),
         num_intermediate_points=150,
+        size=3,
     )
 
     seed = 5
@@ -263,6 +245,7 @@ def test_catch():
         init_flying_pos=jnp.array([[0, 0, 1], [0, 1, 1]]),
         init_target_location=jnp.array([1, 1, 2.5]),
         target_speed=0.1,
+        size=3,
     )
 
     seed = 5

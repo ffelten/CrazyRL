@@ -153,7 +153,7 @@ class Surround(BaseParallelEnv):
                 reward[agent] = np.array([reward_close_to_target, reward_far_from_other_agents])
             else:
                 # MO reward linearly combined using hardcoded weights
-                reward[agent] = 0.8 * reward_close_to_target + 0.2 * reward_far_from_other_agents
+                reward[agent] = 0.995 * reward_close_to_target + 0.005 * reward_far_from_other_agents
 
         return reward
 

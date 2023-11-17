@@ -21,6 +21,8 @@ def compare(state, jax_obs, jax_term, jax_trunc, jax_rewards, np_env, np_obs, np
     assert jax_trunc[0] == np_trunc["agent_0"]
     assert jax_trunc[1] == np_trunc["agent_1"]
 
+    print(jax_rewards)
+    print(np_rewards)
     assert np.allclose(np.asarray(jax_rewards[0]), np_rewards["agent_0"])
     assert np.allclose(np.asarray(jax_rewards[1]), np_rewards["agent_1"])
 

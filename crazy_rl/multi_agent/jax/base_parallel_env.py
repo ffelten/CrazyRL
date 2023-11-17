@@ -32,7 +32,7 @@ class State:
     timestep: int  # represents the number of steps already done in the game.
 
 
-CLOSENESS_THRESHOLD = 0.1
+CLOSENESS_THRESHOLD = 0.2
 
 
 class BaseParallelEnv:

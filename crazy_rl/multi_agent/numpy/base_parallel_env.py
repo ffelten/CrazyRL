@@ -57,7 +57,7 @@ def _distance_to_target(agent_location: npt.NDArray[float], target_location: npt
     return np.linalg.norm(agent_location - target_location)
 
 
-CLOSENESS_THRESHOLD = 0.1
+CLOSENESS_THRESHOLD = 0.2
 
 
 class BaseParallelEnv(ParallelEnv):

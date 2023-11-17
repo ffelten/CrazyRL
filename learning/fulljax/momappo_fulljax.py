@@ -139,15 +139,15 @@ def make_train(args):
         return args.lr * frac
 
     def train(key: chex.PRNGKey, weights: jnp.ndarray):
-        num_drones = 4
+        num_drones = 2
         env = Surround(
             num_drones=num_drones,
             init_flying_pos=jnp.array(
                 [
                     [0.0, 0.0, 1.0],
                     [0.0, 1.0, 1.0],
-                    [1.0, 0.0, 1.0],
-                    [1.0, 2.0, 2.0],
+                    # [1.0, 0.0, 1.0],
+                    # [1.0, 2.0, 2.0],
                     # [2.0, 0.5, 1.0],
                     # [2.0, 2.5, 2.0],
                     # [2.0, 1.0, 2.5],
@@ -155,14 +155,11 @@ def make_train(args):
                 ]
             ),
             target_location=jnp.array([1.0, 1.0, 2.0]),
-            multi_obj=True
+            multi_obj=True,
+            size=5,
             # target_speed=0.15,
             # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
         )
-        # env = Circle(
-        #     num_drones=num_drones,
-        #     init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-        # )
 
         env = ClipActions(env)
         env = NormalizeObservation(env)
@@ -223,6 +220,140 @@ def make_train(args):
         # Batch get value for parallel envs
         vmapped_get_value = vmap(critic.apply, in_axes=(None, 0))
 
+        def _env_step(runner_state, unused):
+            actor_state, critic_state, obs, env_states, key = runner_state
+            last_obs = obs
+
+            # SELECT ACTION
+            key, subkey = jax.random.split(key)
+            # pi contains the normal distributions for each drones, batched (num_drones x  Distribution(num_envs, action_dim))
+            pi = _ma_get_pi(actor_state.params, obs)
+            action_keys = jax.random.split(subkey, num_drones)
+            # for each env:
+            #   for each agent:
+            #       sample an action
+            actions, log_probs = zip(*_ma_sample_and_log_prob_from_pi(pi, action_keys))
+            actions = jnp.array(actions)
+            log_probs = jnp.array(log_probs)
+            log_probs = log_probs.transpose()  # (num_envs, num_drones) for storage
+            joint_actions = actions.transpose((1, 0, 2))  # (num_envs, num_drones, action_dim) for storage
+
+            # CRITIC STEP
+            global_obss = env.state(env_states)
+            values = vmapped_get_value(critic_state.params, global_obss)
+
+            # STEP ENV
+            key, subkey = jax.random.split(key)
+            keys_step = jax.random.split(subkey, args.num_envs)
+            obs, rewards, terminateds, truncateds, info, env_states = env.step(env_states, joint_actions, jnp.stack(keys_step))
+            reward = rewards.sum(axis=-1)  # team reward
+            terminated = jnp.logical_or(jnp.any(terminateds, axis=-1), jnp.any(truncateds, axis=-1))  # TODO handle truncations
+            transition = Transition(
+                terminated=terminated,  # num_envs
+                joint_actions=joint_actions,  # (num_envs, num_drones, action_dim)
+                value=values,  # num_envs
+                reward=reward,  # num_envs
+                log_prob=log_probs,  # (num_envs, num_drones)
+                obs=last_obs,  # (num_envs, num_drones, obs_dim)
+                global_obs=global_obss,  # (num_envs, global_obs_dim)
+                info=info,  # dict containing fields of size (num_envs, ...)
+            )
+
+            runner_state = (actor_state, critic_state, obs, env_states, key)
+            return runner_state, transition
+
+        def _calculate_gae(traj_batch, last_val):
+            def _get_advantages(gae_and_next_value, transition):
+                gae, next_value = gae_and_next_value
+                done, value, reward = (
+                    transition.terminated,
+                    transition.value,
+                    transition.reward,
+                )
+                delta = reward + args.gamma * next_value * (1 - done) - value
+                gae = delta + args.gamma * args.gae_lambda * (1 - done) * gae
+                return (gae, value), gae
+
+            _, advantages = jax.lax.scan(
+                _get_advantages,
+                (jnp.zeros_like(last_val), last_val),
+                traj_batch,
+                reverse=True,
+                unroll=16,
+            )
+            return advantages, advantages + traj_batch.value
+
+        def _update_epoch(update_state, unused):
+            def _update_minbatch(actor_critic_train_state, batch_info):
+                actor_train_state, critic_train_state = actor_critic_train_state
+                traj_batch, advantages, targets = batch_info
+
+                def _loss_fn(actor_params, critic_params, traj_batch, gae, targets):
+                    # Batch values are in shape (batch_size, num_drones, ...)
+
+                    # RERUN NETWORK
+                    pi = _ma_get_pi(
+                        actor_params, traj_batch.obs
+                    )  # this is a list of distributions with batch_shape of minibatch_size and event shape of action_dim
+                    new_value = vmapped_get_value(critic_params, traj_batch.global_obs)
+                    # MA Log Prob: shape (num_drones, minibatch_size)
+                    new_log_probs = jnp.array([pi[i].log_prob(traj_batch.joint_actions[:, i, :]) for i in range(num_drones)])
+                    new_log_probs = new_log_probs.transpose()  # (minibatch_size, num_drones)
+
+                    # Normalizes advantage (trick)
+                    gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+                    gae = gae.reshape((-1, 1))  # (minibatch_size, 1)
+
+                    # CALCULATE VALUE LOSS
+                    value_pred_clipped = traj_batch.value + (new_value - traj_batch.value).clip(-args.clip_eps, args.clip_eps)
+                    value_losses = jnp.square(new_value - targets)
+                    value_losses_clipped = jnp.square(value_pred_clipped - targets)
+                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+
+                    # CALCULATE ACTOR LOSS FOR ALL AGENTS, AGGREGATE LOSS (sum)
+                    logratio = new_log_probs - traj_batch.log_prob
+                    ratio = jnp.exp(logratio)
+                    approx_kl = ((ratio - 1) - logratio).mean()
+                    loss_actor1 = -ratio * gae
+                    loss_actor2 = -jnp.clip(ratio, 1.0 - args.clip_eps, 1.0 + args.clip_eps) * gae
+                    loss_per_agent = jnp.maximum(loss_actor1, loss_actor2).mean(0)  # mean across minibatch
+                    loss_actors = jnp.sum(loss_per_agent)  # sum across agents
+
+                    entropies = jnp.array([p.entropy().mean() for p in pi])
+                    entropy = entropies.mean()  # TODO check how to aggregate entropies
+
+                    total_loss = loss_actors + args.vf_coef * value_loss - args.ent_coef * entropy
+                    return total_loss, (value_loss, loss_actors, entropy, approx_kl)
+
+                grad_fn = jax.value_and_grad(_loss_fn, argnums=(0, 1), has_aux=True)
+                total_loss_and_debug, grads = grad_fn(
+                    actor_train_state.params, critic_train_state.params, traj_batch, advantages, targets
+                )
+                actor_train_state = actor_train_state.apply_gradients(grads=grads[0])
+                critic_train_state = critic_train_state.apply_gradients(grads=grads[1])
+                return (actor_train_state, critic_train_state), total_loss_and_debug
+
+            actor_train_state, critic_train_state, traj_batch, advantages, targets, key = update_state
+            key, subkey = jax.random.split(key)
+            batch_size = minibatch_size * args.num_minibatches
+            assert batch_size == args.num_steps * args.num_envs, "batch size must be equal to number of steps * number of envs"
+            permutation = jax.random.permutation(subkey, batch_size)
+            batch = (traj_batch, advantages, targets)
+            # flattens the num_steps and num_envs dimensions into batch_size; keeps the other dimensions untouched (num_drones, obs_dim, ...)
+            batch = jax.tree_util.tree_map(lambda x: x.reshape((batch_size,) + x.shape[2:]), batch)
+            # shuffles the full batch using permutations
+            shuffled_batch = jax.tree_util.tree_map(lambda x: jnp.take(x, permutation, axis=0), batch)
+            # Slices the shuffled batch into num_minibatches
+            minibatches = jax.tree_util.tree_map(
+                lambda x: jnp.reshape(x, [args.num_minibatches, -1] + list(x.shape[1:])),
+                shuffled_batch,
+            )
+            actor_critic_state, total_loss_and_debug = jax.lax.scan(
+                _update_minbatch, (actor_train_state, critic_train_state), minibatches
+            )
+            update_state = (actor_critic_state[0], actor_critic_state[1], traj_batch, advantages, targets, key)
+            return update_state, total_loss_and_debug
+
         # INIT ENV
         key, subkeys = jax.random.split(key)
         reset_rngs = jax.random.split(subkeys, args.num_envs)
@@ -231,52 +362,6 @@ def make_train(args):
         # TRAIN LOOP
         def _update_step(runner_state: Tuple[TrainState, TrainState, chex.Array, State, chex.PRNGKey], unused):
             # COLLECT TRAJECTORIES
-            def _env_step(runner_state, unused):
-                actor_state, critic_state, obs, env_states, key = runner_state
-                last_obs = obs
-
-                # SELECT ACTION
-                key, subkey = jax.random.split(key)
-                # pi contains the normal distributions for each drones, batched (num_drones x  Distribution(num_envs, action_dim))
-                pi = _ma_get_pi(actor_state.params, obs)
-                action_keys = jax.random.split(subkey, num_drones)
-                # for each env:
-                #   for each agent:
-                #       sample an action
-                actions, log_probs = zip(*_ma_sample_and_log_prob_from_pi(pi, action_keys))
-                actions = jnp.array(actions)
-                log_probs = jnp.array(log_probs)
-                log_probs = log_probs.transpose()  # (num_envs, num_drones) for storage
-                joint_actions = actions.transpose((1, 0, 2))  # (num_envs, num_drones, action_dim) for storage
-
-                # CRITIC STEP
-                global_obss = env.state(env_states)
-                values = vmapped_get_value(critic_state.params, global_obss)
-
-                # STEP ENV
-                key, subkey = jax.random.split(key)
-                keys_step = jax.random.split(subkey, args.num_envs)
-                obs, rewards, terminateds, truncateds, info, env_states = env.step(
-                    env_states, joint_actions, jnp.stack(keys_step)
-                )
-                reward = rewards.sum(axis=-1)  # team reward
-                terminated = jnp.logical_or(
-                    jnp.any(terminateds, axis=-1), jnp.any(truncateds, axis=-1)
-                )  # TODO handle truncations
-                transition = Transition(
-                    terminated=terminated,  # num_envs
-                    joint_actions=joint_actions,  # (num_envs, num_drones, action_dim)
-                    value=values,  # num_envs
-                    reward=reward,  # num_envs
-                    log_prob=log_probs,  # (num_envs, num_drones)
-                    obs=last_obs,  # (num_envs, num_drones, obs_dim)
-                    global_obs=global_obss,  # (num_envs, global_obs_dim)
-                    info=info,  # dict containing fields of size (num_envs, ...)
-                )
-
-                runner_state = (actor_state, critic_state, obs, env_states, key)
-                return runner_state, transition
-
             runner_state, traj_batch = jax.lax.scan(_env_step, runner_state, None, args.num_steps)
 
             # CALCULATE ADVANTAGE
@@ -284,108 +369,9 @@ def make_train(args):
             global_obss = env.state(env_states)
             # TODO global_obss should be based on last obs, not current obs if truncated
             last_val = critic.apply(critic_train_state.params, global_obss)
-
-            def _calculate_gae(traj_batch, last_val):
-                def _get_advantages(gae_and_next_value, transition):
-                    gae, next_value = gae_and_next_value
-                    done, value, reward = (
-                        transition.terminated,
-                        transition.value,
-                        transition.reward,
-                    )
-                    delta = reward + args.gamma * next_value * (1 - done) - value
-                    gae = delta + args.gamma * args.gae_lambda * (1 - done) * gae
-                    return (gae, value), gae
-
-                _, advantages = jax.lax.scan(
-                    _get_advantages,
-                    (jnp.zeros_like(last_val), last_val),
-                    traj_batch,
-                    reverse=True,
-                    unroll=16,
-                )
-                return advantages, advantages + traj_batch.value
-
             advantages, targets = _calculate_gae(traj_batch, last_val)
 
             # UPDATE NETWORK
-            def _update_epoch(update_state, unused):
-                def _update_minbatch(actor_critic_train_state, batch_info):
-                    actor_train_state, critic_train_state = actor_critic_train_state
-                    traj_batch, advantages, targets = batch_info
-
-                    def _loss_fn(actor_params, critic_params, traj_batch, gae, targets):
-                        # Batch values are in shape (batch_size, num_drones, ...)
-
-                        # RERUN NETWORK
-                        pi = _ma_get_pi(
-                            actor_params, traj_batch.obs
-                        )  # this is a list of distributions with batch_shape of minibatch_size and event shape of action_dim
-                        new_value = vmapped_get_value(critic_params, traj_batch.global_obs)
-                        # MA Log Prob: shape (num_drones, minibatch_size)
-                        new_log_probs = jnp.array(
-                            [pi[i].log_prob(traj_batch.joint_actions[:, i, :]) for i in range(num_drones)]
-                        )
-                        new_log_probs = new_log_probs.transpose()  # (minibatch_size, num_drones)
-
-                        # Normalizes advantage (trick)
-                        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                        gae = gae.reshape((-1, 1))  # (minibatch_size, 1)
-
-                        # CALCULATE VALUE LOSS
-                        value_pred_clipped = traj_batch.value + (new_value - traj_batch.value).clip(
-                            -args.clip_eps, args.clip_eps
-                        )
-                        value_losses = jnp.square(new_value - targets)
-                        value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                        value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-
-                        # CALCULATE ACTOR LOSS FOR ALL AGENTS, AGGREGATE LOSS (sum)
-                        logratio = new_log_probs - traj_batch.log_prob
-                        ratio = jnp.exp(logratio)
-                        approx_kl = ((ratio - 1) - logratio).mean()
-                        loss_actor1 = -ratio * gae
-                        loss_actor2 = -jnp.clip(ratio, 1.0 - args.clip_eps, 1.0 + args.clip_eps) * gae
-                        loss_per_agent = jnp.maximum(loss_actor1, loss_actor2).mean(0)  # mean across minibatch
-                        loss_actors = jnp.sum(loss_per_agent)  # sum across agents
-
-                        entropies = jnp.array([p.entropy().mean() for p in pi])
-                        entropy = entropies.mean()  # TODO check how to aggregate entropies
-
-                        total_loss = loss_actors + args.vf_coef * value_loss - args.ent_coef * entropy
-                        return total_loss, (value_loss, loss_actors, entropy, approx_kl)
-
-                    grad_fn = jax.value_and_grad(_loss_fn, argnums=(0, 1), has_aux=True)
-                    total_loss_and_debug, grads = grad_fn(
-                        actor_train_state.params, critic_train_state.params, traj_batch, advantages, targets
-                    )
-                    actor_train_state = actor_train_state.apply_gradients(grads=grads[0])
-                    critic_train_state = critic_train_state.apply_gradients(grads=grads[1])
-                    return (actor_train_state, critic_train_state), total_loss_and_debug
-
-                actor_train_state, critic_train_state, traj_batch, advantages, targets, key = update_state
-                key, subkey = jax.random.split(key)
-                batch_size = minibatch_size * args.num_minibatches
-                assert (
-                    batch_size == args.num_steps * args.num_envs
-                ), "batch size must be equal to number of steps * number of envs"
-                permutation = jax.random.permutation(subkey, batch_size)
-                batch = (traj_batch, advantages, targets)
-                # flattens the num_steps and num_envs dimensions into batch_size; keeps the other dimensions untouched (num_drones, obs_dim, ...)
-                batch = jax.tree_util.tree_map(lambda x: x.reshape((batch_size,) + x.shape[2:]), batch)
-                # shuffles the full batch using permutations
-                shuffled_batch = jax.tree_util.tree_map(lambda x: jnp.take(x, permutation, axis=0), batch)
-                # Slices the shuffled batch into num_minibatches
-                minibatches = jax.tree_util.tree_map(
-                    lambda x: jnp.reshape(x, [args.num_minibatches, -1] + list(x.shape[1:])),
-                    shuffled_batch,
-                )
-                actor_critic_state, total_loss_and_debug = jax.lax.scan(
-                    _update_minbatch, (actor_train_state, critic_train_state), minibatches
-                )
-                update_state = (actor_critic_state[0], actor_critic_state[1], traj_batch, advantages, targets, key)
-                return update_state, total_loss_and_debug
-
             update_state = (actor_train_state, critic_train_state, traj_batch, advantages, targets, key)
             update_state, loss_info = jax.lax.scan(_update_epoch, update_state, None, args.update_epochs)
 
@@ -441,7 +427,7 @@ def make_train(args):
 
 
 def save_actor(actor_state, pathname: str = "actor"):
-    directory = epath.Path("../trained_model")
+    directory = epath.Path("trained_model")
     actor_dir = directory / pathname
     print("Saving actor to ", actor_dir)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
@@ -463,39 +449,38 @@ def equally_spaced_weights(dim: int, n: int, seed: int = 42) -> List[np.ndarray]
 
 
 def multi_obj(args):
-    NUM_WEIGHTS = 30
+    NUM_WEIGHTS = 5
     weights = jnp.array(equally_spaced_weights(2, NUM_WEIGHTS))
-    weights = jnp.array(
-        [
-            [0.96, 0.04],
-            [0.97, 0.03],
-            [0.975, 0.025],
-            [0.98, 0.02],
-            [0.99, 0.01],
-        ]
-    )
-
+    # weights = jnp.array(
+    #     [
+    #         [0.96, 0.04],
+    #         [0.97, 0.03],
+    #         [0.975, 0.025],
+    #         [0.98, 0.02],
+    #         [0.99, 0.01],
+    #     ]
+    # )
     rng = jax.random.PRNGKey(args.seed)
+    start_time = time.time()
     train_vjit = jax.jit(
         jax.vmap(make_train(args), in_axes=(None, 0)),  # vmaps over the weights
     )
-    start_time = time.time()
-    out = jax.block_until_ready(train_vjit(rng, weights))
+    out = jax.block_until_ready(train_vjit(rng, weights))  # noqa
     print(f"total time: {time.time() - start_time}")
     print(f"SPS: {args.total_timesteps *  NUM_WEIGHTS/ (time.time() - start_time)}")
 
-    for i in range(len(weights)):
-        # Plotting online Pareto front
-        # returns = out["metrics"]["returned_episode_returns"][i]
-        # returns = returns.mean(-2)  # agg over envs
-        # returns = returns.reshape((-1, 2))  # flatten
-        # returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
-        # returns = returns[-1]
-        # plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
+    # for i in range(len(weights)):
+    # Plotting online Pareto front
+    # returns = out["metrics"]["returned_episode_returns"][i]
+    # returns = returns.mean(-2)  # agg over envs
+    # returns = returns.reshape((-1, 2))  # flatten
+    # returns = returns[jnp.all(returns != 0.0, axis=1)]  # remove zeros
+    # returns = returns[-1]
+    # plt.scatter(returns[0], returns[1], label="weight=" + str(weights[i]))
 
-        # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
-        actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
-        save_actor(actor_i, pathname="actor_" + str(weights[i]))
+    # vmapped TrainStates are TrainStates of arrays (not arrays of TrainStates), so we need to extract the ith element
+    #     actor_i = jax.tree_map(lambda x: x[i], out["runner_state"][0])
+    #     save_actor(actor_i, pathname="actor_" + str(weights[i]))
 
     # plt.title("Online pareto front")
     # plt.ylabel("far_from_others")

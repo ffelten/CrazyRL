@@ -8,7 +8,10 @@ import numpy.typing as npt
 from gymnasium import spaces
 from pettingzoo.test.parallel_test import parallel_api_test
 
-from crazy_rl.multi_agent.numpy.base_parallel_env import BaseParallelEnv
+from crazy_rl.multi_agent.numpy.base_parallel_env import (
+    BaseParallelEnv,
+    _distance_to_target,
+)
 
 
 class Hover(BaseParallelEnv):
@@ -21,7 +24,7 @@ class Hover(BaseParallelEnv):
         drone_ids: npt.NDArray[int],
         init_flying_pos: npt.NDArray[int],
         render_mode=None,
-        size: int = 3,
+        size: int = 2,
     ):
         """Hover environment for Crazyflies 2.
 
@@ -54,13 +57,14 @@ class Hover(BaseParallelEnv):
             init_flying_pos=self._init_flying_pos,
             target_location=self._target_location,
             drone_ids=drone_ids,
+            target_id=None,  # Should be none for multi target envs
         )
 
     @override
     def _observation_space(self, agent):
         return spaces.Box(
             low=np.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=np.float32),
-            high=np.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=np.float32),
+            high=np.array([self.size, self.size, 3, self.size, self.size, 3], dtype=np.float32),
             shape=(6,),
             dtype=np.float32,
         )
@@ -81,16 +85,25 @@ class Hover(BaseParallelEnv):
     @override
     def _transition_state(self, actions: Dict[str, np.ndarray]):
         target_point_action = dict()
-        state = self._get_drones_state()
+        state = self._agent_location
         for agent in self._agents_names:
-            target_point_action[agent] = np.clip(state[agent] + actions[agent], [-self.size, -self.size, 0], self.size)
+            target_point_action[agent] = np.clip(
+                state[agent] + actions[agent], [-self.size, -self.size, 0], [self.size, self.size, 3]
+            )
         return target_point_action
 
     @override
     def _compute_reward(self):
+        # Reward is based on the euclidean distance to the target point
         reward = dict()
-        for agent in self._agents_names:
-            reward[agent] = -1 * np.linalg.norm(self._target_location[agent] - self._agent_location[agent])
+        for i, agent in enumerate(self._agents_names):
+            # (!) targets and locations must be updated before this
+            dist_from_target = _distance_to_target(self._agent_location[agent], self._target_location[agent])
+            old_dist = _distance_to_target(self._previous_location[agent], self._target_location[agent])
+
+            # reward should be new_potential - old_potential but since the distances should be negated we reversed the signs
+            # -new_potential - (-old_potential) = old_potential - new_potential
+            reward[agent] = old_dist - dist_from_target
         return reward
 
     @override

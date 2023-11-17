@@ -1,11 +1,9 @@
 """Utils for the project."""
 import time
-from threading import Event
 
 import numpy as np
 from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncLogger import SyncLogger
-from cflib.localization import LighthouseConfigWriter
 
 
 def rad2deg(x):
@@ -24,8 +22,6 @@ def reset_estimator(scf):
     Args:
         scf: SyncCrazyflie
     """
-    __load_config(scf)
-    print("Config loaded")
     cf = scf.cf
     cf.param.set_value("kalman.resetEstimation", "1")
     time.sleep(0.1)
@@ -70,28 +66,6 @@ def __wait_for_position_estimator(scf):
 
             if (max_x - min_x) < threshold and (max_y - min_y) < threshold and (max_z - min_z) < threshold:
                 break
-
-
-def __load_config(scf):
-    """Load the configuration saved from cfclient app on all drones. Allow to have the same reference for all.
-
-    Args:
-        scf: SyncCrazyflie
-    """
-    lh_config_writer = LighthouseConfigWriter(scf.cf)
-    names = "/home/py/Documents/ADARS/Crazyflie/save_config_lighthouse/save2501.yaml"
-
-    if names == "":
-        print("empty file")
-        return -1
-
-    event = Event()
-
-    def data_written(_):
-        event.set()
-
-    if lh_config_writer is not None:
-        lh_config_writer.write_and_store_config_from_file(data_written, names)
 
 
 def _activate_high_level_commander(scf):
@@ -139,8 +113,8 @@ def run_land(scf):
 
     commander = scf.cf.high_level_commander
 
-    commander.land(0.0, 2.0)
-    time.sleep(2)
+    commander.land(0.0, 3.0)
+    time.sleep(2.7)
 
     commander.stop()
 
@@ -166,9 +140,9 @@ def run_sequence(scf, command):
     else:
         commander = scf.cf.high_level_commander
         # z limitation for safety
-        z = np.clip(target_pos[2], 0.3, 2)
+        z = np.clip(target_pos[2], 0.3, 2.5)
         commander.go_to(target_pos[0], target_pos[1], z, yaw, flight_time, relative=False)
-        time.sleep(flight_time * 0.65)
+        time.sleep(flight_time * 0.7)
 
 
 class LoggingCrazyflie:

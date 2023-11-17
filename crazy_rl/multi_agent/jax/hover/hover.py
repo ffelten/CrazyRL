@@ -8,7 +8,11 @@ import jax.numpy as jnp
 import jax_dataclasses as jdc
 from jax import jit, random, vmap
 
-from crazy_rl.multi_agent.jax.base_parallel_env import BaseParallelEnv, State
+from crazy_rl.multi_agent.jax.base_parallel_env import (
+    BaseParallelEnv,
+    State,
+    _distances_to_target,
+)
 from crazy_rl.utils.jax_spaces import Box, Space
 from crazy_rl.utils.jax_wrappers import AutoReset, VecEnv
 
@@ -18,6 +22,7 @@ class State(State):
     """State of the environment containing the modifiable variables."""
 
     agents_locations: jnp.ndarray  # a 2D array containing x,y,z coordinates of each agent, indexed from 0.
+    prev_agent_locations: jnp.ndarray  # 2D array containing x,y,z coordinates of each agent at last timestep
     timestep: int  # represents the number of steps already done in the game
 
 
@@ -28,7 +33,7 @@ class Hover(BaseParallelEnv):
         self,
         num_drones: int,
         init_flying_pos: jnp.ndarray,
-        size: int = 3,
+        size: int = 2,
     ):
         """Hover environment for Crazyflies 2.
 
@@ -48,7 +53,7 @@ class Hover(BaseParallelEnv):
     def observation_space(self, agent: int) -> Space:
         return Box(
             low=-self.size,
-            high=self.size,
+            high=3,
             shape=(6,),
         )
 
@@ -64,12 +69,19 @@ class Hover(BaseParallelEnv):
     @override
     @partial(jit, static_argnums=(0,))
     def _transition_state(self, state: State, actions: jnp.ndarray, key: jnp.ndarray) -> State:
-        return jdc.replace(state, agents_locations=self._sanitize_action(state, actions))
+        return jdc.replace(
+            state, agents_locations=self._sanitize_action(state, actions), prev_agent_locations=state.agents_locations
+        )
 
     @override
     @partial(jit, static_argnums=(0,))
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
-        return -1 * jnp.linalg.norm(self._target_location - state.agents_locations, axis=1)
+        # Potential based reward (!) locations and targets must be updated before this
+        dist_from_old_target = _distances_to_target(state.agents_locations, self._target_location)
+        old_dist = _distances_to_target(state.prev_agent_locations, self._target_location)
+        # reward should be new_potential - old_potential but since the potential should be negated (we want to min distance),
+        # we have to negate the reward, -new_potential - (-old_potential) = old_potential - new_potential
+        return old_dist - dist_from_old_target
 
     @override
     @partial(jit, static_argnums=(0,))
@@ -87,6 +99,7 @@ class Hover(BaseParallelEnv):
     def reset(self, key: jnp.ndarray) -> Tuple[jnp.ndarray, dict, State]:
         state = State(
             agents_locations=self._init_flying_pos,
+            prev_agent_locations=self._init_flying_pos,
             timestep=0,
         )
         obs = self._compute_obs(state)

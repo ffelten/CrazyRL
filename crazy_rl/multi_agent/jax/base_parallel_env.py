@@ -32,6 +32,9 @@ class State:
     timestep: int  # represents the number of steps already done in the game.
 
 
+CLOSENESS_THRESHOLD = 0.2
+
+
 class BaseParallelEnv:
     """The Base environment.
 
@@ -80,7 +83,11 @@ class BaseParallelEnv:
             actions : 2D array containing the x, y, z action for each drone.
         """
         # Actions are clipped to stay in the map and scaled to do max 20cm in one step
-        return jnp.clip(state.agents_locations + actions * 0.2, jnp.array([-self.size, -self.size, 0]), self.size)
+        return jnp.clip(
+            state.agents_locations + actions * 0.2,
+            jnp.array([-self.size, -self.size, 0]),
+            jnp.array([self.size, self.size, 3]),
+        )
 
     def _compute_reward(self, state: State, terminations: jnp.ndarray, truncations: jnp.ndarray) -> jnp.ndarray:
         """Computes the current reward value(s) from a given state. Must be implemented in a subclass."""

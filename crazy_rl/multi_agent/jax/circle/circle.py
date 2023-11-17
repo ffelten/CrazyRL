@@ -36,7 +36,7 @@ class Circle(BaseParallelEnv):
         num_drones: int,
         init_flying_pos: jnp.ndarray,
         num_intermediate_points: int = 10,
-        size: int = 3,
+        size: int = 2,
     ):
         """Circle environment for Crazyflies 2.
 
@@ -69,7 +69,7 @@ class Circle(BaseParallelEnv):
     def observation_space(self, agent: int) -> Space:
         return Box(
             low=-self.size,
-            high=self.size,
+            high=3,
             shape=(6,),
         )
 

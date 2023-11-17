@@ -38,7 +38,7 @@ class NormalizeReward(BaseParallelWrapper):
 
     def step(self, action):
         """Steps through the environment, normalizing the rewards returned."""
-        obs, rews, terminateds, truncateds, infos = self.env.step(action)
+        obs, rews, terminateds, truncateds, infos = super().step(action)
         for i, agent in enumerate(self.possible_agents):
             self.returns[i] = self.returns[i] * self.gamma * (1 - terminateds[agent]) + rews[agent]
             rews[agent] = self._normalize(rews[agent], i)
@@ -65,7 +65,7 @@ class RecordEpisodeStatistics(BaseParallelWrapper):
 
     def step(self, action):
         """Steps through the environment, recording episode statistics."""
-        obs, rews, terminateds, truncateds, infos = self.env.step(action)
+        obs, rews, terminateds, truncateds, infos = super().step(action)
         for agent in self.env.possible_agents:
             self.episode_rewards[agent] += rews[agent]
             self.episode_lengths[agent] += 1
@@ -78,7 +78,7 @@ class RecordEpisodeStatistics(BaseParallelWrapper):
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Resets the environment, recording episode statistics."""
-        obs, info = self.env.reset(seed=seed, options=options)
+        obs, info = super().reset(seed, options)
         for agent in self.env.possible_agents:
             self.episode_rewards[agent] = 0
             self.episode_lengths[agent] = 0

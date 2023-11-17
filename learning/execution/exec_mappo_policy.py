@@ -21,6 +21,7 @@ from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from pettingzoo import ParallelEnv
 
+import crazy_rl.utils.geometry
 from crazy_rl.multi_agent.numpy.catch import Catch  # noqa
 from crazy_rl.multi_agent.numpy.circle import Circle  # noqa
 from crazy_rl.multi_agent.numpy.escort import Escort  # noqa
@@ -129,7 +130,10 @@ def play_episode(actor_module, actor_state, env, init_obs, key, simu):
         terminated: bool = any(terminateds.values())
         truncated: bool = any(truncateds.values())
 
-        done = terminated or truncated
+        if not simu:
+            done = env.timestep == 30
+        else:
+            done = terminated or truncated
         obs = next_obs
     print("==========Episode return: ", ep_return)
 
@@ -160,11 +164,51 @@ def replay_simu(args):
     # env = Circle(
     #     drone_ids=np.array([0, 1, 2]),
     #     render_mode="human",
-    #     init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
+    #     init_flying_pos=np.array([[-0.5, 0.0, 1.5], [0.0, 0.5, 0.5], [0.5, 0.0, 1.5]]),
+    # )
+
+    # env = Escort(
+    #     drone_ids=np.arange(4),
+    #     render_mode="human",
+    #     init_flying_pos=np.array(
+    #         [
+    #             # [-0.7, -0.5, 1.5],
+    #             [-0.8, 0.5, 0.5],
+    #             [1.0, 0.5, 1.5],
+    #             [0.5, 0.0, 0.5],
+    #             [0.5, -0.5, 1.0],
+    #             # [2.0, 2.5, 2.0],
+    #             # [2.0, 1.0, 2.5],
+    #             # [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     # target_location=jnp.array([0.0, 0.5, 1.5]),
+    #     init_target_location=np.array([-0.1, 0.6, 1.1]),
+    #     final_target_location=np.array([1.2, -1.3, 2.3]),
+    # )
+
+    # env = Catch(
+    #     drone_ids=np.arange(8),
+    #     render_mode="human",
+    #     init_flying_pos=np.array(
+    #         [
+    #             [-0.7, -0.5, 1.5],
+    #             [-0.8, 0.5, 0.5],
+    #             [1.0, 0.5, 1.5],
+    #             [0.5, 0.0, 0.5],
+    #             [0.5, -0.5, 1.0],
+    #             [2.0, 2.5, 2.0],
+    #             [2.0, 1.0, 2.5],
+    #             [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     init_target_location=np.array([0.0, 0.5, 1.5]),
+    #     target_speed=0.15,
+    #     size=5,
     # )
 
     env = Surround(
-        drone_ids=np.arange(4),
+        drone_ids=np.arange(8),
         render_mode="human",
         init_flying_pos=np.array(
             [
@@ -172,21 +216,16 @@ def replay_simu(args):
                 [0.0, 1.0, 1.0],
                 [1.0, 0.0, 1.0],
                 [1.0, 2.0, 2.0],
-                # [2.0, 0.5, 1.0],
-                # [2.0, 2.5, 2.0],
-                # [2.0, 1.0, 2.5],
-                # [0.5, 0.5, 0.5],
+                [2.0, 0.5, 1.0],
+                [2.0, 2.5, 2.0],
+                [2.0, 1.0, 2.5],
+                [0.5, 0.5, 0.5],
             ]
         ),
         target_location=np.array([1.0, 1.0, 2.0]),
+        multi_obj=False,
+        size=5,
     )
-
-    # env: ParallelEnv = Circle(
-    #     drone_ids=np.array([0, 1, 2, 3, 4]),
-    #     render_mode="human",
-    #     init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-    #     # target_location=np.array([1, 1, 2.5]),
-    # )
 
     _ = env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])
@@ -225,28 +264,71 @@ def replay_real(args):
 
     # Init swarm config of crazyflie
     cflib.crtp.init_drivers()
-    uris = {
-        "radio://0/4/2M/E7E7E7E700",
-        "radio://0/4/2M/E7E7E7E701",
-        # Add more URIs if you want more copters in the swarm
-    }
-    # uri = 'radio://0/4/2M/E7E7E7E7' + str(id).zfill(2) # you can browse the drone_id and add as this code at the end of the uri
+    # target_id = "0"
+    drones_ids = np.array(["9", "2", "0"])
+    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in drones_ids]
+
+    # Writes geometry to crazyflie
+    for id in drones_ids:
+        if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(id), verbose=True):
+            exit(-1)
+    # if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(target_id), verbose=True):
+    #     exit(-1)
 
     # the Swarm class will automatically launch the method in parameter of parallel_safe method
-    factory = CachedCfFactory(rw_cache="./cache")
-
-    with Swarm(uris, factory=factory) as swarm:
+    with Swarm(uris, factory=CachedCfFactory(rw_cache="./cache")) as swarm:
         swarm.parallel_safe(LoggingCrazyflie)
-        # swarm.reset_estimators()
-        swarm.get_estimated_positions()
 
         env: ParallelEnv = Circle(
-            drone_ids=np.array([0, 1, 2, 3, 4]),
-            render_mode="human",
-            init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
-            # target_location=np.array([1, 1, 2.5]),
+            drone_ids=drones_ids,
+            render_mode="real",
+            init_flying_pos=np.array([[-0.5, 0.0, 1.5], [0.0, 0.5, 0.5], [0.5, 0.0, 1.5]]),
             swarm=swarm,
         )
+
+        # env = Catch(
+        #     drone_ids=drones_ids,
+        #     render_mode="real",
+        #     init_flying_pos=np.array(
+        #         [
+        #             # [-0.7, -0.5, 1.5],
+        #             [-0.8, 0.5, 0.5],
+        #             [-0.8, 0.5, 1.0],
+        #             [0.5, 0.5, 0.5],
+        #             [0.5, -0.5, 1.0],
+        #             # [2.0, 2.5, 2.0],
+        #             # [2.0, 1.0, 2.5],
+        #             # [0.5, 0.5, 0.5],
+        #         ]
+        #     ),
+        #     init_target_location=np.array([0.0, 0.0, 1.0]),
+        #     # init_target_location=np.array([-0.5, 0.7, 1.1]),
+        #     # final_target_location=np.array([1.2, -1.3, 2.3]),
+        #     target_speed=0.1,
+        #     size=1.3,
+        #     target_id=target_id,
+        #     swarm=swarm,
+        # )
+
+        # env = Surround(
+        #     drone_ids=drones_ids,
+        #     render_mode="real",
+        #     init_flying_pos=np.array(
+        #         [
+        #             [-1.0, 0.0, 1.0],
+        #             [-1.0, 0.5, 1.5],
+        #             [0.0, 1.0, 1.0],
+        #             [0.5, 0.0, 0.5],
+        #             [0.5, -0.5, 1.5],
+        #             # [2.0, 2.5, 2.0],
+        #             # [2.0, 1.0, 2.5],
+        #             # [0.5, 0.5, 0.5],
+        #         ]
+        #     ),
+        #     target_location=np.array([0.0, 0.5, 1.5]),
+        #     target_id=target_id,
+        #     swarm=swarm,
+        # )
 
         obs, _ = env.reset(seed=args.seed)
         single_action_space = env.action_space(env.unwrapped.agents[0])
@@ -269,7 +351,7 @@ def replay_real(args):
         )
         actor_state = load_actor_state(args.model_dir, actor_state)
 
-        play_episode(actor_module, actor_state, env, obs, key, True)
+        play_episode(actor_module, actor_state, env, obs, key, False)
 
         env.close()
 

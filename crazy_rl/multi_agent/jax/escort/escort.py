@@ -10,6 +10,7 @@ import jax_dataclasses as jdc
 from jax import jit, random
 
 from crazy_rl.multi_agent.jax.base_parallel_env import (
+    CLOSENESS_THRESHOLD,
     BaseParallelEnv,
     State,
     _distances_to_target,
@@ -38,9 +39,9 @@ class Escort(BaseParallelEnv):
         init_flying_pos: jnp.ndarray,
         init_target_location: jnp.ndarray,
         final_target_location: jnp.ndarray,
-        num_intermediate_points: int = 100,
+        num_intermediate_points: int = 20,
         multi_obj: bool = False,
-        size: int = 3,
+        size: int = 2,
     ):
         """Escort environment for Crazyflies 2.
 
@@ -77,7 +78,7 @@ class Escort(BaseParallelEnv):
     def observation_space(self, agent: int) -> Space:
         return Box(
             low=-self.size,
-            high=self.size,
+            high=3,
             shape=(3 * (self.num_drones + 1),),  # coordinates of the drones and the target
         )
 
@@ -136,7 +137,7 @@ class Escort(BaseParallelEnv):
         else:
             # MO reward linearly combined using hardcoded weights
             return (1 - jnp.any(terminations)) * (
-                0.9995 * reward_close_to_target + 0.0005 * reward_far_from_other_agents
+                0.995995 * reward_close_to_target + 0.004005 * reward_far_from_other_agents
             ) + jnp.any(terminations) * reward_crash
 
     @override
@@ -144,7 +145,8 @@ class Escort(BaseParallelEnv):
     def _compute_terminated(self, state: State) -> jnp.ndarray:
         # collision with the ground and the target
         terminated = jnp.logical_or(
-            state.agents_locations[:, 2] < 0.2, jnp.linalg.norm(state.agents_locations - state.target_location) < 0.2
+            state.agents_locations[:, 2] < CLOSENESS_THRESHOLD,
+            jnp.linalg.norm(state.agents_locations - state.target_location) < CLOSENESS_THRESHOLD,
         )
 
         for agent in range(self.num_drones):
@@ -152,7 +154,7 @@ class Escort(BaseParallelEnv):
 
             # collision between two drones
             terminated = terminated.at[agent].set(
-                jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < 0.2)))
+                jnp.logical_or(terminated[agent], jnp.any(jnp.logical_and(distances > 0.001, distances < CLOSENESS_THRESHOLD)))
             )
 
         return jnp.any(terminated) * jnp.ones(self.num_drones)

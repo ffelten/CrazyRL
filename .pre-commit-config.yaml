@@ -8,6 +8,7 @@ repos:
       - id: destroyed-symlinks
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        exclude: (trained_model/)
       - id: check-yaml
       - id: check-toml
       - id: check-ast
@@ -22,11 +23,12 @@ repos:
     hooks:
       - id: codespell
         args:
-          - --ignore-words-list=reacher,ure,referenc,wile,mor,ser,esr,nowe
+          - --ignore-words-list=reacher,ure
   - repo: https://github.com/PyCQA/flake8
     rev: 6.0.0
     hooks:
       - id: flake8
+        exclude: (trained_model/)
         args:
           - '--per-file-ignores=*/__init__.py:F401'
           - --ignore=E203,W503,E741
@@ -47,11 +49,12 @@ repos:
     rev: 23.3.0
     hooks:
       - id: black
+        exclude: (trained_model/)
   - repo: https://github.com/pycqa/pydocstyle
     rev: 6.3.0
     hooks:
       - id: pydocstyle
-        exclude: ^(tests/)|(docs/)|(setup.py)|(examples/)|(crazy_rl/mono_agent/)|(learning/)|(crazy_rl/utils/jax_wrappers)
+        exclude: ^(tests/)|(docs/)|(setup.py)|(examples/)|(crazy_rl/mono_agent/)|(learning/)|(trained_model/)|(crazy_rl/utils/jax_wrappers)|(crazy_rl/utils/geometry)
         args:
           - --source
           - --explain

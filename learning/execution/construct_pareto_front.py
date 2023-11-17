@@ -150,22 +150,22 @@ def replay_simu(args):
     # )
 
     env = Surround(
-        drone_ids=np.arange(4),
-        render_mode=None,
+        drone_ids=np.arange(8),
         init_flying_pos=np.array(
             [
                 [0.0, 0.0, 1.0],
                 [0.0, 1.0, 1.0],
                 [1.0, 0.0, 1.0],
                 [1.0, 2.0, 2.0],
-                # [2.0, 0.5, 1.0],
-                # [2.0, 2.5, 2.0],
-                # [2.0, 1.0, 2.5],
-                # [0.5, 0.5, 0.5],
+                [2.0, 0.5, 1.0],
+                [2.0, 2.5, 2.0],
+                [2.0, 1.0, 2.5],
+                [0.5, 0.5, 0.5],
             ]
         ),
         target_location=np.array([1.0, 1.0, 2.0]),
         multi_obj=True,
+        size=5,
     )
 
     # env = Catch(
@@ -236,10 +236,13 @@ if __name__ == "__main__":
     pf = replay_simu(args=args)
 
     for candidate, eval in zip(pf.individuals, pf.evaluations):
-        plt.scatter(eval[0], eval[1], label=candidate.name, alpha=0.5)
+        plt.scatter(eval[0], eval[1], label=candidate.name, alpha=0.9, c="#5CB5FF")
 
-    cursor(hover=True)
-    plt.ylabel("Far from others")
-    plt.xlabel("Close to target")
+    plt.ylabel("Far from others", fontsize=16)
+    plt.xlabel("Close to target", fontsize=16)
     plt.grid(alpha=0.25)
+    plt.tight_layout()
+    plt.savefig("results/mo/pareto_front.png", dpi=600)
+    plt.savefig("results/mo/pareto_front.pdf", dpi=600)
+    cursor(hover=True)
     plt.show()

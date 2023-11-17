@@ -25,7 +25,7 @@ class Circle(BaseParallelEnv):
         init_flying_pos: npt.NDArray[int],
         render_mode=None,
         num_intermediate_points: int = 10,
-        size: int = 3,
+        size: int = 2,
         swarm=None,
     ):
         """Circle environment for Crazyflies 2.
@@ -74,6 +74,7 @@ class Circle(BaseParallelEnv):
             target_location=self._target_location,
             agents_names=self._agents_names,
             drone_ids=drone_ids,
+            target_id=None,  # Should be none in the case of multi target envs
             swarm=swarm,
         )
 
@@ -81,7 +82,7 @@ class Circle(BaseParallelEnv):
     def _observation_space(self, agent):
         return spaces.Box(
             low=np.array([-self.size, -self.size, 0, -self.size, -self.size, 0], dtype=np.float32),
-            high=np.array([self.size, self.size, self.size, self.size, self.size, self.size], dtype=np.float32),
+            high=np.array([self.size, self.size, 3, self.size, self.size, 3], dtype=np.float32),
             shape=(6,),
             dtype=np.float32,
         )
@@ -102,7 +103,7 @@ class Circle(BaseParallelEnv):
     @override
     def _transition_state(self, actions):
         target_point_action = dict()
-        state = self._get_drones_state()
+        state = self._agent_location
         t = self.timestep % self.num_intermediate_points  # redo the circle if the end is reached
         for i, agent in enumerate(self._agents_names):
             # new targets
@@ -112,7 +113,9 @@ class Circle(BaseParallelEnv):
             # Moving agents
             # Actions are clipped to stay in the map and scaled to do max 20cm in one step
             # The state is not update here because there are some stuffs to do for real drones
-            target_point_action[agent] = np.clip(state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], self.size)
+            target_point_action[agent] = np.clip(
+                state[agent] + actions[agent] * 0.2, [-self.size, -self.size, 0], [self.size, self.size, 3]
+            )
 
         return target_point_action
 

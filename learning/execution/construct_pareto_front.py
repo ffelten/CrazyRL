@@ -238,9 +238,11 @@ if __name__ == "__main__":
     for candidate, eval in zip(pf.individuals, pf.evaluations):
         plt.scatter(eval[0], eval[1], label=candidate.name, alpha=0.9, c="#5CB5FF")
 
-    plt.ylabel("Far from others")
-    plt.xlabel("Close to target")
+    plt.ylabel("Far from others", fontsize=16)
+    plt.xlabel("Close to target", fontsize=16)
     plt.grid(alpha=0.25)
+    plt.tight_layout()
     plt.savefig("results/mo/pareto_front.png", dpi=600)
+    plt.savefig("results/mo/pareto_front.pdf", dpi=600)
     cursor(hover=True)
     plt.show()

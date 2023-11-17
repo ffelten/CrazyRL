@@ -69,6 +69,7 @@ def load_and_plot(exp_names, env_name):
         rolling=100,
         n_samples=10000,
         colors=colors,
+        linewidth=2,
     )
     ex.plot(
         ax=ax[1],
@@ -81,26 +82,36 @@ def load_and_plot(exp_names, env_name):
         rolling=100,
         n_samples=10000,
         colors=colors,
+        linewidth=2,
     )
 
     ax[0].set_title("")
     ax[1].set_title("")
-    ax[0].set_xlabel("Total timesteps")
-    ax[1].set_xlabel("Time (seconds)")
+    ax[0].set_xlabel("Total timesteps", fontsize=16)
+    ax[1].set_xlabel("Time (seconds)", fontsize=16)
     ax[1].set_ylabel("")
     ax[0].set_ylabel("")
-    fig.supylabel("Episodic return")
+    fig.supylabel("Episodic return", fontsize=16)
     h, l = ax[0].get_legend_handles_labels()
-    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=len(exp_names))
+    fig.legend(
+        h,
+        l,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.0),
+        bbox_transform=fig.transFigure,
+        ncols=3,
+        fontsize="15",
+    )
     fig.tight_layout()
     fig.savefig(f"results/{env_name}.png", bbox_inches="tight")
     fig.savefig(f"results/{env_name}.pdf", bbox_inches="tight")
 
 
-def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround*"):
+def plot_training_time_mo(exp_names):
     """Plot for training time when training multiple policies.
 
     Args:
+        exp_names: a dictionary mapping experiment names to file patterns
         file_pattern: file pattern to match the results
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 5), sharex=True)
@@ -108,16 +119,18 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
     colors = [
         "#5CB5FF",
         # "#D55E00",
-        # "#e6194b",
-        # "#009E73",
+        "#e6194b",
+        "#009E73",
     ]
 
-    ex = expt.Experiment("Fully accelerated MOMARL")
+    ex = expt.Experiment("MOMAX")
     print(os.getcwd())
-    runs = expt.get_runs(file_pattern)
-    print(runs)
-    h = runs.to_hypothesis("Fully accelerated MOMARL")
-    ex.add_hypothesis(h)
+    for exp_name, exp_file_pattern in exp_names.items():
+        runs = expt.get_runs(exp_file_pattern)
+        for run in runs:
+            print(run.summary())
+        h = runs.to_hypothesis(exp_name)
+        ex.add_hypothesis(h)
 
     # cpu_env_training_time = [
     #     7264.94,
@@ -140,6 +153,7 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
     # ex.add_hypothesis(h)
 
     print(ex.summary())
+    ax.set_prop_cycle(linestyle=[(0, (3, 5, 1, 5, 1, 5)), (0, (3, 5, 1, 5)), (0, (5, 10))])
     # for ax in axs:
     ex.plot(
         ax=ax,
@@ -148,17 +162,18 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
         err_style="fill",
         err_fn=_ci,
         legend=False,
-        std_alpha=0.1,
+        std_alpha=0.2,
         # rolling=100,
         # n_samples=10000,
         colors=colors,
+        linewidth=2,
     )
     # Plots a line with the function x = y
-    ax.plot([0, 30], [0, 10 * 30], ls="-.", c=".3", alpha=0.7, label="Linear scaling")
+    ax.plot([0, 30], [0, 10 * 30], ls="-.", c=".3", alpha=0.7, label="Linear scaling", linewidth=2)
     # ax.plot([0, 30], [7264, 7264], ls="--", c=".3", label="Training 1 MAPPO policy (CPU env)")
 
     # axs[0].set_ylim([7000, 7500])
-    # axs[1].set_ylim([0, 100])
+    ax.set_ylim([0, 85])
 
     # ax = axs[0]
     # ax2 = axs[1]
@@ -183,25 +198,32 @@ def plot_training_time_mo(file_pattern: str = "results/mo/training_time_surround
     ax.set_title("")
     ax.set_ylabel("")
     ax.set_xlabel("")
-    fig.supylabel("Training time (seconds)")
-    fig.supxlabel("Number of policies (3M steps per policy)")
+    fig.supylabel("Training time (seconds)", fontsize=16)
+    fig.supxlabel("Number of policies (3M steps per policy)", fontsize=16)
     h, l = ax.get_legend_handles_labels()
-    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=3)
+    # matplotlib.rcParams.update({"font.size": 25})
+    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure, ncols=4, fontsize="16")
     fig.tight_layout()
     fig.savefig("results/mo/training_time.png", bbox_inches="tight")
     fig.savefig("results/mo/training_time.pdf", bbox_inches="tight")
 
 
 if __name__ == "__main__":
-    load_and_plot(
-        {
-            "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
-            "MAPPO Full GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
-            "MAPPO Full GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
-            # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
-            # "MAPPO GPU (128 envs)": "results/results_MAPPO_GPU_Circle_(128envs*",
-        },
-        "Circle",
-    )
+    # load_and_plot(
+    #     {
+    #         "MAPPO CPU (1 env)": "results/results_MAPPO_CPU_*",
+    #         "MAPPO Full GPU (1 env)": "results/results_MAPPO_GPU_Circle_(1env*",
+    #         "MAPPO Full GPU (10 envs)": "results/results_MAPPO_GPU_Circle_(10envs*",
+    #         # "MAPPO GPU (20 envs)": "results/results_MAPPO_GPU_Circle_(20envs*",
+    #         # "MAPPO GPU (128 envs)": "results/results_MAPPO_GPU_Circle_(128envs*",
+    #     },
+    #     "Circle",
+    # )
 
-    plot_training_time_mo()
+    plot_training_time_mo(
+        {
+            "Surround": "results/mo/training_time_surround_*",
+            "Escort": "results/mo/training_time_surround_*",
+            "Catch": "results/mo/training_time_surround_*",
+        }
+    )

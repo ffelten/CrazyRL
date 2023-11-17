@@ -82,6 +82,13 @@ We also have a multi-agent version of SAC, [MASAC](https://github.com/ffelten/MA
 <img src="results/Circle.png">
 In the above image, we can see that sample efficiency of both MAPPO versions are very close, but the JAX version is much faster in terms of time. Notice that the Jax version can be improved further by relying on vectorized envs.
 
+
+### Multi-Objective Multi-Agent RL
+
+When `vmapping` over a set of weight vectors to perform MOMARL learning, we achieve sublinear scaling w.r.t. the number of Pareto optimal policies we aim at learning:
+
+<img src="results/mo/training_time.png" alt="Learning time"/>
+
 ## API
 
 There are examples of usage in the [test files](crazy_rl/test) and main methods of the environments. Moreover, the [learning](learning/) folder contains examples of MARL algorithms.

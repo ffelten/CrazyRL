@@ -4,10 +4,11 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 ![Test: pytest](https://github.com/ffelten/CrazyRL/actions/workflows/test.yml/badge.svg)
+![YouTube](https://www.youtube.com/watch?v=4FeTjZnpgJI&ab_channel=FlorianFelten)
 
 # CrazyRL
 
-A hardware-accelerated library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones.
+A hardware-accelerated library for doing Multi-Agent Reinforcement Learning with [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones. A video showing the results with real drones in our lab is available on [YouTube](https://www.youtube.com/watch?v=4FeTjZnpgJI&ab_channel=FlorianFelten).
 
 It has:
 

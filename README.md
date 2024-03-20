@@ -4,7 +4,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 ![Test: pytest](https://github.com/ffelten/CrazyRL/actions/workflows/test.yml/badge.svg)
-![YouTube](https://www.youtube.com/watch?v=4FeTjZnpgJI&ab_channel=FlorianFelten)
+[!YouTube](https://www.youtube.com/watch?v=4FeTjZnpgJI&ab_channel=FlorianFelten)
 
 # CrazyRL
 

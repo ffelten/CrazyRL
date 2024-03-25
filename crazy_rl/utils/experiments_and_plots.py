@@ -2,9 +2,23 @@
 import os
 
 import expt
+import matplotlib as mpl
 import pandas as pd
 from expt import Hypothesis
 from matplotlib import pyplot as plt
+
+
+mpl.rcParams["pdf.fonttype"] = 42  # use true-type
+mpl.rcParams["ps.fonttype"] = 42  # use true-type
+mpl.rcParams["font.size"] = 18
+mpl.rcParams["lines.linewidth"] = 2.2
+mpl.rcParams["text.latex.preamble"] = r"\usepackage{amsmath,amssymb,underscore}"
+mpl.rcParams["text.usetex"] = True
+mpl.rcParams["xtick.labelsize"] = 18
+mpl.rcParams["ytick.labelsize"] = 18
+mpl.rcParams["axes.titlesize"] = 18
+mpl.rcParams["axes.labelsize"] = 18
+mpl.rcParams["legend.fontsize"] = 16
 
 
 def save_results(returns, exp_name, seed):

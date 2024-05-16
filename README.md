@@ -1,3 +1,5 @@
+> The CPU-based environments have been moved into [MOMAland](https://github.com/Farama-Foundation/momaland) for long-term maintenance. I suggest using these if you do not need the Jax-based implementations.
+
 <img src="surround.gif" alt="Swarm" align="right" width="50%"/>
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)

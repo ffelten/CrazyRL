@@ -48,9 +48,9 @@ def parse_args():
     parser.add_argument("--debug", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True, help="run in debug mode")
 
     # Algorithm specific arguments
-    parser.add_argument("--num-envs", type=int, default=1, help="the number of parallel environments")
-    parser.add_argument("--num-steps", type=int, default=1280, help="the number of steps per epoch (higher batch size should be better)")
-    parser.add_argument("--total-timesteps", type=int, default=1e5,
+    parser.add_argument("--num-envs", type=int, default=128, help="the number of parallel environments")
+    parser.add_argument("--num-steps", type=int, default=10, help="the number of steps per epoch (higher batch size should be better)")
+    parser.add_argument("--total-timesteps", type=int, default=1e6,
                         help="total timesteps of the experiments")
     parser.add_argument("--update-epochs", type=int, default=2, help="the number epochs to update the policy")
     parser.add_argument("--num-minibatches", type=int, default=2, help="the number of minibatches (keep small in MARL)")
@@ -133,49 +133,49 @@ def make_train(args):
     minibatch_size = args.num_envs * args.num_steps // args.num_minibatches
 
     def train(key: chex.PRNGKey, lr: Optional[float] = None):
-        num_drones = 3
-        # env = Catch(
+        num_drones = 4
+        # env = Escort(
         #     num_drones=num_drones,
         #     init_flying_pos=jnp.array(
         #         [
-        #             [-0.7, -0.5, 1.5],
-        #             [-0.8, 0.5, 0.5],
-        #             [1.0, 0.5, 1.5],
+        #             [-0.5, -0.5, 1.3],
+        #             [-0.5, 0.5, 0.5],
+        #             [0.6, 0.5, 1.3],
         #             [0.5, 0.0, 0.5],
-        #             [0.5, -0.5, 1.0],
-        #             [2.0, 2.5, 2.0],
-        #             [2.0, 1.0, 2.5],
-        #             [0.5, 0.5, 0.5],
-        #         ]
-        #     ),
-        #     init_target_location=jnp.array([0.0, 0.5, 1.5]),
-        #     target_speed=0.15,
-        #     size=5,
-        # )
-        env = Circle(
-            num_drones=num_drones,
-            init_flying_pos=jnp.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-        )
-        # env = Surround(
-        #     num_drones=num_drones,
-        #     init_flying_pos=jnp.array(
-        #         [
-        #             [0.0, 0.0, 1.0],
-        #             [0.0, 1.0, 1.0],
-        #             # [1.0, 0.0, 1.0],
-        #             # [1.0, 2.0, 2.0],
-        #             # [2.0, 0.5, 1.0],
+        #             # [0.5, -0.5, 1.0],
         #             # [2.0, 2.5, 2.0],
         #             # [2.0, 1.0, 2.5],
         #             # [0.5, 0.5, 0.5],
         #         ]
         #     ),
-        #     target_location=jnp.array([1.0, 1.0, 2.0]),
-        #     multi_obj=False,
-        #     size=5,
-        #     # target_speed=0.15,
-        #     # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
+        #     init_target_location=jnp.array([0.6, 0.6, 0.3]),
+        #     final_target_location=jnp.array([0.7, 0.7, 1.5]),
+        #     size=2,
         # )
+        # env = Circle(
+        #     num_drones=num_drones,
+        #     init_flying_pos=jnp.array([[0.0, 0.0, 1.5], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.5]]),
+        #     size=2,
+        # )
+        env = Catch(
+            num_drones=num_drones,
+            init_flying_pos=jnp.array(
+                [
+                    [0.5, 0.0, 1.5],
+                    [0.0, 1.0, 1.0],
+                    [1.0, 0.0, 0.5],
+                    [1.0, 1.0, 1.3],
+                    # [2.0, 0.5, 1.0],
+                    # [2.0, 2.5, 2.0],
+                    # [2.0, 1.0, 2.5],
+                    # [0.5, 0.5, 0.5],
+                ]
+            ),
+            init_target_location=jnp.array([0.0, 0.0, 1.0]),
+            multi_obj=False,
+            size=1.0,
+            target_speed=0.07,
+        )
 
         env = ClipActions(env)
         env = NormalizeObservation(env)
@@ -448,28 +448,28 @@ def make_train(args):
 
 
 def save_actor(actor_state):
-    directory = epath.Path("trained_model")
-    actor_dir = directory / "actor_catch_8_big_map"
+    current_dir = epath.Path(__file__).parent.parent.parent
+    actor_dir = current_dir / "trained_model" / "actor_catch_4"
     print("Saving actor to ", actor_dir)
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
     ckptr.save(actor_dir, actor_state, force=True)
 
 
-def multi_seeds(rng, args):
-    NUM_SEEDS = 10
-    rngs = jax.random.split(rng, NUM_SEEDS)
-    train_vjit = jax.jit(jax.vmap(make_train(args), in_axes=(0,)))
-    start_time = time.time()
-    out = jax.block_until_ready(train_vjit(rngs, None))
-    print(f"total time: {time.time() - start_time}")
-    print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
-
-    for i in range(NUM_SEEDS):
-        returns = out["metrics"]["returned_episode_returns"][i]
-        returns = returns.mean(-1).reshape(-1)
-        returns = returns[returns != 0.0]  # filters out non-terminal returns
-        plt.plot(returns)
-    plt.show()
+# def multi_seeds(rng, args):
+#     NUM_SEEDS = 10
+#     rngs = jax.random.split(rng, NUM_SEEDS)
+#     train_vjit = jax.jit(jax.vmap(make_train(args), in_axes=(0,)))
+#     start_time = time.time()
+#     out = jax.block_until_ready(train_vjit(rngs, None))
+#     print(f"total time: {time.time() - start_time}")
+#     print(f"SPS: {args.total_timesteps * NUM_SEEDS / (time.time() - start_time)}")
+#
+#     for i in range(NUM_SEEDS):
+#         returns = out["metrics"]["returned_episode_returns"][i]
+#         returns = returns.mean(-1).reshape(-1)
+#         returns = returns[returns != 0.0]  # filters out non-terminal returns
+#         plt.plot(returns)
+#     plt.show()
 
 
 def hp_search(args):
@@ -509,32 +509,32 @@ if __name__ == "__main__":
     print(f"total time: {total_time}")
     print(f"SPS: {args.total_timesteps / total_time}")
 
-    # actor_state = out["runner_state"][0]
-    # save_actor(actor_state)
+    actor_state = out["runner_state"][0]
+    save_actor(actor_state)
 
-    import matplotlib.pyplot as plt
-
-    returns = out["metrics"]["returned_episode_returns"]
-    ep_length = out["metrics"]["returned_episode_lengths"]
-    returns = returns.mean(-1)  # flattens seeds
-    returns = returns.reshape(returns.shape[:1] + (-1,))  # flattens parallel envs
-    returns = returns.reshape(-1)  # flattens rollouts
-    returns = returns[returns != 0.0]  # filters out non-terminal returns
+    # import matplotlib.pyplot as plt
     #
-    return_with_timestep_and_time = []
-    for i in range(len(returns)):
-        timestep = (i + 1) * 200  # Circle episodes are always 200 timesteps (truncation)
-        time = total_time / len(returns) * (i + 1)
-        return_with_timestep_and_time.append(
-            (
-                timestep,
-                time,  # assumes consistent SPS because it is impossible to get time inside jitted function
-                returns[i],
-            )
-        )
-
-    return_with_timestep_and_time = np.array(return_with_timestep_and_time)
-    save_results(return_with_timestep_and_time, f"MAPPO_GPU_Circle_({args.num_envs}envs)", args.seed)
+    # returns = out["metrics"]["returned_episode_returns"]
+    # ep_length = out["metrics"]["returned_episode_lengths"]
+    # returns = returns.mean(-1)  # flattens seeds
+    # returns = returns.reshape(returns.shape[:1] + (-1,))  # flattens parallel envs
+    # returns = returns.reshape(-1)  # flattens rollouts
+    # returns = returns[returns != 0.0]  # filters out non-terminal returns
+    # #
+    # return_with_timestep_and_time = []
+    # for i in range(len(returns)):
+    #     timestep = (i + 1) * 200  # Circle episodes are always 200 timesteps (truncation)
+    #     time = total_time / len(returns) * (i + 1)
+    #     return_with_timestep_and_time.append(
+    #         (
+    #             timestep,
+    #             time,  # assumes consistent SPS because it is impossible to get time inside jitted function
+    #             returns[i],
+    #         )
+    #     )
+    #
+    # return_with_timestep_and_time = np.array(return_with_timestep_and_time)
+    # save_results(return_with_timestep_and_time, f"MAPPO_GPU_Circle_({args.num_envs}envs)", args.seed)
     #
     # plt.plot(returns, label="episode return")
 

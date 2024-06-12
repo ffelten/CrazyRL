@@ -131,7 +131,7 @@ def play_episode(actor_module, actor_state, env, init_obs, key, simu):
         truncated: bool = any(truncateds.values())
 
         if not simu:
-            done = env.timestep == 30
+            done = env.timestep == 37
         else:
             done = terminated or truncated
         obs = next_obs
@@ -162,29 +162,51 @@ def replay_simu(args):
     key = jax.random.PRNGKey(args.seed)
 
     # env = Circle(
-    #     drone_ids=np.array([0, 1, 2]),
+    #     drone_ids=np.array([0, 1, 2, 3]),
     #     render_mode="human",
-    #     init_flying_pos=np.array([[-0.5, 0.0, 1.5], [0.0, 0.5, 0.5], [0.5, 0.0, 1.5]]),
+    #     init_flying_pos=np.array([[0.0, 0.0, 1.5], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.5]]),
+    #     size=2,
     # )
+
+    env = Catch(
+        drone_ids=np.arange(4),
+        init_flying_pos=np.array(
+            [
+                [0.5, 1.0, 1.5],
+                [0.0, 1.0, 1.0],
+                [1.0, 0.0, 0.5],
+                [1.0, 1.0, 1.3],
+                # [2.0, 0.5, 1.0],
+                # [2.0, 2.5, 2.0],
+                # [2.0, 1.0, 2.5],
+                # [0.5, 0.5, 0.5],
+            ]
+        ),
+        init_target_location=np.array([0.0, 0.0, 0.7]),
+        multi_obj=False,
+        size=1.0,
+        render_mode="human",
+        target_speed=0.07,
+    )
 
     # env = Escort(
     #     drone_ids=np.arange(4),
     #     render_mode="human",
     #     init_flying_pos=np.array(
     #         [
-    #             # [-0.7, -0.5, 1.5],
-    #             [-0.8, 0.5, 0.5],
-    #             [1.0, 0.5, 1.5],
+    #             [-0.5, -0.5, 1.3],
+    #             [-0.5, 0.5, 0.5],
+    #             [0.6, 0.5, 1.3],
     #             [0.5, 0.0, 0.5],
-    #             [0.5, -0.5, 1.0],
+    #             # [0.5, -0.5, 1.0],
     #             # [2.0, 2.5, 2.0],
     #             # [2.0, 1.0, 2.5],
     #             # [0.5, 0.5, 0.5],
     #         ]
     #     ),
-    #     # target_location=jnp.array([0.0, 0.5, 1.5]),
-    #     init_target_location=np.array([-0.1, 0.6, 1.1]),
-    #     final_target_location=np.array([1.2, -1.3, 2.3]),
+    #     init_target_location=np.array([-0.6, -0.6, 0.3]),
+    #     final_target_location=np.array([0.7, 0.7, 1.5]),
+    #     size=2,
     # )
 
     # env = Catch(
@@ -207,25 +229,27 @@ def replay_simu(args):
     #     size=5,
     # )
 
-    env = Surround(
-        drone_ids=np.arange(8),
-        render_mode="human",
-        init_flying_pos=np.array(
-            [
-                [0.0, 0.0, 1.0],
-                [0.0, 1.0, 1.0],
-                [1.0, 0.0, 1.0],
-                [1.0, 2.0, 2.0],
-                [2.0, 0.5, 1.0],
-                [2.0, 2.5, 2.0],
-                [2.0, 1.0, 2.5],
-                [0.5, 0.5, 0.5],
-            ]
-        ),
-        target_location=np.array([1.0, 1.0, 2.0]),
-        multi_obj=False,
-        size=5,
-    )
+    # env = Surround(
+    #     drone_ids=np.arange(4),
+    #     render_mode="human",
+    #     init_flying_pos=np.array(
+    #         [
+    #             [0.5, 0.0, 1.0],
+    #             [0.0, 1.0, 1.0],
+    #             [1.0, 0.0, 0.5],
+    #             [1.0, 1.0, 1.3],
+    #             # [2.0, 0.5, 1.0],
+    #             # [2.0, 2.5, 2.0],
+    #             # [2.0, 1.0, 2.5],
+    #             # [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     target_location=np.array([0.0, 0.0, 1.5]),
+    #     multi_obj=False,
+    #     size=2,
+    #     # target_speed=0.15,
+    #     # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
+    # )
 
     _ = env.reset(seed=args.seed)
     single_action_space = env.action_space(env.unwrapped.agents[0])
@@ -264,13 +288,14 @@ def replay_real(args):
 
     # Init swarm config of crazyflie
     cflib.crtp.init_drivers()
-    # target_id = "0"
-    drones_ids = np.array(["9", "2", "0"])
-    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in drones_ids]
+    target_id = "0"
+    drones_ids = np.array(["3", "7", "8", "9"])
+    uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in np.concatenate((drones_ids, [target_id]))]
+    # uris = ["radio://0/4/2M/E7E7E7E7" + str(id).zfill(2) for id in drones_ids]
 
     # Writes geometry to crazyflie
     for id in drones_ids:
-        if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(id), verbose=True):
+        if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/config_crazyflie.yaml", str(id), verbose=True):
             exit(-1)
     # if not crazy_rl.utils.geometry.save_and_check("crazy_rl/utils/geometry.yaml", str(target_id), verbose=True):
     #     exit(-1)
@@ -279,53 +304,76 @@ def replay_real(args):
     with Swarm(uris, factory=CachedCfFactory(rw_cache="./cache")) as swarm:
         swarm.parallel_safe(LoggingCrazyflie)
 
-        env: ParallelEnv = Circle(
-            drone_ids=drones_ids,
-            render_mode="real",
-            init_flying_pos=np.array([[-0.5, 0.0, 1.5], [0.0, 0.5, 0.5], [0.5, 0.0, 1.5]]),
-            swarm=swarm,
-        )
-
-        # env = Catch(
+        # env: ParallelEnv = Circle(
         #     drone_ids=drones_ids,
         #     render_mode="real",
+        #     init_flying_pos=np.array([[0.0, 0.0, 1.5], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.5]]),
+        #     swarm=swarm,
+        #     size=2,
+        # )
+
+        # env = Escort(
+        #     drone_ids=drones_ids,
+        #     render_mode="real",
+        #     swarm=swarm,
+        #     target_id=target_id,
         #     init_flying_pos=np.array(
         #         [
-        #             # [-0.7, -0.5, 1.5],
-        #             [-0.8, 0.5, 0.5],
-        #             [-0.8, 0.5, 1.0],
-        #             [0.5, 0.5, 0.5],
-        #             [0.5, -0.5, 1.0],
+        #             [-0.5, -0.5, 1.3],
+        #             [-0.5, 0.5, 0.5],
+        #             [0.6, 0.5, 1.3],
+        #             [0.5, 0.0, 0.5],
+        #             # [0.5, -0.5, 1.0],
         #             # [2.0, 2.5, 2.0],
         #             # [2.0, 1.0, 2.5],
         #             # [0.5, 0.5, 0.5],
         #         ]
         #     ),
-        #     init_target_location=np.array([0.0, 0.0, 1.0]),
-        #     # init_target_location=np.array([-0.5, 0.7, 1.1]),
-        #     # final_target_location=np.array([1.2, -1.3, 2.3]),
-        #     target_speed=0.1,
-        #     size=1.3,
-        #     target_id=target_id,
-        #     swarm=swarm,
+        #     init_target_location=np.array([-0.6, -0.6, 0.3]),
+        #     final_target_location=np.array([0.7, 0.7, 1.5]),
+        #     size=2,
         # )
+
+        env = Catch(
+            drone_ids=drones_ids,
+            render_mode="real",
+            init_flying_pos=np.array(
+                [
+                    [0.5, 0.0, 1.5],
+                    [0.0, 1.0, 1.0],
+                    [1.0, 0.0, 0.5],
+                    [1.0, 1.0, 1.3],
+                    # [2.0, 0.5, 1.0],
+                    # [2.0, 2.5, 2.0],
+                    # [2.0, 1.0, 2.5],
+                    # [0.5, 0.5, 0.5],
+                ]
+            ),
+            init_target_location=np.array([0.0, 0.0, 0.7]),
+            target_speed=0.07,
+            size=1.0,
+            target_id=target_id,
+            swarm=swarm,
+        )
 
         # env = Surround(
         #     drone_ids=drones_ids,
         #     render_mode="real",
         #     init_flying_pos=np.array(
         #         [
-        #             [-1.0, 0.0, 1.0],
-        #             [-1.0, 0.5, 1.5],
+        #             [0.5, 0.0, 1.0],
         #             [0.0, 1.0, 1.0],
-        #             [0.5, 0.0, 0.5],
-        #             [0.5, -0.5, 1.5],
+        #             [1.0, 0.0, 0.5],
+        #             [1.0, 1.0, 1.3],
+        #             # [2.0, 0.5, 1.0],
         #             # [2.0, 2.5, 2.0],
         #             # [2.0, 1.0, 2.5],
         #             # [0.5, 0.5, 0.5],
         #         ]
         #     ),
-        #     target_location=np.array([0.0, 0.5, 1.5]),
+        #     target_location=np.array([0.0, 0.0, 1.5]),
+        #     multi_obj=False,
+        #     size=2,
         #     target_id=target_id,
         #     swarm=swarm,
         # )

@@ -1,12 +1,5 @@
-"""This is an MAPPO implementation which runs the environment on CPU (PettingZoo) and the learning on jax compiled functions.
+"""This is an MOMAPPO implementation which runs the environment on CPU (MOMAland) and the learning on jax compiled functions."""
 
-Should be way faster than the original MAPPO implementation based on torch. Main changes compared to full jax version:
-- CPU environment (PZ) instead of GPU environment
-- Relies on Supersuit wrappers
-- No vectorized environment (no autoreset)
-- Step function, and by extension train function are not jittable or vmappable due to env step not being jittable
-The last two points are probably the main reason why this implementation is slower than the full jax version.
-"""
 import argparse
 import os
 import time
@@ -21,24 +14,29 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import orbax.checkpoint
+
+# from crazy_rl.utils.experiments_and_plots import save_results # TODO
 from distrax import MultivariateNormalDiag
 from etils import epath
 from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 from jax import vmap
-from learning.cpu_env.wrappers import NormalizeReward, RecordEpisodeStatistics
-from pettingzoo import ParallelEnv
+from momaland.envs.crazyrl.catch import catch_v0 as Catch  # noqa
+from momaland.learning.continuous_ppo.wrappers import (
+    RecordEpisodeStatistics,
+    save_results,
+)
+
+# from momaland.envs.crazyrl.escort import escort_v0 as Escort  # noqa
+# from momaland.envs.crazyrl.surround import surround_v0 as Surround  # noqa
+from momaland.utils.env import ParallelEnv
+from momaland.utils.parallel_wrappers import LinearizeReward, NormalizeReward
 from supersuit import agent_indicator_v0, clip_actions_v0, normalize_obs_v0
 from tqdm import tqdm
 
-from crazy_rl.multi_agent.numpy.catch import Catch  # noqa
-from crazy_rl.multi_agent.numpy.circle import Circle
-from crazy_rl.multi_agent.numpy.escort import Escort  # noqa
-from crazy_rl.multi_agent.numpy.surround import Surround  # noqa
-from crazy_rl.utils.experiments_and_plots import save_results
-
 
 def parse_args():
+    """Argument parsing for hyperparameter optimization."""
     # fmt: off
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp-name", type=str, default=os.path.basename(__file__).rstrip(".py"),
@@ -78,11 +76,14 @@ def parse_args():
 
 
 class Actor(nn.Module):
+    """Actor class for the agent."""
+
     action_dim: Sequence[int]
     activation: str = "tanh"
 
     @nn.compact
     def __call__(self, local_obs_and_id: jnp.ndarray):
+        """Actor network initialization."""
         if self.activation == "relu":
             activation = nn.relu
         else:
@@ -98,10 +99,13 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
+    """Critic class for the agent."""
+
     activation: str = "tanh"
 
     @nn.compact
     def __call__(self, global_obs: jnp.ndarray):
+        """Actor network initialization."""
         if self.activation == "relu":
             activation = nn.relu
         else:
@@ -117,6 +121,8 @@ class Critic(nn.Module):
 
 
 class Transition(NamedTuple):
+    """Transition info for buffer."""
+
     terminated: jnp.ndarray
     joint_actions: jnp.ndarray  # shape is (num_agents, action_dim)
     value: jnp.ndarray
@@ -131,6 +137,7 @@ class Buffer:
     """A numpy buffer to accumulate the samples, normally faster than jax based because mutable."""
 
     def __init__(self, batch_size: int, joint_actions_shape, obs_shape, global_obs_shape, num_agents):
+        """Buffer initialization to keep track of data between episodes."""
         self.batch_size = batch_size
         self.joint_actions = np.zeros((batch_size, *joint_actions_shape))
         self.obs = np.zeros((batch_size, *obs_shape))
@@ -153,6 +160,7 @@ class Buffer:
         log_prob: np.ndarray,
         info: dict,
     ):
+        """Appending new data to the buffer."""
         self.terminated[self.idx] = terminated
         self.joint_actions[self.idx] = joint_actions
         self.obs[self.idx] = obs
@@ -164,9 +172,11 @@ class Buffer:
         self.idx += 1
 
     def flush(self):
+        """Resetting the idx."""
         self.idx = 0
 
     def to_transition(self):
+        """Cast to type Transition."""
         return Transition(
             terminated=jnp.array(self.terminated),
             joint_actions=jnp.array(self.joint_actions),
@@ -179,7 +189,8 @@ class Buffer:
         )
 
 
-def train(args, key: chex.PRNGKey):
+def train(args, weights: np.ndarray, key: chex.PRNGKey):
+    """Main training loop for MOMAPPO with SO collapse."""
     num_updates = int(args.total_timesteps // args.num_steps)
     minibatch_size = int(args.num_steps // args.num_minibatches)
 
@@ -187,38 +198,21 @@ def train(args, key: chex.PRNGKey):
         frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / num_updates
         return args.lr * frac
 
-    num_drones = 3
-    # env = Surround(
-    #     drone_ids=np.arange(num_drones),
-    #     init_flying_pos=np.array(
-    #         [
-    #             [0.0, 0.0, 1.0],
-    #             [0.0, 1.0, 1.0],
-    #             # [1.0, 0.0, 1.0],
-    #             # [1.0, 2.0, 2.0],
-    #             # [2.0, 0.5, 1.0],
-    #             # [2.0, 2.5, 2.0],
-    #             # [2.0, 1.0, 2.5],
-    #             # [0.5, 0.5, 0.5],
-    #         ]
-    #     ),
-    #     target_location=np.array([1.0, 1.0, 2.0]),
-    #     multi_obj=False,
-    #     size=5,
-    #     # target_speed=0.15,
-    #     # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
-    # )
-
-    env: ParallelEnv = Circle(
-        drone_ids=np.arange(num_drones),
-        init_flying_pos=np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0]]),
-    )
-
+    env: ParallelEnv = Catch.parallel_env()
     env = clip_actions_v0(env)
     env = normalize_obs_v0(env, env_min=-1.0, env_max=1.0)
     env = agent_indicator_v0(env)
+    for agent in env.possible_agents:
+        for idx in range(env.unwrapped.reward_space(agent).shape[0]):  # reward space still not accessible? @ffelten
+            env = NormalizeReward(env, agent, idx)
+    weights = {
+        env.possible_agents[0]: weights,
+        env.possible_agents[1]: weights,
+        env.possible_agents[2]: weights,
+        env.possible_agents[3]: weights,
+    }
+    env = LinearizeReward(env, weights)  # linearizing the rewards given the weight distribution
     env = RecordEpisodeStatistics(env)
-    env = NormalizeReward(env, args.gamma)
 
     # Initial reset to have correct dimensions in the observations
     env.reset(seed=args.seed)
@@ -260,34 +254,34 @@ def train(args, key: chex.PRNGKey):
     # BUFFER
     buffer = Buffer(
         batch_size=args.num_steps,
-        joint_actions_shape=(num_drones, single_action_space.shape[0]),
-        obs_shape=(num_drones, single_obs_space.shape[0]),
+        joint_actions_shape=(len(env.possible_agents), single_action_space.shape[0]),
+        obs_shape=(len(env.possible_agents), single_obs_space.shape[0]),
         global_obs_shape=env.state().shape,
-        num_agents=num_drones,
+        num_agents=len(env.possible_agents),
     )
 
     def _to_array_obs(obs: dict):
-        """Converts a dict of observations to a numpy array of shape (num_agents, obs_dim)"""
+        """Converts a dict of observations to a numpy array of shape (num_agents, obs_dim)."""
         return np.stack([obs[agent] for agent in env.possible_agents])
 
     @jax.jit
     def _ma_get_pi(params, obs: jnp.ndarray):
         """Gets the actions for all agents at once. This is done with a for loop because distrax does not like vmapping."""
-        return [actor.apply(params, obs[i]) for i in range(num_drones)]
+        return [actor.apply(params, obs[i]) for i in range(len(env.possible_agents))]
 
     def _batched_ma_get_pi(params, obs: jnp.ndarray):
         """Gets the actions for all agents in all the envs at once. This is done with a for loop because distrax does not like vmapping."""
-        return [actor.apply(params, obs[:, i, :]) for i in range(num_drones)]
+        return [actor.apply(params, obs[:, i, :]) for i in range(len(env.possible_agents))]
 
     @jax.jit
     def _ma_sample_and_log_prob_from_pi(pi: List[MultivariateNormalDiag], key: chex.PRNGKey):
         """Samples actions for all agents in all the envs at once. This is done with a for loop because distrax does not like vmapping.
 
         Args:
-            pi (List[MultivariateNormalDiag]): List of distrax distributions for agent actions (batched over envs)
-            key (chex.PRNGKey): PRNGKey to use for sampling: size should be (num_agents, 2)
+            pi (List[MultivariateNormalDiag]): List of distrax distributions for agent actions (batched over envs).
+            key (chex.PRNGKey): PRNGKey to use for sampling: size should be (num_agents, 2).
         """
-        return [pi[i].sample_and_log_prob(seed=key[i]) for i in range(num_drones)]
+        return [pi[i].sample_and_log_prob(seed=key[i]) for i in range(len(env.possible_agents))]
 
     # Batch get value
     vmapped_get_value = vmap(critic.apply, in_axes=(None, 0))
@@ -330,7 +324,9 @@ def train(args, key: chex.PRNGKey):
             )  # this is a list of distributions with batch_shape of minibatch_size and event shape of action_dim
             new_value = vmapped_get_value(critic_params, traj_batch.global_obs)
             # MA Log Prob: shape (num_drones, minibatch_size)
-            new_log_probs = jnp.array([pi[i].log_prob(traj_batch.joint_actions[:, i, :]) for i in range(num_drones)])
+            new_log_probs = jnp.array(
+                [pi[i].log_prob(traj_batch.joint_actions[:, i, :]) for i in range(len(env.possible_agents))]
+            )
             new_log_probs = new_log_probs.transpose()  # (minibatch_size, num_drones)
 
             # Normalizes advantage (trick)
@@ -405,7 +401,7 @@ def train(args, key: chex.PRNGKey):
             # pi contains the normal distributions for each drone (num_drones x  Distribution(action_dim))
             np_obs = _to_array_obs(obs)
             pi = _ma_get_pi(actor_state.params, jnp.array(np_obs))
-            action_keys = jax.random.split(subkey, num_drones)
+            action_keys = jax.random.split(subkey, len(env.possible_agents))
 
             # for each agent, sample an action
             actions, log_probs = zip(*_ma_sample_and_log_prob_from_pi(pi, action_keys))
@@ -513,6 +509,7 @@ def train(args, key: chex.PRNGKey):
 
 
 def save_actor(actor_state):
+    """Saves trained actor."""
     directory = epath.Path("../trained_model")
     actor_dir = directory / "actor_cpu"
     print("Saving actor to ", actor_dir)
@@ -526,7 +523,12 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
 
     start_time = time.time()
-    out = train(args, rng)
+    out = []
+    for i in range(1, 10):  # iterating over the different weights
+        weights = np.array([round(1 - i / 10, 1), round(i / 10, 1)])
+        out.append(train(args, weights, rng))
+        returns = out[-1]["metrics"]["returned_episode_returns"]
+        save_results(returns, f"MOMAPPO_Catch_{weights[0], 1}-{weights[1]}", args.seed)
     print(f"total time: {time.time() - start_time}")
     print(f"SPS: {args.total_timesteps / (time.time() - start_time)}")
 
@@ -534,9 +536,6 @@ if __name__ == "__main__":
     # save_actor(actor_state)
 
     # import matplotlib.pyplot as plt
-    #
-    returns = out["metrics"]["returned_episode_returns"]
-    save_results(returns, "MAPPO_CPU_Circle_(1env)", args.seed)
     # plt.plot(returns[:, 0], returns[:, 2], label="episode return")
 
     # plt.plot(out["metrics"]["total_loss"].mean(-1).reshape(-1), label="total loss")

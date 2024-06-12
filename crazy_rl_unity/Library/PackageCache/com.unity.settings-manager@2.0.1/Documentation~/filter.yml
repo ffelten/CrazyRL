@@ -1,0 +1,18 @@
+apiRules:
+  - exclude:
+      hasAttribute:
+        uid: System.ObsoleteAttribute
+      type: Member
+  - exclude:
+      hasAttribute:
+        uid: System.ObsoleteAttribute
+      type: Type
+  - exclude:
+      uidRegex: Tests(.Framework)$
+      type: Namespace
+  - exclude:
+      uidRegex: ^Global Namespace.*
+      type: Namespace
+  - exclude:
+      uidRegex: EditorTests*
+      type: Namespace

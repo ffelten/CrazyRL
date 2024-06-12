@@ -46,6 +46,7 @@ supersuit = "^3.9.0"
 tqdm = "^4.66.1"
 pandas = "^2.0.3"
 expt = "^0.4.2"
+zmq = "^0.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.20"

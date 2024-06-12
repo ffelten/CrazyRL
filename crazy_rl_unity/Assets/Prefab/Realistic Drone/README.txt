@@ -1,0 +1,1 @@
+->->->-> PAY ATTENTION: In order to use this package, you have to set the variable Fixed_Timestamp to 0.05 (you can find it in "Edit / Project Settings / Time") and restart Unity (maybe it is necessary to restart 2 times!). <-<-<-<-

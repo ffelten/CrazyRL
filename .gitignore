@@ -144,10 +144,10 @@ crazy_rl_unity/[Bb]uilds/
 crazy_rl_unity/Logs/
 crazy_rl_unity/UserSettings/
 
-Assets/AssetStoreTools*
+crazy_rl_unity/Assets/AssetStoreTools*
 
 # Visual Studio cache directory
-.vs/
+crazy_rl_unity/.vs/
 
 # Unity3D generated meta files
 *.pidb.meta

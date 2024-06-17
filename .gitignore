@@ -135,30 +135,3 @@ dmypy.json
 #trained_model/
 **.DS_Store
 
-# Unity
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
-
-crazy_rl_unity/Assets/AssetStoreTools*
-
-# Visual Studio cache directory
-crazy_rl_unity/.vs/
-
-# Unity3D generated meta files
-*.pidb.meta
-*.pdb.meta
-
-# Unity3D Generated File On Crash Reports
-sysinfo.txt
-
-# Builds
-*.apk
-*.unitypackage
-
-# Crashlytics generated file
-Assets/StreamingAssets/crashlytics-build.properties

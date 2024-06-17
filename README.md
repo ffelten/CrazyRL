@@ -232,6 +232,13 @@ It is sufficient since the control of the CrazyFlies is high-level and precise e
 
 Available in the Numpy version.
 
+`render_mode = "unity"`
+
+The simulation is more realistic with 3D drones on a 3D Cartesian reference frame based on the Crazyflie [lighthouse reference frame](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/lighthouse/terminology_definitions/). 
+It is modelled using the [crazy_rl_uinty](https://github.com/ffelten/CrazyRL/tree/main/crazy_rl_unity) application created with Unity.
+
+Available in the Numpy version.
+
 ### Real
 
 `render_mode = "real"`

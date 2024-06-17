@@ -136,13 +136,13 @@ dmypy.json
 **.DS_Store
 
 # Unity
-crazy_rl_unity/[Ll]ibrary/
-crazy_rl_unity/[Tt]emp/
-crazy_rl_unity/[Oo]bj/
-crazy_rl_unity/[Bb]uild/
-crazy_rl_unity/[Bb]uilds/
-crazy_rl_unity/Logs/
-crazy_rl_unity/UserSettings/
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
 
 crazy_rl_unity/Assets/AssetStoreTools*
 

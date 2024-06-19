@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using UnityEngine;
 using TMPro;
+using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
@@ -12,11 +12,11 @@ public class Menu : MonoBehaviour
     /// <value>
     /// Game Object optionMenu : it's panel UI object "Option menu" with all settings
     /// Game Object buttonOpenMenu : it's button UI object for open the option menu
-    /// String posInit : camera position selected before starting simulation, default is “A” to position the camera at cube vertex A
-    /// Game Object TerrainNature : it's the terrain object whith the nature
-    /// Game Object TerrainIndustrial : it's the terrain object whith the the industrial cuty
-    /// TMP_Dropdown resolutionDropdown : dropdown to select the resolution of the simulation window 
-    /// List<string> resolutionDropdownOption : list of possible resolutions, resolution dropdown option 
+    /// String posInit : camera position selected before starting simulation, default is A to position the camera at cube vertex A
+    /// Game Object TerrainNature : it's the terrain object with the nature
+    /// Game Object TerrainIndustrial : it's the terrain object with the the industrial cuty
+    /// TMP_Dropdown resolutionDropdown : dropdown to select the resolution of the simulation window
+    /// List<string> resolutionDropdownOption : list of possible resolutions, resolution dropdown option
     /// Resolution[] resolutions : resolutions table
     /// TMP_Dropdown resolutionDropdown2 : dropdown (of the option menu) to select the resolution of the simulation window
     /// </value>
@@ -31,7 +31,6 @@ public class Menu : MonoBehaviour
     public TMP_Dropdown resolutionDropdown2;
     public Sprite[] tabSpriteView;
     public Image imageView;
-
 
     /// <summary>
     /// retrieves all possible resolutions and adds them to resolution dropdowns
@@ -50,13 +49,17 @@ public class Menu : MonoBehaviour
     }
 
     /// <summary>
-    /// change la résolution de la fenetre par rapport au choix de l'utilsateur 
+    /// change la rï¿½solution de la fenetre par rapport au choix de l'utilsateur
     /// </summary>
     /// <param name="selecctedIndex"> int : resolution number select by user</param>
     public void ChangeResolution(int selecctedIndex)
     {
         Debug.Log(selecctedIndex);
-        Screen.SetResolution(resolutions[selecctedIndex].width, resolutions[selecctedIndex].height, false);
+        Screen.SetResolution(
+            resolutions[selecctedIndex].width,
+            resolutions[selecctedIndex].height,
+            false
+        );
     }
 
     /// <summary>
@@ -80,7 +83,7 @@ public class Menu : MonoBehaviour
     /// <summary>
     /// selects the view according to the user's choices and change the sprite of icon
     /// options: 0 -> "A" -> positions the camera at cube vertex A         C_________________B
-    ///        : 1 -> "B" -> positions the camera at cube vertex B         /                /| 
+    ///        : 1 -> "B" -> positions the camera at cube vertex B         /                /|
     ///        : 2 -> "C" -> positions the camera at cube vertex C        /                / |
     ///        : 3 -> "D" -> positions the camera at cube vertex D      D/________________/ A|
     ///                                                                 |                 |  |
@@ -91,14 +94,14 @@ public class Menu : MonoBehaviour
     ///        : 6 -> "F" -> positions the camera on the front of the cube
     ///        : 7 -> "Back" -> positions the camera on the back of the cube
     ///        : 5 -> "R" -> positions the camera on the right-hand side of the cube
-    ///        : 4 -> "L" -> positions the camera on the left-hand side of the cube   
+    ///        : 4 -> "L" -> positions the camera on the left-hand side of the cube
     /// </summary>
     /// <param name="index"> int : view number selected by user </param>
     public void DropdownSample(int index)
     {
         switch (index)
         {
-            case 0: 
+            case 0:
                 posInit = "A";
                 imageView.sprite = tabSpriteView[0];
                 break;
@@ -130,10 +133,8 @@ public class Menu : MonoBehaviour
                 posInit = "Back";
                 imageView.sprite = tabSpriteView[7];
                 break;
-
         }
     }
-
 
     /// <summary>
     /// selects the terrain according to the user's choices

@@ -4,10 +4,10 @@ using UnityEngine;
 /// <summary>
 /// class Drone : each drone belongs to this class; it contains the data (positions...) of the drone and uses them to move it around
 /// </summary>
-public class Drone: MonoBehaviour
+public class Drone : MonoBehaviour
 {
     /// <summary>
-    /// flaot precision : precision of movement, desired position +/- precesion
+    /// float precision : precision of movement, desired position +/- precision
     /// Vector3 wantedPosition : position where the drone should go
     /// bool isFinish : true: the drone flew to all the positions in its position list, false: the drone did not fly to all the positions in the list.
     /// bool isSaved : true: all data has been saved during the first execution, false: there is still data to be saved (value modified by the client script).
@@ -35,30 +35,47 @@ public class Drone: MonoBehaviour
         for (int i = 1; i <= 4; i++)
             SpinRotor(transform.GetChild(i));
 
-
-        if (isSaved) //all the data is saved   
+        if (isSaved) //all the data is saved
         {
             if (!isFinish) //drone didn't do all the positions
             {
                 //drone movement
-                transform.position = Vector3.Lerp(transform.position, wantedPosition, Time.deltaTime);
+                transform.position = Vector3.Lerp(
+                    transform.position,
+                    wantedPosition,
+                    Time.deltaTime
+                );
 
                 //checks whether the drone is more or less in the desired position
-                if ((transform.position.x <= wantedPosition.x + precision && transform.position.x >= wantedPosition.x - precision) && 
-                    (transform.position.y <= wantedPosition.y + precision && transform.position.y >= wantedPosition.y - precision) && 
-                    (transform.position.z <= wantedPosition.z + precision && transform.position.z >= wantedPosition.z - precision))
+                if (
+                    (
+                        transform.position.x <= wantedPosition.x + precision
+                        && transform.position.x >= wantedPosition.x - precision
+                    )
+                    && (
+                        transform.position.y <= wantedPosition.y + precision
+                        && transform.position.y >= wantedPosition.y - precision
+                    )
+                    && (
+                        transform.position.z <= wantedPosition.z + precision
+                        && transform.position.z >= wantedPosition.z - precision
+                    )
+                )
                 {
                     //advances in the position list
                     idPos += 3;
 
-                    
                     if (idPos == lisPos.Count) //all the positions have been taken
                     {
                         isFinish = true;
                     }
                     else //change requested position
                     {
-                        wantedPosition = new Vector3(lisPos[idPos], lisPos[idPos + 1], lisPos[idPos + 2]);
+                        wantedPosition = new Vector3(
+                            lisPos[idPos],
+                            lisPos[idPos + 1],
+                            lisPos[idPos + 2]
+                        );
                     }
                 }
             }
@@ -68,7 +85,7 @@ public class Drone: MonoBehaviour
     /// <summary>
     /// turns the rotors
     /// </summary>
-    /// <param name="rotor"> transform : tranform of the object to be toured </param>
+    /// <param name="rotor"> transform : transform of the object to be toured </param>
     private void SpinRotor(Transform rotor)
     {
         rotor.Rotate(0, 0, spinSpeed * Time.deltaTime);

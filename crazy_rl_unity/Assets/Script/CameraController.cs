@@ -1,6 +1,5 @@
 using UnityEngine;
 
-
 /// <summary>
 /// Class Camera Controller : Control camera position
 /// </summary>
@@ -20,7 +19,7 @@ public class CameraController : MonoBehaviour
     /// Vector3 posLeft: Coordinate to the left of the drones
     /// Vector3 posRight: Coordinate to the right of the drones
     /// GameObject dropDownView: Dropdown to select the view before starting the simulation ->  retrieves the position requested by the user
-    /// float zoomSpeed: Camera zoom speed, zoom triggered by mouse wheel 
+    /// float zoomSpeed: Camera zoom speed, zoom triggered by mouse wheel
     /// </value>
     public float size = -1;
     public float margin = 8;
@@ -36,11 +35,10 @@ public class CameraController : MonoBehaviour
     public GameObject dropDownView;
     public float zoomSpeed = 100;
 
-
     public GameObject test;
 
     /// <summary>
-    /// calculates the possible positions for the camera, taking into account size and margin. 
+    /// calculates the possible positions for the camera, taking into account size and margin.
     /// position (0,0,0) is at the center of the cube with dimensions size+margin.
     /// </summary>
     public void CalculPos()
@@ -56,13 +54,13 @@ public class CameraController : MonoBehaviour
         posLeft = new Vector3(-pos, 0, 0);
         posRight = new Vector3(pos, 0, 0);
 
-        ChangePos(dropDownView.GetComponent<Menu>().posInit);        
+        ChangePos(dropDownView.GetComponent<Menu>().posInit);
     }
 
     /// <summary>
     /// sets the camera to the position, requested in the parameters
     /// options: "A" -> positions the camera at cube vertex A         C_________________B
-    ///        : "B" -> positions the camera at cube vertex B         /                /| 
+    ///        : "B" -> positions the camera at cube vertex B         /                /|
     ///        : "C" -> positions the camera at cube vertex C        /                / |
     ///        : "D" -> positions the camera at cube vertex D      D/________________/ A|
     ///                                                            |                 |  |
@@ -73,12 +71,12 @@ public class CameraController : MonoBehaviour
     ///        : "F" -> positions the camera on the front of the cube
     ///        : "Back" -> positions the camera on the back of the cube
     ///        : "R" -> positions the camera on the right-hand side of the cube
-    ///        : "L" -> positions the camera on the left-hand side of the cube   
+    ///        : "L" -> positions the camera on the left-hand side of the cube
     /// </summary>
     /// <param name="Angle"> string : requested position</param>
     public void ChangePos(string Angle)
     {
-        switch(Angle)
+        switch (Angle)
         {
             case "A":
                 transform.position = posA;
@@ -104,13 +102,12 @@ public class CameraController : MonoBehaviour
             case "R":
                 transform.position = posRight;
                 break;
-
         }
-        Vector3 pos = new Vector3(0,0,0);
+        Vector3 pos = new Vector3(0, 0, 0);
         //points the camera at the drones
         if (obj.transform.childCount != 0)
         {
-            for(int i = 0; i< obj.transform.childCount; i++)
+            for (int i = 0; i < obj.transform.childCount; i++)
             {
                 pos.x += obj.transform.GetChild(i).transform.position.x;
                 pos.y += obj.transform.GetChild(i).transform.position.y;
@@ -119,7 +116,7 @@ public class CameraController : MonoBehaviour
             pos.x /= obj.transform.childCount;
             pos.y /= obj.transform.childCount;
             pos.z /= obj.transform.childCount;
-            test.transform.position = pos; 
+            test.transform.position = pos;
             transform.LookAt(pos);
         }
     }
@@ -136,7 +133,5 @@ public class CameraController : MonoBehaviour
             else if (Input.mouseScrollDelta.y < 0)
                 GetComponent<Camera>().fieldOfView += zoomSpeed * Time.deltaTime;
         }
-            
     }
-
 }

@@ -1,13 +1,13 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading;
 using AsyncIO;
 using NetMQ;
 using NetMQ.Sockets;
-using System;
-using System.Collections.Concurrent;
-using System.Threading;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
-using TMPro;
 
 /// <summary>
 /// class Receiver : receives data
@@ -21,7 +21,7 @@ public class Receiver
     /// TimeSpan timeout : waiting time for the reception of a message, if the time is exceeded the client disconnects from the server
     /// bool isButtonReset :indicates whether button reset can be activated or not
     /// </summary>
-    private readonly Thread receiveThread; 
+    private readonly Thread receiveThread;
     public bool running;
     public bool messageReceived = true;
     TimeSpan timeout = new TimeSpan(0, 0, 5);
@@ -35,44 +35,45 @@ public class Receiver
     /// <param name="port"> string : port to connect to the server</param>
     public Receiver(string ip, string port)
     {
-        receiveThread = new Thread((object callback) =>
-        {
-            using (var socket = new RequestSocket())
+        receiveThread = new Thread(
+            (object callback) =>
             {
-                socket.Connect("tcp://" + ip + ":" + port);
-                Debug.Log("connecting to the server");
-
-                while (running)
+                using (var socket = new RequestSocket())
                 {
-                    string message = "";
+                    socket.Connect("tcp://" + ip + ":" + port);
+                    Debug.Log("connecting to the server");
 
-                    //send then receive a message
-                    if (socket.TrySendFrameEmpty()) //succeeds in sending the message
+                    while (running)
                     {
-                        //receives a message
-                        messageReceived = socket.TryReceiveFrameString(timeout, out message);
-                    }
+                        string message = "";
 
-                    //Checks if it has received a message within 5 seconds
-                    if (messageReceived) //message received
-                    {
-                        //converts the message into data
-                        Data data = JsonUtility.FromJson<Data>(message);
-                        ((Action<Data>)callback)(data);
-                        isButtonReset = false;
-                    }
-                    else //message not received
-                    {
-                        //stop the connection
-                        isButtonReset = true;
-                        Debug.Log("Stop client");
-                        Stop();
-                        NetMQConfig.Cleanup();
-                        
+                        //send then receive a message
+                        if (socket.TrySendFrameEmpty()) //succeeds in sending the message
+                        {
+                            //receives a message
+                            messageReceived = socket.TryReceiveFrameString(timeout, out message);
+                        }
+
+                        //Checks if it has received a message within 5 seconds
+                        if (messageReceived) //message received
+                        {
+                            //converts the message into data
+                            Data data = JsonUtility.FromJson<Data>(message);
+                            ((Action<Data>)callback)(data);
+                            isButtonReset = false;
+                        }
+                        else //message not received
+                        {
+                            //stop the connection
+                            isButtonReset = true;
+                            Debug.Log("Stop client");
+                            Stop();
+                            NetMQConfig.Cleanup();
+                        }
                     }
                 }
             }
-        });
+        );
     }
 
     /// <summary>
@@ -96,7 +97,7 @@ public class Receiver
 }
 
 /// <summary>
-/// class client: manages the entire simulation, interprets messages, gives instructions to the drones and activates the reset and restart buttons 
+/// class client: manages the entire simulation, interprets messages, gives instructions to the drones and activates the reset and restart buttons
 /// </summary>
 public class Client : MonoBehaviour
 {
@@ -150,7 +151,7 @@ public class Client : MonoBehaviour
 
     /// <summary>
     /// GameObject mainCamera : Camera of the scene
-    /// GameObject connectionPanel : Connection Pannel
+    /// GameObject connectionPanel : Connection Panel
     /// Button buttonRestart : Restart button
     /// Button buttonReset : Reset Button
     /// </summary>
@@ -159,13 +160,12 @@ public class Client : MonoBehaviour
     public Button buttonRestart;
     public Button buttonReset;
 
-
     /// <summary>
     /// connects the client to the server using the connection button
     /// </summary>
     public void Connection()
     {
-        ForceDotNet.Force();  // If you have multiple sockets in the following threads
+        ForceDotNet.Force(); // If you have multiple sockets in the following threads
 
         //modifies the ip address and/or port
         if (inputIp.text != "")
@@ -175,17 +175,18 @@ public class Client : MonoBehaviour
 
         //create the receiver and launches the message collector
         receiver = new Receiver(ip, port);
-        receiver.Start((Data d) => runOnMainThread.Enqueue(() =>
-        {
-            data = d;
-        }
-        ));
+        receiver.Start(
+            (Data d) =>
+                runOnMainThread.Enqueue(() =>
+                {
+                    data = d;
+                })
+        );
         isConnect = true;
 
         //disables the connection panel
         connectionPanel.SetActive(false);
     }
-
 
     public void Update()
     {
@@ -252,9 +253,7 @@ public class Client : MonoBehaviour
                     {
                         idTabData = -1;
                     }
-
                 }
-                
             }
 
             if (receiver.isButtonReset)
@@ -267,40 +266,35 @@ public class Client : MonoBehaviour
                 buttonReset.interactable = true;
                 receiver.isButtonReset = false;
                 isConnect = false;
-
             }
             else
             {
                 buttonReset.interactable = false;
             }
-
         }
         else // not connected to the server
         {
-            if(IsRestart()) //can restart the simulation
+            if (IsRestart()) //can restart the simulation
             {
                 buttonReset.interactable = true;
             }
             else //can't restart the simulation
                 buttonReset.interactable = false;
         }
-
-
     }
 
     /// <summary>
-    /// create and position the drone in the right place 
+    /// create and position the drone in the right place
     /// </summary>
     /// <param name="d">Data: data being processed </param>
     void Initiate(Data d)
     {
-
         if (!d.isInstantiate)
         {
             if (d.str == "Instantiate") //treatment for a drone
             {
                 nbDrone = d.ndDrone;
-                if (drones.Length != nbDrone)//uninitialised table
+                if (drones.Length != nbDrone) //uninitialised table
                 {
                     //initialisation of the drone array and recovery of the zone size
                     drones = new GameObject[nbDrone];
@@ -337,7 +331,11 @@ public class Client : MonoBehaviour
     /// <param name="transform"> Tansform : transform of the object to be moved</param>
     void Movement(Data d, Transform transform)
     {
-        transform.position = Vector3.Lerp(transform.position, new Vector3(d.posX, d.posY, d.posZ), Time.deltaTime);
+        transform.position = Vector3.Lerp(
+            transform.position,
+            new Vector3(d.posX, d.posY, d.posZ),
+            Time.deltaTime
+        );
     }
 
     /// <summary>
@@ -348,9 +346,20 @@ public class Client : MonoBehaviour
     void VerificationPos(Data d, GameObject obj)
     {
         float precision = obj.GetComponent<Drone>().precision;
-        if ((obj.transform.position.x <= d.posX + precision && obj.transform.position.x >= d.posX - precision)
-        && (obj.transform.position.y <= d.posY + precision && obj.transform.position.y >= d.posY - precision)
-        && (obj.transform.position.z <= d.posZ + precision && obj.transform.position.z >= d.posZ - precision))
+        if (
+            (
+                obj.transform.position.x <= d.posX + precision
+                && obj.transform.position.x >= d.posX - precision
+            )
+            && (
+                obj.transform.position.y <= d.posY + precision
+                && obj.transform.position.y >= d.posY - precision
+            )
+            && (
+                obj.transform.position.z <= d.posZ + precision
+                && obj.transform.position.z >= d.posZ - precision
+            )
+        )
         {
             obj.GetComponent<Drone>().isPos = true;
         }
@@ -363,7 +372,7 @@ public class Client : MonoBehaviour
     /// <summary>
     /// check if all the drone have finished their move to be able to move on to the next move
     /// </summary>
-    /// <returns>true: data can changed, false: data connot changed</returns>
+    /// <returns>true: data can changed, false: data cannot changed</returns>
     bool IsChangeTabData()
     {
         for (int k = 0; k < nbDrone; k++)
@@ -415,7 +424,6 @@ public class Client : MonoBehaviour
             dr.GetComponent<Drone>().RestartDrone();
         }
         target.GetComponent<Drone>().RestartDrone();
-
     }
 
     /// <summary>
@@ -429,7 +437,7 @@ public class Client : MonoBehaviour
             if (!dr.GetComponent<Drone>().isFinish)
                 return false;
         }
-        if(target != null)
+        if (target != null)
             if (!target.GetComponent<Drone>().isFinish)
                 return false;
         return true;
@@ -448,7 +456,6 @@ public class Client : MonoBehaviour
         for (int i = 0; i < drones.Length; i++)
             Destroy(drones[i]);
         Destroy(target);
-
     }
 
     /// <summary>

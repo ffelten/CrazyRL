@@ -76,3 +76,11 @@ The data received by the client contains:
 - posY (float): Y coordinate of the drone.
 - posZ (float): Z coordinate of the drone.
 - str (string): Message to correctly process the sent data.
+
+## Pre-Commit Formatting
+
+We use CSharpier for pre-commit formatting of our C# code to ensure consistent code style and formatting. Make sure to have:
+
+- [.NET8 SDk](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) : `apt update && sudo apt install -y dotnet-sdk-8.0`
+- [Csharpier](https://csharpier.com/docs/Installation) : `dotnet tool install csharpier`
+

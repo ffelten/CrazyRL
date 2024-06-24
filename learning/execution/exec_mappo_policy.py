@@ -86,7 +86,7 @@ def parse_args():
                         help="seed of the experiment")
     parser.add_argument("--model-dir", type=str, required=True, help="the dir of the model to load.")
 
-    parser.add_argument("--mode", type=str, default="simu", choices=["simu", "real"],
+    parser.add_argument("--mode", type=str, default="simu", choices=["simu", "real", "unity"],
                         help="choose the replay mode to perform real or simulation")
     args = parser.parse_args()
     # fmt: on
@@ -404,6 +404,132 @@ def replay_real(args):
         env.close()
 
 
+def replay_unity(args):
+    """Replay the simulation for one episode.
+
+    Args:
+        args: the arguments from the command line
+    """
+
+    # TRY NOT TO MODIFY: seeding
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    key = jax.random.PRNGKey(args.seed)
+
+    # env = Circle(
+    #     drone_ids=np.array([0, 1, 2, 3]),
+    #     render_mode="unity",
+    #     init_flying_pos=np.array([[0.0, 0.0, 1.5], [0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.5]]),
+    #     size=2,
+    # )
+
+    env = Catch(
+        drone_ids=np.arange(4),
+        init_flying_pos=np.array(
+            [
+                [0.5, 1.0, 1.5],
+                [0.0, 1.0, 1.0],
+                [1.0, 0.0, 0.5],
+                [1.0, 1.0, 1.3],
+                # [2.0, 0.5, 1.0],
+                # [2.0, 2.5, 2.0],
+                # [2.0, 1.0, 2.5],
+                # [0.5, 0.5, 0.5],
+            ]
+        ),
+        init_target_location=np.array([0.0, 0.0, 0.7]),
+        multi_obj=False,
+        size=1.0,
+        render_mode="unity",
+        target_speed=0.07,
+    )
+
+    # env = Escort(
+    #     drone_ids=np.arange(4),
+    #     render_mode="unity",
+    #     init_flying_pos=np.array(
+    #         [
+    #             [-0.5, -0.5, 1.3],
+    #             [-0.5, 0.5, 0.5],
+    #             [0.6, 0.5, 1.3],
+    #             [0.5, 0.0, 0.5],
+    #             # [0.5, -0.5, 1.0],
+    #             # [2.0, 2.5, 2.0],
+    #             # [2.0, 1.0, 2.5],
+    #             # [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     init_target_location=np.array([-0.6, -0.6, 0.3]),
+    #     final_target_location=np.array([0.7, 0.7, 1.5]),
+    #     size=2,
+    # )
+
+    # env = Catch(
+    #     drone_ids=np.arange(8),
+    #     render_mode="unity",
+    #     init_flying_pos=np.array(
+    #         [
+    #             [-0.7, -0.5, 1.5],
+    #             [-0.8, 0.5, 0.5],
+    #             [1.0, 0.5, 1.5],
+    #             [0.5, 0.0, 0.5],
+    #             [0.5, -0.5, 1.0],
+    #             [2.0, 2.5, 2.0],
+    #             [2.0, 1.0, 2.5],
+    #             [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     init_target_location=np.array([0.0, 0.5, 1.5]),
+    #     target_speed=0.15,
+    #     size=5,
+    # )
+
+    # env = Surround(
+    #     drone_ids=np.arange(4),
+    #     render_mode="unity",
+    #     init_flying_pos=np.array(
+    #         [
+    #             [0.5, 0.0, 1.0],
+    #             [0.0, 1.0, 1.0],
+    #             [1.0, 0.0, 0.5],
+    #             [1.0, 1.0, 1.3],
+    #             # [2.0, 0.5, 1.0],
+    #             # [2.0, 2.5, 2.0],
+    #             # [2.0, 1.0, 2.5],
+    #             # [0.5, 0.5, 0.5],
+    #         ]
+    #     ),
+    #     target_location=np.array([0.0, 0.0, 1.5]),
+    #     multi_obj=False,
+    #     size=2,
+    #     # target_speed=0.15,
+    #     # final_target_location=jnp.array([-2.0, -2.0, 1.0]),
+    # )
+
+    _ = env.reset(seed=args.seed)
+    single_action_space = env.action_space(env.unwrapped.agents[0])
+    key, actor_key = jax.random.split(key, 2)
+    init_local_state = jnp.asarray(env.observation_space(env.unwrapped.agents[0]).sample())
+    init_local_state_and_id = jnp.append(init_local_state, _one_hot(0, env.num_agents))  # add a fake id to init the actor net
+    assert isinstance(single_action_space, gym.spaces.Box), "only continuous action space is supported"
+
+    # Use pretrained model
+    actor_module = Actor(single_action_space.shape[0])
+    actor_state = TrainState.create(
+        apply_fn=actor_module.apply,
+        params=actor_module.init(actor_key, init_local_state_and_id),
+        tx=optax.chain(
+            optax.clip_by_global_norm(0.5),
+            optax.adam(learning_rate=0.01, eps=1e-5),  # not used
+        ),
+    )
+    actor_state = load_actor_state(args.model_dir, actor_state)
+
+    obs, _ = env.reset(seed=args.seed)
+    play_episode(actor_module, actor_state, env, obs, key, True)
+    env.close()
+
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -411,3 +537,5 @@ if __name__ == "__main__":
         replay_simu(args=args)
     elif args.mode == "real":
         replay_real(args=args)
+    elif args.mode == "unity":
+        replay_unity(args=args)

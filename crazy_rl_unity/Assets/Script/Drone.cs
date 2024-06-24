@@ -15,6 +15,7 @@ public class Drone : MonoBehaviour
     /// bool isPos : is used in client.cs, true: the drone is in the desired position, false: the drone is not in the desired position
     /// List<float> lisPos : list containing the coordinates of the drone (x, y, z, x1, y1, z1, .... , xn, yn, zn)
     /// float spinSpeed : Rotor speed
+    /// float speed : drone speed
     /// </summary>
     public float precision = 0.5f;
     public Vector3 wantedPosition;
@@ -24,6 +25,7 @@ public class Drone : MonoBehaviour
     public bool isPos = false;
     public List<float> lisPos;
     public float spinSpeed = 2000.0f;
+    public float speed;
 
     /// <summary>
     /// Update is called once per frame
@@ -43,7 +45,7 @@ public class Drone : MonoBehaviour
                 transform.position = Vector3.Lerp(
                     transform.position,
                     wantedPosition,
-                    Time.deltaTime
+                    Time.deltaTime * speed
                 );
 
                 //checks whether the drone is more or less in the desired position

@@ -431,7 +431,7 @@ class BaseParallelEnv(ParallelEnv):
         if self.server is False and self.render_mode == "unity":
             init_serv()
             """run with Linux"""
-            subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Linux/CrazyUnity.x86_64")
+            subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Linux/CrazyRlUnity.x86_64")
             """run with Window"""
             # subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Window/CrazyRl_Unity.exe")
 

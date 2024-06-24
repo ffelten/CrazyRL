@@ -131,6 +131,8 @@ public class Client : MonoBehaviour
     /// GameObject prefab_target : Prefab copied to create a target
     /// int nbDrone : Number of drones without the target
     /// bool isInvoke : indicates whether to continue retrieving data. true: data table is up to date , false : data table is not up to date
+    /// float speed : speed of drone
+    /// TMP_InputField inputSpeed : InputField to modify speed
     /// </summary>
     public GameObject parent;
     public GameObject[] drones;
@@ -139,6 +141,8 @@ public class Client : MonoBehaviour
     public GameObject prefab_target;
     private int nbDrone;
     private bool isInvoke = false;
+    public TMP_InputField inputSpeed;
+    public float speed = 8;
 
     /// <summary>
     /// Data data : Data being processed
@@ -266,6 +270,16 @@ public class Client : MonoBehaviour
                 buttonReset.interactable = true;
                 receiver.isButtonReset = false;
                 isConnect = false;
+
+                foreach (GameObject dr in drones)
+                {
+                    if (inputIp.text != "")
+                        speed = float.Parse(inputSpeed.text);
+                    dr.GetComponent<Drone>().speed = speed;
+                }
+                if (inputIp.text != "")
+                    speed = float.Parse(inputSpeed.text);
+                target.GetComponent<Drone>().speed = speed;
             }
             else
             {
@@ -274,6 +288,7 @@ public class Client : MonoBehaviour
         }
         else // not connected to the server
         {
+            
             if (IsRestart()) //can restart the simulation
             {
                 buttonReset.interactable = true;
@@ -331,10 +346,12 @@ public class Client : MonoBehaviour
     /// <param name="transform"> Tansform : transform of the object to be moved</param>
     void Movement(Data d, Transform transform)
     {
+        if (inputIp.text != "")
+            speed = float.Parse(inputSpeed.text);
         transform.position = Vector3.Lerp(
             transform.position,
             new Vector3(d.posX, d.posY, d.posZ),
-            Time.deltaTime
+            Time.deltaTime * speed
         );
     }
 

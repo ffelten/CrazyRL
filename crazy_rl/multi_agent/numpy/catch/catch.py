@@ -26,7 +26,7 @@ class Catch(BaseParallelEnv):
         init_target_location: np.ndarray,
         target_speed: float,
         target_id: Optional[int] = None,
-        render_mode="unity",  # None,
+        render_mode=None,
         size: int = 2,
         multi_obj: bool = False,
         swarm=None,

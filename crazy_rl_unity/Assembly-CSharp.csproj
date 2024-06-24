@@ -64,6 +64,7 @@
     <Compile Include="Assets\Script\Data.cs" />
     <Compile Include="Assets\Environments\Polytope Studio\Lowpoly_Demos\Environment_Free\Helpers\MouseLook.cs" />
     <Compile Include="Assets\Environments\Polytope Studio\Lowpoly_Demos\Environment_Free\Helpers\PlayerMovement.cs" />
+    <Compile Include="Assets\Script\Wall.cs" />
     <Compile Include="Assets\Script\Client.cs" />
     <Compile Include="Assets\Script\CameraController.cs" />
     <Compile Include="Assets\Script\Menu.cs" />

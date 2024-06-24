@@ -20,6 +20,7 @@ public class CameraController : MonoBehaviour
     /// Vector3 posRight: Coordinate to the right of the drones
     /// GameObject dropDownView: Dropdown to select the view before starting the simulation ->  retrieves the position requested by the user
     /// float zoomSpeed: Camera zoom speed, zoom triggered by mouse wheel
+    /// GameObject[] walls: cage walls
     /// </value>
     public float size = -1;
     public float margin = 8;
@@ -34,6 +35,9 @@ public class CameraController : MonoBehaviour
     public Vector3 posRight;
     public GameObject dropDownView;
     public float zoomSpeed = 100;
+
+    public GameObject[] walls = new GameObject[4];
+
 
     public GameObject test;
 
@@ -55,6 +59,29 @@ public class CameraController : MonoBehaviour
         posRight = new Vector3(pos, 0, 0);
 
         ChangePos(dropDownView.GetComponent<Menu>().posInit);
+
+        WallSet();
+    }
+
+    /// <summary>
+    /// set walls (position, scale, rotation)
+    /// </summary>
+    public void WallSet()
+    {
+        foreach (GameObject wall in walls)
+        {
+            wall.transform.localScale = new Vector3((size + 2) / 5, (size + 2) / 5, (size + 2) / 5);
+        }
+
+        walls[0].transform.position = new Vector3(0, 0, -(size + 2));
+        walls[1].transform.position = new Vector3((size + 2), 0, 0);
+        walls[2].transform.position = new Vector3(0, 0, (size + 2));
+        walls[3].transform.position = new Vector3(-(size + 2), 0, 0);
+
+        walls[0].transform.Rotate(new Vector3(90, 0, 0));
+        walls[1].transform.Rotate(new Vector3(0, 0, 90));
+        walls[2].transform.Rotate(new Vector3(90, 0, 0));
+        walls[3].transform.Rotate(new Vector3(0, 0, 90));
     }
 
     /// <summary>

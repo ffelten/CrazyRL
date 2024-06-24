@@ -38,7 +38,6 @@ public class CameraController : MonoBehaviour
 
     public GameObject[] walls = new GameObject[4];
 
-
     public GameObject test;
 
     /// <summary>

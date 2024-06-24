@@ -142,7 +142,7 @@ public class Client : MonoBehaviour
     private int nbDrone;
     private bool isInvoke = false;
     public TMP_InputField inputSpeed;
-    public float speed = 8;
+    public int speed = 10;
 
     /// <summary>
     /// Data data : Data being processed
@@ -270,16 +270,6 @@ public class Client : MonoBehaviour
                 buttonReset.interactable = true;
                 receiver.isButtonReset = false;
                 isConnect = false;
-
-                foreach (GameObject dr in drones)
-                {
-                    if (inputIp.text != "")
-                        speed = float.Parse(inputSpeed.text);
-                    dr.GetComponent<Drone>().speed = speed;
-                }
-                if (inputIp.text != "")
-                    speed = float.Parse(inputSpeed.text);
-                target.GetComponent<Drone>().speed = speed;
             }
             else
             {
@@ -288,13 +278,21 @@ public class Client : MonoBehaviour
         }
         else // not connected to the server
         {
-            
             if (IsRestart()) //can restart the simulation
             {
                 buttonReset.interactable = true;
             }
             else //can't restart the simulation
                 buttonReset.interactable = false;
+
+            foreach (GameObject dr in drones)
+            {
+                speed = int.Parse(inputSpeed.text);
+                dr.GetComponent<Drone>().speed = speed;
+            }
+
+            speed = int.Parse(inputSpeed.text);
+            target.GetComponent<Drone>().speed = speed;
         }
     }
 
@@ -346,8 +344,7 @@ public class Client : MonoBehaviour
     /// <param name="transform"> Tansform : transform of the object to be moved</param>
     void Movement(Data d, Transform transform)
     {
-        if (inputIp.text != "")
-            speed = float.Parse(inputSpeed.text);
+        speed = int.Parse(inputSpeed.text);
         transform.position = Vector3.Lerp(
             transform.position,
             new Vector3(d.posX, d.posY, d.posZ),

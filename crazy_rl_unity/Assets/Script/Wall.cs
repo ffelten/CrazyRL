@@ -21,7 +21,7 @@ public class Wall : MonoBehaviour
     /// <param name="other">Collider: collider of the object that has entered the wall collider</param>
     private void OnTriggerEnter(Collider other)
     {
-        if(other.tag == "Drone")
+        if (other.tag == "Drone")
         {
             GetComponent<MeshRenderer>().enabled = true;
         }

@@ -1,6 +1,6 @@
 # CRAZYRL UNITY
 
-CrazyRL Unity is a [Unity](https://unity.com/fr) project for bulding rendering engine of CrazyRL.
+CrazyRL Unity is a [Unity](https://unity.com/fr) project for building rendering engine of CrazyRL.
 
 ## Overview
 
@@ -41,11 +41,15 @@ This project is used for the `render_mode = "unity"` simulation of the [CrazyRL 
 
 ### Options Menu
 
+- Drones speed: Set the speed of the drones using input field.
+
 - Camera Settings: Change the camera's view angle using the buttons. The red arrow on the icon represents the camera direction.
 
 - Restart: Restart the simulation by first pressing the reset button (repositions the drones to their initial positions) and then the restart button (resumes the simulation).
 
 - Application Window Resolution: Change the application window's resolution using the dropdown menu.
+
+- Terrain Change: Switch the environment (natural or industrial) using the dropdown menu.
 
 - Quit Button: Exit the application without causing it to crash.
 
@@ -83,4 +87,3 @@ We use CSharpier for pre-commit formatting of our C# code to ensure consistent c
 
 - [.NET8 SDk](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) : `apt update && sudo apt install -y dotnet-sdk-8.0`
 - [Csharpier](https://csharpier.com/docs/Installation) : `dotnet tool install csharpier`
-

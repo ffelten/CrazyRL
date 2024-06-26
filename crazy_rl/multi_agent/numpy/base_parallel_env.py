@@ -415,7 +415,7 @@ class BaseParallelEnv(ParallelEnv):
             """
             data = {
                 "isInstantiate": self.is_instantiate,
-                "ndDrone": len(self.drone_ids),
+                "ndDrones": len(self.drone_ids),
                 "size": self.size * 5,
                 "id": int(id),
                 "posX": float(point[0] * 5),
@@ -447,8 +447,8 @@ class BaseParallelEnv(ParallelEnv):
         else:
             self.i = 0
             for agent in self._agent_location.values():
-                send_pos(np.array([agent[0], agent[1], agent[2]]), "Deplacement", self.drone_ids[self.i])
+                send_pos(np.array([agent[0], agent[1], agent[2]]), "Move", self.drone_ids[self.i])
                 self.i += 1
 
             for target in self._target_location.values():
-                send_pos(np.array([target[0], target[1], target[2]]), "Deplacement Target", len(self.drone_ids))
+                send_pos(np.array([target[0], target[1], target[2]]), "Move Target", len(self.drone_ids))

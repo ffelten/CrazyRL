@@ -8,7 +8,7 @@ public struct Data
 {
     /// <value>
     /// bool isInstantiate : true: instantiated drone, false: non-instantiated drone
-    /// int nbDrone : number of drones present in the scene (target not taken into account)
+    /// int nbDrones : number of drones present in the scene (target not taken into account)
     /// int size : size of the simulation zone
     /// int id : drone identifier
     /// float posX : drone's X coordinate
@@ -17,7 +17,7 @@ public struct Data
     /// string str : message to correctly process the data sent
     /// </value>
     public bool isInstantiate;
-    public int ndDrone;
+    public int ndDrones;
     public int size;
     public int id;
     public float posX;

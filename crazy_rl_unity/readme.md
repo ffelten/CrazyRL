@@ -15,11 +15,17 @@ This project is used for the `render_mode = "unity"` simulation of the [CrazyRL 
     - Packages: NuGet, JSON, and ZMQ packages are used for the client-server part of the project.
 - Executables: (Linux and Windows) located in the folder [crazy_rl/multi_agent/numpy/bin](https://github.com/ffelten/CrazyRL/tree/main/crazy_rl/multi_agent/numpy/bin)
 
+## Running the Application on Different Operating Systems
+
+By default, the application runs on Linux. If you want to run it on Windows, comment out line *subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Linux/CrazyRlUnity.x86_64")* and uncomment line *subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Window/CrazyRl_Unity.exe")* in the send_to_unity() function in [base_parallel_env.py](https://github.com/ffelten/CrazyRL/blob/main/crazy_rl/multi_agent/numpy/base_parallel_env.py).
+
 ## Features
 
 ### Connection Menu
 
-- Connection Settings: Change the IP and port used for communication with the server. By default, the IP address is *127.0.0.1* and the port is *5555*. Modify these in the send_to_unity() function in crazy_rl/multi_agent/numpy/base_parallel_env.py if needed.
+- Connection Settings: Change the IP and port used for communication with the server. By default, the IP address is *127.0.0.1* and the port is *5555*.
+    - If you want to  to change the IP address and port, modify these in the send_to_unity() function in [base_parallel_env.py](https://github.com/ffelten/CrazyRL/blob/main/crazy_rl/multi_agent/numpy/base_parallel_env.py) and enter the same IP and port in the input fields of the connection menu.
+    - If you want to change the default IP address and port, modify these in the send_to_unity() function in [base_parallel_env.py](https://github.com/ffelten/CrazyRL/blob/main/crazy_rl/multi_agent/numpy/base_parallel_env.py) and modify the ip and port attributes of the Client class in [Client.cs](https://github.com/ffelten/CrazyRL/tree/main/crazy_rl_unity/Assets/Script/Client.cs)
 
 - Connection Button: Connect to the server and access the simulation scene.
 

@@ -129,7 +129,7 @@ public class Client : MonoBehaviour
     /// GameObject target : GameObject Target
     /// GameObject prefab_drone : Prefab copied to create a drone
     /// GameObject prefab_target : Prefab copied to create a target
-    /// int nbDrone : Number of drones without the target
+    /// int nbDrones : Number of drones without the target
     /// bool isInvoke : indicates whether to continue retrieving data. true: data table is up to date , false : data table is not up to date
     /// float speed : speed of drone
     /// TMP_InputField inputSpeed : InputField to modify speed
@@ -139,7 +139,7 @@ public class Client : MonoBehaviour
     public GameObject target;
     public GameObject prefab_drone;
     public GameObject prefab_target;
-    private int nbDrone;
+    private int nbDrones;
     private bool isInvoke = false;
     public TMP_InputField inputSpeed;
     public int speed = 10;
@@ -209,9 +209,9 @@ public class Client : MonoBehaviour
             }
             else //Drones aren instantiated
             {
-                if (tabData.Length != nbDrone + 1)
+                if (tabData.Length != nbDrones + 1)
                 {
-                    tabData = new Data[nbDrone + 1];
+                    tabData = new Data[nbDrones + 1];
                 }
 
                 if (idTabData < tabData.Length - 1)
@@ -221,9 +221,9 @@ public class Client : MonoBehaviour
                         idTabData++;
                         tabData[idTabData] = data;
 
-                        if (data.str == "Deplacement")
+                        if (data.str == "Move")
                             SaveData(data, ref drones[data.id].GetComponent<Drone>().lisPos);
-                        else if (data.str == "Deplacement Target")
+                        else if (data.str == "Move Target")
                             SaveData(data, ref target.GetComponent<Drone>().lisPos);
 
                         isInvoke = true;
@@ -240,14 +240,14 @@ public class Client : MonoBehaviour
                 }
                 else
                 {
-                    for (int j = 0; j < nbDrone + 1; j++)
+                    for (int j = 0; j < nbDrones + 1; j++)
                     {
-                        if (tabData[j].str == "Deplacement")
+                        if (tabData[j].str == "Move")
                         {
                             Movement(tabData[j], drones[tabData[j].id].transform);
                             VerificationPos(tabData[j], drones[tabData[j].id]);
                         }
-                        else if (tabData[j].str == "Deplacement Target")
+                        else if (tabData[j].str == "Move Target")
                         {
                             Movement(tabData[j], target.transform);
                             VerificationPos(tabData[j], target);
@@ -306,11 +306,11 @@ public class Client : MonoBehaviour
         {
             if (d.str == "Instantiate") //treatment for a drone
             {
-                nbDrone = d.ndDrone;
-                if (drones.Length != nbDrone) //uninitialised table
+                nbDrones = d.ndDrones;
+                if (drones.Length != nbDrones) //uninitialised table
                 {
                     //initialisation of the drone array and recovery of the zone size
-                    drones = new GameObject[nbDrone];
+                    drones = new GameObject[nbDrones];
                     mainCamera.GetComponent<CameraController>().size = d.size;
                 }
                 //positions the drone in the right place and makes it a child of the parent GameObject in the unity hierarchy
@@ -389,7 +389,7 @@ public class Client : MonoBehaviour
     /// <returns>true: data can changed, false: data cannot changed</returns>
     bool IsChangeTabData()
     {
-        for (int k = 0; k < nbDrone; k++)
+        for (int k = 0; k < nbDrones; k++)
         {
             if (drones[k].GetComponent<Drone>().isPos == false)
                 return false;

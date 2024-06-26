@@ -17,7 +17,7 @@ from crazy_rl.multi_agent.numpy.base_parallel_env import (
 class Catch(BaseParallelEnv):
     """A Parallel Environment where drone learn how to surround a moving target trying to escape."""
 
-    metadata = {"render_modes": ["human", "real"], "is_parallelizable": True, "render_fps": 20}
+    metadata = {"render_modes": ["human", "real", "unity"], "is_parallelizable": True, "render_fps": 20}
 
     def __init__(
         self,
@@ -250,7 +250,7 @@ class Catch(BaseParallelEnv):
 if __name__ == "__main__":
     parallel_env = Catch(
         drone_ids=np.array([0, 1, 2, 3]),
-        render_mode="human",
+        render_mode="unity",
         init_flying_pos=np.array([[0, 0, 1], [1, 1, 1], [0, 1, 1], [2, 2, 1]]),
         init_target_location=np.array([1, 1, 2.5]),
         target_speed=0.1,
@@ -264,5 +264,6 @@ if __name__ == "__main__":
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
+        time.sleep(0.5)
         print("obs", observations, "reward", rewards)
         time.sleep(0.02)

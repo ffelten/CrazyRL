@@ -133,6 +133,7 @@ public class Client : MonoBehaviour
     /// bool isInvoke : indicates whether to continue retrieving data. true: data table is up to date , false : data table is not up to date
     /// float speed : speed of drone
     /// TMP_InputField inputSpeed : InputField to modify speed
+    /// int nbDrobesScene : number of drone in scene
     /// </summary>
     public GameObject parent;
     public GameObject[] drones;
@@ -143,6 +144,7 @@ public class Client : MonoBehaviour
     private bool isInvoke = false;
     public TMP_InputField inputSpeed;
     public int speed = 10;
+    int nbDronesScene = 0;
 
     /// <summary>
     /// Data data : Data being processed
@@ -196,7 +198,12 @@ public class Client : MonoBehaviour
     {
         if (isConnect) // connected to the server
         {
-            if (!data.isInstantiate) // Drones aren't instantiated
+            if (data.type == "init")
+            {
+                nbDrones = data.nbDrones;
+                mainCamera.GetComponent<CameraController>().size = data.size;
+            }
+            if (nbDronesScene <= nbDrones + 1) // Drones aren't instantiated
             {
                 if (!runOnMainThread.IsEmpty) //data still to be processed
                 {
@@ -204,6 +211,7 @@ public class Client : MonoBehaviour
                     {
                         action.Invoke();
                         Initiate(data);
+                        nbDronesScene += 1;
                     }
                 }
             }
@@ -221,9 +229,9 @@ public class Client : MonoBehaviour
                         idTabData++;
                         tabData[idTabData] = data;
 
-                        if (data.str == "Move")
+                        if (data.type == "Drone")
                             SaveData(data, ref drones[data.id].GetComponent<Drone>().lisPos);
-                        else if (data.str == "Move Target")
+                        else if (data.type == "Target")
                             SaveData(data, ref target.GetComponent<Drone>().lisPos);
 
                         isInvoke = true;
@@ -242,12 +250,12 @@ public class Client : MonoBehaviour
                 {
                     for (int j = 0; j < nbDrones + 1; j++)
                     {
-                        if (tabData[j].str == "Move")
+                        if (tabData[j].type == "Drone")
                         {
                             Movement(tabData[j], drones[tabData[j].id].transform);
                             VerificationPos(tabData[j], drones[tabData[j].id]);
                         }
-                        else if (tabData[j].str == "Move Target")
+                        else if (tabData[j].type == "Target")
                         {
                             Movement(tabData[j], target.transform);
                             VerificationPos(tabData[j], target);
@@ -291,8 +299,11 @@ public class Client : MonoBehaviour
                 dr.GetComponent<Drone>().speed = speed;
             }
 
-            speed = int.Parse(inputSpeed.text);
-            target.GetComponent<Drone>().speed = speed;
+            if (target != null)
+            {
+                speed = int.Parse(inputSpeed.text);
+                target.GetComponent<Drone>().speed = speed;
+            }
         }
     }
 
@@ -302,38 +313,33 @@ public class Client : MonoBehaviour
     /// <param name="d">Data: data being processed </param>
     void Initiate(Data d)
     {
-        if (!d.isInstantiate)
+        if (d.type == "Drone") //treatment for a drone
         {
-            if (d.str == "Instantiate") //treatment for a drone
+            if (drones.Length != nbDrones) //uninitialised table
             {
-                nbDrones = d.ndDrones;
-                if (drones.Length != nbDrones) //uninitialised table
-                {
-                    //initialisation of the drone array and recovery of the zone size
-                    drones = new GameObject[nbDrones];
-                    mainCamera.GetComponent<CameraController>().size = d.size;
-                }
-                //positions the drone in the right place and makes it a child of the parent GameObject in the unity hierarchy
-                Vector3 posInit = new Vector3(d.posX, d.posY, d.posZ);
-                Quaternion qua = new Quaternion(0, 0, 0, 0);
-                drones[d.id] = Instantiate(prefab_drone, posInit, qua, parent.transform);
-
-                //save the details for the next simulation if necessary
-                SaveData(d, ref drones[d.id].GetComponent<Drone>().lisPos);
+                //initialisation of the drone array and recovery of the zone size
+                drones = new GameObject[nbDrones];
             }
-            else if (d.str == "Target") //target treatment
-            {
-                //positions the target in the right place and makes it a child of the parent GameObject in the unity hierarchy
-                Vector3 posInit = new Vector3(d.posX, d.posY, d.posZ);
-                Quaternion qua = new Quaternion(0, 0, 0, 0);
-                target = Instantiate(prefab_target, posInit, qua, parent.transform);
+            //positions the drone in the right place and makes it a child of the parent GameObject in the unity hierarchy
+            Vector3 posInit = new Vector3(d.posX, d.posY, d.posZ);
+            Quaternion qua = new Quaternion(0, 0, 0, 0);
+            drones[d.id] = Instantiate(prefab_drone, posInit, qua, parent.transform);
 
-                //save the details for the next simulation if necessary
-                SaveData(d, ref target.GetComponent<Drone>().lisPos);
+            //save the details for the next simulation if necessary
+            SaveData(d, ref drones[d.id].GetComponent<Drone>().lisPos);
+        }
+        else if (d.type == "Target") //target treatment
+        {
+            //positions the target in the right place and makes it a child of the parent GameObject in the unity hierarchy
+            Vector3 posInit = new Vector3(d.posX, d.posY, d.posZ);
+            Quaternion qua = new Quaternion(0, 0, 0, 0);
+            target = Instantiate(prefab_target, posInit, qua, parent.transform);
 
-                //calculate and positions the camera in the right place
-                mainCamera.GetComponent<CameraController>().CalculPos();
-            }
+            //save the details for the next simulation if necessary
+            SaveData(d, ref target.GetComponent<Drone>().lisPos);
+
+            //calculate and positions the camera in the right place
+            mainCamera.GetComponent<CameraController>().CalculPos();
         }
     }
 

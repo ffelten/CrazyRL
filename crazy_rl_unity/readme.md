@@ -78,14 +78,13 @@ Client-server communication is provided by the ZMQ (ZeroMQ) library. The server 
 
 The data received by the client contains:
 
-- isInstantiate (bool): true if the drone is instantiated, false if the drone is not instantiated.
-- nbDrone (int): Number of drones present in the scene (targets not included).
+- nbDrones (int): Number of drones present in the scene (targets not included).
 - size (int): Size of the simulation area.
 - id (int): Identifier of the drone.
 - posX (float): X coordinate of the drone.
 - posY (float): Y coordinate of the drone.
 - posZ (float): Z coordinate of the drone.
-- str (string): Message to correctly process the sent data.
+- type (string): Message to correctly process the sent data (init -> set up env, Drone -> update drone, Target -> update target).
 
 ## Pre-Commit Formatting
 

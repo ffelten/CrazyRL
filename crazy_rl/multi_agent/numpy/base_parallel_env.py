@@ -143,7 +143,7 @@ class BaseParallelEnv(ParallelEnv):
             self.server = False
             self.socket = None
             self.i = 0
-            self.is_instantiate = False
+            self.is_setup = False
 
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
@@ -406,24 +406,32 @@ class BaseParallelEnv(ParallelEnv):
             self.socket = context.socket(zmq.REP)
             self.socket.bind("tcp://*:5555")
             self.server = True
+            self.is_setup = False
 
-        def send_pos(point, message, id):
+        def send_env():
+            self.is_setup = True
+            data = {
+                "nbDrones": len(self.drone_ids),
+                "size": self.size * 5,
+                "type": "init",
+            }
+            self.socket.recv()
+            # Send reply back to client (data)
+            self.socket.send_json(data)
+
+        def send_pos(point, type, id):
             """In Unity, the Y axis is up, whereas in the code, the Z axis is up.
 
             To get the right coordinates in Unity, you need to invert the Y and Z coordinates,
             so posY = z and posZ = y.
             """
             data = {
-                "isInstantiate": self.is_instantiate,
-                "ndDrones": len(self.drone_ids),
-                "size": self.size * 5,
                 "id": int(id),
                 "posX": float(point[0] * 5),
                 "posY": float(point[2] * 5),
                 "posZ": float(point[1] * 5),
-                "str": message,
+                "type": type,
             }
-            # Wait for next request from client
             self.socket.recv()
             # Send reply back to client (data)
             self.socket.send_json(data)
@@ -435,20 +443,14 @@ class BaseParallelEnv(ParallelEnv):
             """run with Window"""
             # subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Window/CrazyRl_Unity.exe")
 
-        if not self.is_instantiate:
-            self.i = 0
-            for agent in self._agent_location.values():
-                send_pos(np.array([agent[0], agent[1], agent[2]]), "Instantiate", self.drone_ids[self.i])
-                self.i += 1
+        if self.server:
+            if not self.is_setup:
+                send_env()
+            else:
+                self.i = 0
+                for agent in self._agent_location.values():
+                    send_pos(np.array([agent[0], agent[1], agent[2]]), "Drone", self.drone_ids[self.i])
+                    self.i += 1
 
-            for target in self._target_location.values():
-                send_pos(np.array([target[0], target[1], target[2]]), "Target", len(self.drone_ids))
-            self.is_instantiate = True
-        else:
-            self.i = 0
-            for agent in self._agent_location.values():
-                send_pos(np.array([agent[0], agent[1], agent[2]]), "Move", self.drone_ids[self.i])
-                self.i += 1
-
-            for target in self._target_location.values():
-                send_pos(np.array([target[0], target[1], target[2]]), "Move Target", len(self.drone_ids))
+                for target in self._target_location.values():
+                    send_pos(np.array([target[0], target[1], target[2]]), "Target", len(self.drone_ids))

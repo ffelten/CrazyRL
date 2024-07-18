@@ -17,7 +17,7 @@ from crazy_rl.multi_agent.numpy.base_parallel_env import (
 class Circle(BaseParallelEnv):
     """A Parallel Environment where drone learn how to perform a circle."""
 
-    metadata = {"render_modes": ["human", "real"], "is_parallelizable": True, "render_fps": 20}
+    metadata = {"render_modes": ["human", "real", "unity"], "is_parallelizable": True, "render_fps": 20}
 
     def __init__(
         self,
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
     parallel_env = Circle(
         drone_ids=np.array([0, 1]),
-        render_mode=None,
+        render_mode="unity",
         init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
     )
 
@@ -188,6 +188,7 @@ if __name__ == "__main__":
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
         parallel_env.render()
+        time.sleep(0.1)
 
         if global_step % 100 == 0:
             print("SPS:", int(global_step / (time.time() - start_time)))

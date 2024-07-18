@@ -54,7 +54,6 @@ public class Menu : MonoBehaviour
     /// <param name="selecctedIndex"> int : resolution number select by user</param>
     public void ChangeResolution(int selecctedIndex)
     {
-        Debug.Log(selecctedIndex);
         Screen.SetResolution(
             resolutions[selecctedIndex].width,
             resolutions[selecctedIndex].height,

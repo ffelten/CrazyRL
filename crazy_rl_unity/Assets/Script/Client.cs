@@ -126,10 +126,11 @@ public class Client : MonoBehaviour
     /// <summary>
     /// GameObject parent : GameObject empty will contain all the created GameObjects
     /// GameObject[] drones : list of drones
-    /// GameObject target : GameObject Target
+    /// GameObject[] targets : list of Target
     /// GameObject prefab_drone : Prefab copied to create a drone
     /// GameObject prefab_target : Prefab copied to create a target
     /// int nbDrones : Number of drones without the target
+    /// int nbTargets : number of targets
     /// bool isInvoke : indicates whether to continue retrieving data. true: data table is up to date , false : data table is not up to date
     /// float speed : speed of drone
     /// TMP_InputField inputSpeed : InputField to modify speed
@@ -137,10 +138,11 @@ public class Client : MonoBehaviour
     /// </summary>
     public GameObject parent;
     public GameObject[] drones;
-    public GameObject target;
+    public GameObject[] targets;
     public GameObject prefab_drone;
     public GameObject prefab_target;
     private int nbDrones;
+    private int nbTargets;
     private bool isInvoke = false;
     public TMP_InputField inputSpeed;
     public int speed = 10;
@@ -201,9 +203,10 @@ public class Client : MonoBehaviour
             if (data.type == "init")
             {
                 nbDrones = data.nbDrones;
+                nbTargets = data.nbTargets;
                 mainCamera.GetComponent<CameraController>().size = data.size;
             }
-            if (nbDronesScene <= nbDrones + 1) // Drones aren't instantiated
+            if (nbDronesScene <= nbDrones + nbTargets) // Drones aren't instantiated
             {
                 if (!runOnMainThread.IsEmpty) //data still to be processed
                 {
@@ -215,11 +218,13 @@ public class Client : MonoBehaviour
                     }
                 }
             }
-            else //Drones aren instantiated
+            else //Drones aren't instantiated
             {
-                if (tabData.Length != nbDrones + 1)
+                if (tabData.Length != drones.Length + targets.Length)
                 {
-                    tabData = new Data[nbDrones + 1];
+                    tabData = new Data[drones.Length + targets.Length];
+                    //calculate and positions the camera in the right place
+                    mainCamera.GetComponent<CameraController>().CalculPos();
                 }
 
                 if (idTabData < tabData.Length - 1)
@@ -232,7 +237,7 @@ public class Client : MonoBehaviour
                         if (data.type == "Drone")
                             SaveData(data, ref drones[data.id].GetComponent<Drone>().lisPos);
                         else if (data.type == "Target")
-                            SaveData(data, ref target.GetComponent<Drone>().lisPos);
+                            SaveData(data, ref targets[data.id].GetComponent<Drone>().lisPos);
 
                         isInvoke = true;
                     }
@@ -248,7 +253,7 @@ public class Client : MonoBehaviour
                 }
                 else
                 {
-                    for (int j = 0; j < nbDrones + 1; j++)
+                    for (int j = 0; j < drones.Length + targets.Length; j++)
                     {
                         if (tabData[j].type == "Drone")
                         {
@@ -257,8 +262,8 @@ public class Client : MonoBehaviour
                         }
                         else if (tabData[j].type == "Target")
                         {
-                            Movement(tabData[j], target.transform);
-                            VerificationPos(tabData[j], target);
+                            Movement(tabData[j], targets[tabData[j].id].transform);
+                            VerificationPos(tabData[j], targets[tabData[j].id]);
                         }
                     }
                     if (IsChangeTabData())
@@ -274,7 +279,9 @@ public class Client : MonoBehaviour
                 {
                     dr.GetComponent<Drone>().isFinish = true;
                 }
-                target.GetComponent<Drone>().isFinish = true;
+                foreach (GameObject tar in targets)
+                    tar.GetComponent<Drone>().isFinish = true;
+
                 buttonReset.interactable = true;
                 receiver.isButtonReset = false;
                 isConnect = false;
@@ -299,10 +306,10 @@ public class Client : MonoBehaviour
                 dr.GetComponent<Drone>().speed = speed;
             }
 
-            if (target != null)
+            foreach (GameObject tar in targets)
             {
                 speed = int.Parse(inputSpeed.text);
-                target.GetComponent<Drone>().speed = speed;
+                tar.GetComponent<Drone>().speed = speed;
             }
         }
     }
@@ -330,16 +337,19 @@ public class Client : MonoBehaviour
         }
         else if (d.type == "Target") //target treatment
         {
+            if (targets.Length != nbTargets) //uninitialised table
+            {
+                //initialisation of the target array and recovery of the zone size
+                targets = new GameObject[nbTargets];
+            }
             //positions the target in the right place and makes it a child of the parent GameObject in the unity hierarchy
             Vector3 posInit = new Vector3(d.posX, d.posY, d.posZ);
             Quaternion qua = new Quaternion(0, 0, 0, 0);
-            target = Instantiate(prefab_target, posInit, qua, parent.transform);
+            Debug.Log(d.id);
+            targets[d.id] = Instantiate(prefab_target, posInit, qua, parent.transform);
 
             //save the details for the next simulation if necessary
-            SaveData(d, ref target.GetComponent<Drone>().lisPos);
-
-            //calculate and positions the camera in the right place
-            mainCamera.GetComponent<CameraController>().CalculPos();
+            SaveData(d, ref targets[d.id].GetComponent<Drone>().lisPos);
         }
     }
 
@@ -400,8 +410,9 @@ public class Client : MonoBehaviour
             if (drones[k].GetComponent<Drone>().isPos == false)
                 return false;
         }
-        if (target.GetComponent<Drone>().isPos == false)
-            return false;
+        for (int k = 0; k < nbTargets; k++)
+            if (targets[k].GetComponent<Drone>().isPos == false)
+                return false;
 
         return true;
     }
@@ -429,7 +440,8 @@ public class Client : MonoBehaviour
         {
             dr.GetComponent<Drone>().ResetDrone();
         }
-        target.GetComponent<Drone>().ResetDrone();
+        foreach (GameObject tar in targets)
+            tar.GetComponent<Drone>().ResetDrone();
         buttonRestart.interactable = true;
     }
 
@@ -443,7 +455,8 @@ public class Client : MonoBehaviour
         {
             dr.GetComponent<Drone>().RestartDrone();
         }
-        target.GetComponent<Drone>().RestartDrone();
+        foreach (GameObject tar in targets)
+            tar.GetComponent<Drone>().RestartDrone();
     }
 
     /// <summary>
@@ -457,8 +470,8 @@ public class Client : MonoBehaviour
             if (!dr.GetComponent<Drone>().isFinish)
                 return false;
         }
-        if (target != null)
-            if (!target.GetComponent<Drone>().isFinish)
+        foreach (GameObject tar in targets)
+            if (!tar.GetComponent<Drone>().isFinish)
                 return false;
         return true;
     }
@@ -474,8 +487,13 @@ public class Client : MonoBehaviour
             NetMQConfig.Cleanup();
         }
         for (int i = 0; i < drones.Length; i++)
+        {
             Destroy(drones[i]);
-        Destroy(target);
+        }
+        for (int i = 0; i < targets.Length; i++)
+        {
+            Destroy(targets[i]);
+        }
     }
 
     /// <summary>

@@ -17,7 +17,7 @@ from crazy_rl.multi_agent.numpy.base_parallel_env import (
 class Hover(BaseParallelEnv):
     """A Parallel Environment where drone learn how to hover around a target point."""
 
-    metadata = {"render_modes": ["human", "real"], "is_parallelizable": True, "render_fps": 20}
+    metadata = {"render_modes": ["human", "real", "unity"], "is_parallelizable": True, "render_fps": 20}
 
     def __init__(
         self,
@@ -145,7 +145,7 @@ if __name__ == "__main__":
 
     parallel_env = Hover(
         drone_ids=np.array([0, 1]),
-        render_mode="human",
+        render_mode="unity",
         init_flying_pos=np.array([[0, 0, 1], [1, 1, 1]]),
     )
 
@@ -156,5 +156,6 @@ if __name__ == "__main__":
             agent: parallel_env.action_space(agent).sample() for agent in parallel_env.agents
         }  # this is where you would insert your policy
         observations, rewards, terminations, truncations, infos = parallel_env.step(actions)
+        time.sleep(0.2)
         print("obs", observations, "reward", rewards)
         time.sleep(0.02)

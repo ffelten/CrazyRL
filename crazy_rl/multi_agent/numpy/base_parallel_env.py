@@ -80,7 +80,7 @@ class BaseParallelEnv(ParallelEnv):
     """
 
     metadata = {
-        "render_modes": ["human", "real"],
+        "render_modes": ["human", "real", "unity"],
         "is_parallelizable": False,
         "render_fps": 10,
     }
@@ -140,6 +140,7 @@ class BaseParallelEnv(ParallelEnv):
                 print("Waiting for connection...")
         elif self.render_mode == "unity":
             self.drone_ids = drone_ids
+            self.target_id = target_id
             self.server = False
             self.socket = None
             self.i = 0
@@ -412,6 +413,7 @@ class BaseParallelEnv(ParallelEnv):
             self.is_setup = True
             data = {
                 "nbDrones": len(self.drone_ids),
+                "nbTargets": len(self._target_location),
                 "size": self.size * 5,
                 "type": "init",
             }
@@ -452,5 +454,7 @@ class BaseParallelEnv(ParallelEnv):
                     send_pos(np.array([agent[0], agent[1], agent[2]]), "Drone", self.drone_ids[self.i])
                     self.i += 1
 
+                self.i = 0
                 for target in self._target_location.values():
-                    send_pos(np.array([target[0], target[1], target[2]]), "Target", len(self.drone_ids))
+                    send_pos(np.array([target[0], target[1], target[2]]), "Target", self.i)
+                    self.i += 1

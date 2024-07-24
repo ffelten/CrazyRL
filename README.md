@@ -291,13 +291,15 @@ In some cases, an additional conflicting reward is also needed: maximizing the d
 If you use this code for your research, please cite this using:
 
 ```bibtex
-@misc{crazyrl,
-    author = {Florian Felten and Coline Ledez and Pierre-Yves Houitte and El-Ghazali Talbi and Grégoire Danoy},
-    title = {CrazyRL: A Multi-Agent Reinforcement Learning library for flying Crazyflie drones},
-    year = {2023},
-    publisher = {GitHub},
-    journal = {GitHub repository},
-    howpublished = {\url{https://github.com/ffelten/CrazyRL}},
+@phdthesis{felten_multi-objective_2024,
+	type = {{PhD} {Thesis}},
+	title = {Multi-{Objective} {Reinforcement} {Learning}},
+	url = {https://hdl.handle.net/10993/61488},
+	language = {English},
+	school = {Unilu - Université du Luxembourg [FSTM], Luxembourg},
+	author = {Felten, Florian},
+	month = jun,
+	year = {2024},
 }
 ```
 

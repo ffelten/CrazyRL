@@ -17,7 +17,7 @@ from crazy_rl.multi_agent.numpy.base_parallel_env import (
 class Surround(BaseParallelEnv):
     """A Parallel Environment where drone learn how to surround a target point."""
 
-    metadata = {"render_modes": ["human", "real"], "is_parallelizable": True, "render_fps": 20}
+    metadata = {"render_modes": ["human", "real", "unity"], "is_parallelizable": True, "render_fps": 20}
 
     def __init__(
         self,
@@ -212,7 +212,7 @@ class Surround(BaseParallelEnv):
 if __name__ == "__main__":
     parallel_env = Surround(
         drone_ids=np.array([0, 1, 2, 3, 4]),
-        render_mode=None,
+        render_mode="unity",
         init_flying_pos=np.array([[0, 0, 1], [2, 1, 1], [0, 1, 1], [2, 2, 1], [1, 0, 1]]),
         target_location=np.array([1, 1, 2.5]),
     )
@@ -233,6 +233,7 @@ if __name__ == "__main__":
 
                 global_step += 1
             observations, infos = parallel_env.reset()
+            time.sleep(0.1)
 
     durations = np.zeros(10)
 

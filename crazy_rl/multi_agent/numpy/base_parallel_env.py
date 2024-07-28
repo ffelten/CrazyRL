@@ -1,5 +1,6 @@
 """The Base environment inheriting from pettingZoo Parallel environment class."""
 import functools
+import subprocess
 import time
 from copy import copy
 from typing import Dict, Optional
@@ -8,6 +9,7 @@ from typing_extensions import override
 import numpy as np
 import numpy.typing as npt
 import pygame
+import zmq
 from cflib.crazyflie.swarm import Swarm
 from gymnasium import spaces
 from OpenGL.GL import (
@@ -78,7 +80,7 @@ class BaseParallelEnv(ParallelEnv):
     """
 
     metadata = {
-        "render_modes": ["human", "real"],
+        "render_modes": ["human", "real", "unity"],
         "is_parallelizable": False,
         "render_fps": 10,
     }
@@ -136,6 +138,13 @@ class BaseParallelEnv(ParallelEnv):
             while not self.swarm:
                 time.sleep(0.5)
                 print("Waiting for connection...")
+        elif self.render_mode == "unity":
+            self.drone_ids = drone_ids
+            self.target_id = target_id
+            self.server = False
+            self.socket = None
+            self.i = 0
+            self.is_setup = False
 
     def _observation_space(self, agent) -> spaces.Space:
         """Returns the observation space of the environment. Must be implemented in a subclass."""
@@ -269,6 +278,8 @@ class BaseParallelEnv(ParallelEnv):
     def render(self):
         if self.render_mode == "human" and self._mode == "simu":
             self._render_frame()
+        if self.render_mode == "unity":
+            self.send_to_unity()
 
     def _render_frame(self):
         """Renders the current frame of the environment. Only works in human rendering mode."""
@@ -384,3 +395,66 @@ class BaseParallelEnv(ParallelEnv):
                     agent_locs["agent_" + uri[-1]] = np.array(pos[uri])
 
             return target_loc, agent_locs
+
+    def send_to_unity(self):
+        """Starts the unity executable and sends it the data.
+
+        By default, the application runs under Linux. To run under Window, uncomment the subprocess.Popen(... .exe) line and comment out the subprocess.Popen(... .x86_64) line.
+        """
+
+        def init_serv():
+            context = zmq.Context()
+            self.socket = context.socket(zmq.REP)
+            self.socket.bind("tcp://*:5555")
+            self.server = True
+            self.is_setup = False
+
+        def send_env():
+            self.is_setup = True
+            data = {
+                "nbDrones": len(self.drone_ids),
+                "nbTargets": len(self._target_location),
+                "size": self.size * 5,
+                "type": "init",
+            }
+            self.socket.recv()
+            # Send reply back to client (data)
+            self.socket.send_json(data)
+
+        def send_pos(point, type, id):
+            """In Unity, the Y axis is up, whereas in the code, the Z axis is up.
+
+            To get the right coordinates in Unity, you need to invert the Y and Z coordinates,
+            so posY = z and posZ = y.
+            """
+            data = {
+                "id": int(id),
+                "posX": float(point[0] * 5),
+                "posY": float(point[2] * 5),
+                "posZ": float(point[1] * 5),
+                "type": type,
+            }
+            self.socket.recv()
+            # Send reply back to client (data)
+            self.socket.send_json(data)
+
+        if self.server is False and self.render_mode == "unity":
+            init_serv()
+            """run with Linux"""
+            subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Linux/CrazyRlUnity.x86_64")
+            """run with Window"""
+            # subprocess.Popen("./crazy_rl/multi_agent/numpy/bin/unity/Window/CrazyRl_Unity.exe")
+
+        if self.server:
+            if not self.is_setup:
+                send_env()
+            else:
+                self.i = 0
+                for agent in self._agent_location.values():
+                    send_pos(np.array([agent[0], agent[1], agent[2]]), "Drone", self.drone_ids[self.i])
+                    self.i += 1
+
+                self.i = 0
+                for target in self._target_location.values():
+                    send_pos(np.array([target[0], target[1], target[2]]), "Target", self.i)
+                    self.i += 1
